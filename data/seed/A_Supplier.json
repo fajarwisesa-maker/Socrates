@@ -1,0 +1,12 @@
+[
+  {"Supplier": "V-1001", "SupplierName": "PT Sumber Pangan Semarang", "CityName": "Semarang",
+   "YY1_SupplierRole": "PRIMARY", "YY1_DefaultIncoterm": "DDP",
+   "YY1_LeadTimeDays": null, "YY1_CapacityCartons": null, "YY1_PremiumPerCartonIDR": null},
+  {"Supplier": "V-2002", "SupplierName": "PT Agro Pangan Tangerang", "CityName": "Tangerang", "Region": "Jabodetabek",
+   "YY1_SupplierRole": "ALTERNATE", "YY1_DefaultIncoterm": "DDP",
+   "YY1_LeadTimeDays": 1, "YY1_CapacityCartons": 600, "YY1_PremiumPerCartonIDR": 15000,
+   "YY1_ApprovedMaterials": ["MG-2L"]},
+  {"Supplier": "F-3001", "SupplierName": "PT Lintas Cargo Nusantara",
+   "YY1_SupplierRole": "FORWARDER", "YY1_DefaultIncoterm": null,
+   "YY1_LeadTimeDays": null, "YY1_CapacityCartons": null, "YY1_PremiumPerCartonIDR": null}
+]

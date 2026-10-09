@@ -1,0 +1,5 @@
+[
+  {"FreightQuote": "Q-AIR-0001", "Mode": "AIR_CHARTER", "Material": "MG-2L", "DestinationPlant": "DC-CKR",
+   "PriceIDR": 31000000, "PricingBasis": "FLAT", "Coverage": "FULL_SHORTFALL",
+   "YY1_ArrivalDate": {"day": 2}, "YY1_Status": "QUOTED"}
+]

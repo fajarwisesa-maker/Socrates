@@ -1,0 +1,7 @@
+[
+  {"PurchaseOrder": "4500018231", "PurchaseOrderType": "NB", "Supplier": "V-1001",
+   "IncotermsClassification": "DDP", "DocumentCurrency": "IDR",
+   "YY1_Status": "OPEN", "YY1_ShipmentStatus": "IN_TRANSIT",
+   "YY1_Forwarder": "F-3001", "YY1_TransportLane": "SMG-JKT",
+   "YY1_CaseId": null, "YY1_ApprovalId": null}
+]

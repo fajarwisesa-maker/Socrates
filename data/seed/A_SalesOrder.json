@@ -1,0 +1,10 @@
+[
+  {"SalesOrder": "SO-7001", "SalesOrderType": "OR", "SoldToParty": "C-5001", "YY1_SoldToPartyName": "Mitra Retail Nusantara",
+   "YY1_Channel": "Modern Trade", "Material": "MG-2L", "RequestedQuantity": 700, "RequestedQuantityUnit": "CAR",
+   "Plant": "DC-CKR", "YY1_LoadingCutoffDateTime": {"day": 2, "time": "18:00"},
+   "YY1_PenaltyType": "OTIF_PENALTY", "YY1_PenaltyAmountIDR": 250000000, "YY1_Status": "OPEN"},
+  {"SalesOrder": "SO-7002", "SalesOrderType": "OR", "SoldToParty": "C-5002", "YY1_SoldToPartyName": "Grosir Sentosa",
+   "YY1_Channel": "Wholesale", "Material": "MG-2L", "RequestedQuantity": 300, "RequestedQuantityUnit": "CAR",
+   "Plant": "DC-CKR", "YY1_LoadingCutoffDateTime": {"day": 2, "time": "18:00"},
+   "YY1_PenaltyType": "LOST_MARGIN", "YY1_PenaltyAmountIDR": 90000000, "YY1_Status": "OPEN"}
+]

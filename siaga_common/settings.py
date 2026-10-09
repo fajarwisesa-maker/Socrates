@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     solver_url: str = Field("http://127.0.0.1:8002", alias="SOLVER_URL")
     case_api_url: str = Field("http://127.0.0.1:8000", alias="CASE_API_URL")
     sqlite_path: Path = Field(REPO_ROOT / "var" / "siaga.db", alias="SQLITE_PATH")
+    sap_db_path: Path = Field(REPO_ROOT / "var" / "sap_mock.db", alias="SAP_DB_PATH")
     audit_dir: Path = Field(REPO_ROOT / "var" / "audit", alias="AUDIT_DIR")
 
     # --- Agent loop limits (enforced in code, not by the model) ---

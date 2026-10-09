@@ -1,0 +1,6 @@
+[
+  {"PurchaseOrder": "4500018231", "PurchaseOrderItem": "10", "Material": "MG-2L", "Plant": "DC-CKR",
+   "OrderQuantity": 1200, "PurchaseOrderQuantityUnit": "CAR",
+   "YY1_ConfirmedQuantity": 1200,
+   "YY1_ScheduledDeliveryDateTime": {"day": 1, "time": "10:00"}}
+]

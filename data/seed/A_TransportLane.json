@@ -1,0 +1,10 @@
+[
+  {"TransportLane": "SMG-JKT", "Description": "Semarang -> Jakarta / Jabodetabek FTL", "Corridor": "Pantura",
+   "FromLocation": "Semarang", "ToLocation": "Jabodetabek", "ServedPlants": ["DC-CKR"],
+   "Mode": "FTL_TRUCK", "Carrier": "F-3001",
+   "CostPerTruckIDR": null, "CapacityPerTruckCartons": null, "TransitHours": null, "IsReversibleInternal": false},
+  {"TransportLane": "BDG-CKR", "Description": "Bandung DC -> Cikarang DC internal transfer", "Corridor": "Non-Pantura",
+   "FromLocation": "DC-BDG", "ToLocation": "DC-CKR", "ServedPlants": ["DC-CKR"],
+   "Mode": "FTL_TRUCK", "Carrier": null,
+   "CostPerTruckIDR": 1950000, "CapacityPerTruckCartons": 250, "TransitHours": 8, "IsReversibleInternal": true}
+]

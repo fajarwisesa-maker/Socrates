@@ -1,0 +1,6 @@
+[
+  {"Material": "MG-2L", "Plant": "DC-CKR", "MaterialBaseUnit": "CAR",
+   "OnHandQuantity": 200, "SafetyStockQuantity": 100, "InTransitQuantity": 0},
+  {"Material": "MG-2L", "Plant": "DC-BDG", "MaterialBaseUnit": "CAR",
+   "OnHandQuantity": 800, "SafetyStockQuantity": 400, "InTransitQuantity": 0}
+]

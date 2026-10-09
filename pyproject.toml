@@ -44,6 +44,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
 markers = [
     "aws: needs real AWS credentials and network to Bedrock (skipped unless SIAGA_RUN_AWS_TESTS=1)",
 ]

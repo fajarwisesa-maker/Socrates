@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev test lint fmt aws-check aws-probe seed demo demo-reset replay rehearse destroy
+.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock demo-inputs demo demo-reset replay rehearse destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -29,16 +29,22 @@ aws-check: ## Show AWS identity and ACTIVE Claude models in AWS_REGION
 aws-probe: ## Also prove tool use with a tiny Converse call per Sonnet model
 	$(UV) python scripts/aws_check.py --probe
 
+seed: ## Load seed data (data/seed) into the mock SAP SQLite DB; DAY0=YYYY-MM-DD optional
+	$(UV) python -m services.sap_mock.seed $(if $(DAY0),--day0 $(DAY0),)
+
+sap-mock: ## Run the mock S/4HANA API on :8001
+	$(UV) uvicorn --factory services.sap_mock.app:create_app --host 127.0.0.1 --port 8001 --reload
+
+demo-reset: ## Restore demo state (via the running mock SAP, else directly in SQLite)
+	$(UV) python scripts/demo_reset.py
+
+demo-inputs: ## Regenerate data/demo/forwarder_notice.pdf
+	$(UV) python scripts/make_demo_inputs.py
+
 # ---- Targets below are filled in by later phases ----
 define not_yet
 	@echo "'$@' is implemented in Phase $(1)."; exit 1
 endef
-
-seed: ## Load seed data into SQLite (Phase 1)
-	$(call not_yet,1)
-
-demo-reset: ## Restore mock SAP to seed state (Phase 1)
-	$(call not_yet,1)
 
 dev: ## Run mock SAP, solver, Case API and dashboard locally (Phase 5)
 	$(call not_yet,5)

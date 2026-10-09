@@ -10,7 +10,8 @@ and the decisions made. **Update it every phase.**
 | Phase | State |
 | --- | --- |
 | 0 Setup and check-in | scaffold done; **AWS access blocked** (see Open items) |
-| 1–8 | not started |
+| 1 Seed data + mock S/4HANA | done — awaiting checkpoint review |
+| 2–8 | not started |
 
 ## How to run
 
@@ -24,6 +25,15 @@ make aws-check               # STS identity + ACTIVE non-legacy Claude models in
 make aws-probe               # + one forced-tool Converse call per Sonnet model
 uv run python scripts/aws_check.py --model-id <id>   # one tiny Converse call
 SIAGA_RUN_AWS_TESTS=1 make test                     # include the live Bedrock test
+```
+
+Phase 1 (mock S/4HANA):
+
+```bash
+make seed [DAY0=2026-10-29]  # load data/seed into var/sap_mock.db (day 0 default: today WIB)
+make sap-mock                # mock S/4HANA on http://127.0.0.1:8001 (auto-seeds an empty DB)
+make demo-reset              # POST /admin/reset on the running mock, else re-seed SQLite
+make demo-inputs             # regenerate data/demo/forwarder_notice.pdf
 ```
 
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
@@ -41,7 +51,7 @@ See `.env.example` for the full list.
 | `REPLAY` | `0` | Phase 6 replay mode |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
 | `SAP_MOCK_URL` / `SOLVER_URL` / `CASE_API_URL` | `127.0.0.1:8001/8002/8000` | local services |
-| `SQLITE_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
+| `SQLITE_PATH` / `SAP_DB_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
 | `MAX_TOOL_CALLS` / `MAX_REPLANS` | `20` / `2` | enforced by the state machine |
 | `VERIFY_DELAY_SECONDS` | `60` | VERIFY timer |
 
@@ -64,7 +74,7 @@ agent/          state machine, stages, prompts/, providers/, tools/
 api/            Case API
 services/       sap_mock/, solver/
 policy/         .cedar policies + schema
-siaga_common/   settings and shared models
+siaga_common/   settings, timeline (day offsets <-> WIB/UTC), shared models
 data/           seed/, demo/ (inputs, precedents/), golden/ (replay recording)
 scripts/        operational scripts (aws_check.py, …)
 web/            Next.js dashboard (Phase 5)
@@ -127,8 +137,51 @@ tests/          pytest
    arrive late (day 3–4) and leave extra stock at DC-CKR; a planner may want to reverse
    part of the transfer later.
 
+### Phase 1 decisions (mock S/4HANA and data)
+
+- **Seed files are one JSON per OData entity set** (`data/seed/A_*.json`) in API field
+  shape, so the loader is a straight copy plus time resolution. S/4HANA field names where
+  natural; `YY1_*` marks custom extension fields (SAP key-user extensibility convention).
+  `null` = the brief gives no value (e.g. V-1001 lead time); nothing is invented except
+  identifiers (customer IDs `C-5001/5002`, forwarder `F-3001`, lanes `SMG-JKT`/`BDG-CKR`,
+  quote `Q-AIR-0001`).
+- **Relative times** (`{"day":1,"time":"10:00"}`) are resolved at seed/reset time against
+  day 0 = midnight WIB of the reset date (default today). Reset the demo on the day you
+  run it so that day 0 matches the case start date.
+- **Extra entity sets beyond the brief:** `A_Product`, `A_Plant`, `A_TransportLane`
+  (truck rate/capacity/transit/reversibility, Pantura vs non-Pantura corridor) and
+  `A_FreightQuote` (the air charter quote). Without them the agent would have no tool
+  source for those §2.1 numbers. The forwarder is an `A_Supplier` with role `FORWARDER`.
+- `A_SalesOrder` is flat (header + one material line) instead of header/item — simpler
+  for the agent, and every demo order has one line.
+- **Storage:** `SapStore` interface; SQLite impl uses a single generic table
+  `(entity_set, key) -> JSON`, which maps 1:1 to a single-table DynamoDB design (Phase 7).
+- **OData support:** `value` envelope + `@odata.context`, key lookup incl. composite keys
+  (`A_MaterialStock(Material='MG-2L',Plant='DC-CKR')`), `$filter` (eq/ne/gt/ge/lt/le,
+  and/or/not, parentheses, contains/startswith/endswith, unquoted ISO datetimes),
+  `$select`, `$top`, `$orderby` (nulls lowest). Errors are `{"error":{code,message}}`.
+- **Mock SAP does bookkeeping only.** `POST /StockTransfer` checks lane, truck capacity
+  and on-hand, moves stock (source on-hand ↓, destination in-transit ↑), status
+  `IN_TRANSIT`, ETA = now + lane transit hours, cost = trucks × lane rate. It does **not**
+  enforce safety stock — that is the Critic's business rule (tested).
+  `POST /A_PurchaseOrder` (deep insert `to_PurchaseOrderItem`) assigns numbers from
+  4500018232, confirms immediately up to the supplier's remaining capacity
+  (`PARTIALLY_CONFIRMED` beyond it), ETA = creation + supplier lead time, premium =
+  premium/carton × confirmed qty. Both accept an `IdempotencyKey` for safe retries.
+  Tier/approval checks live in the tool layer (Phase 3), not here.
+- **Forwarder PDF has no calendar date** so it never contradicts the demo timeline;
+  regenerate with `make demo-inputs`.
+- **PERCEIVE test set** vocabulary (causes, lanes `SMG-JKT`/`BDG-CKR`/`SBY-JKT`/`TPR-CKR`/
+  `MRK-BKS`) and scoring rules are in `data/demo/PERCEIVE_TESTSET.md`.
+- Precedents P-001 (Pantura flood, donor DC taken below safety stock → secondary miss),
+  P-002 (Cikampek toll closure), P-003 (Priok port strike) resemble the demo case.
+- **Starlette:** the TestClient deprecation warning about httpx is filtered in
+  pytest config.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
   `InvalidClientTokenId`. Model list + Converse check still to run.
 - `BEDROCK_MODEL_ID` not chosen yet.
+- Air charter "arrives day 2" has no time of day; the solver needs one to compare with
+  the day 2 18:00 cutoff (asked at the Phase 1 checkpoint).

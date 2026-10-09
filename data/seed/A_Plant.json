@@ -1,0 +1,5 @@
+[
+  {"Plant": "DC-CKR", "PlantName": "Cikarang DC", "YY1_Role": "Destination DC"},
+  {"Plant": "DC-BDG", "PlantName": "Bandung DC", "YY1_Role": "Donor DC (not on Pantura)"},
+  {"Plant": "DC-SMG", "PlantName": "Semarang", "YY1_Role": "Origin side"}
+]
