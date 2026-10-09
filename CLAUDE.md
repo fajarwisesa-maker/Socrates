@@ -10,8 +10,9 @@ and the decisions made. **Update it every phase.**
 | Phase | State |
 | --- | --- |
 | 0 Setup and check-in | scaffold done; **AWS access blocked** (see Open items) |
-| 1 Seed data + mock S/4HANA | done — awaiting checkpoint review |
-| 2–8 | not started |
+| 1 Seed data + mock S/4HANA | done |
+| 2 Solver and risk | done — awaiting checkpoint review |
+| 3–8 | not started |
 
 ## How to run
 
@@ -34,6 +35,13 @@ make seed [DAY0=2026-10-29]  # load data/seed into var/sap_mock.db (day 0 defaul
 make sap-mock                # mock S/4HANA on http://127.0.0.1:8001 (auto-seeds an empty DB)
 make demo-reset              # POST /admin/reset on the running mock, else re-seed SQLite
 make demo-inputs             # regenerate data/demo/forwarder_notice.pdf
+```
+
+Phase 2 (solver):
+
+```bash
+make solver                  # solver API on http://127.0.0.1:8002 (/risk /solve /compare /timing)
+make solver-demo [DAY0=…]    # risk + option A, B first solve, B replan from the seed data
 ```
 
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
@@ -113,7 +121,7 @@ tests/          pytest
   profile ID (prefers `apac.*`).
 - Legacy models (Claude Instant, v2, 3.x) are filtered out of the model list.
 
-### Business decisions (agreed with the product owner, Phase 0 check-in)
+### Business decisions (agreed with the product owner at the Phase 0–1 check-ins)
 
 1. **Exposure — store both.** `max_exposure` = full penalty / lost margin of every at-risk
    order (UI headline). `expected_exposure` = Σ stockout probability × penalty (used for
@@ -136,6 +144,16 @@ tests/          pytest
 6. **Original PO 4500018231: no action.** The case summary carries a Tier 0 note: it will
    arrive late (day 3–4) and leave extra stock at DC-CKR; a planner may want to reverse
    part of the transfer later.
+
+7. **Air charter delivery time** = day 2 12:00 at DC-CKR, stored in the seed quote
+   (`A_FreightQuote.YY1_DeliveryDateTime`), not a solver constant.
+8. **Bridge PO lead time counts from PO creation (= approval).** At plan time approval is
+   assumed immediate. The plan carries an "approve by" time per action (`dispatch_by`
+   = deadline − lead time; bridge PO: day 1 18:00). At approval time the agent re-checks
+   feasibility against the actual time (`POST /timing`); after the approve-by time the
+   plan is infeasible and the agent replans (tested in `test_solver.py`).
+9. **AWS credentials are in progress on the owner's side.** Build with the `fake` provider;
+   do not block on Bedrock before the end of Phase 4.
 
 ### Phase 1 decisions (mock S/4HANA and data)
 
@@ -178,10 +196,37 @@ tests/          pytest
 - **Starlette:** the TestClient deprecation warning about httpx is filtered in
   pytest config.
 
+### Phase 2 decisions (solver and risk)
+
+- **Solver is a pure function of its inputs** (`services/solver/models.py`); it never calls
+  SAP. `agent/tools/sap_to_solver.py` maps OData rows + the structured disruption to
+  solver inputs; tests and `make solver-demo` build inputs through the mock SAP API the
+  same way the agent will.
+- **Risk** (`risk.py`): delay distribution (`none` / `fixed` / `uniform`) vs each order's
+  cutoff; P(late) = P(D > cutoff − ETA). Scenarios of inbound shipments on time / late are
+  enumerated (independent delays); in each, stock available by the cutoff (on hand −
+  safety stock + on-time inbound) is allocated by cutoff, then penalty desc; an order is
+  missed unless filled in full (OTIF). `shortfall` assumes every at-risk inbound misses;
+  `deadline` = earliest cutoff with a shortfall. Both exposure figures are returned.
+- **MIP** (`mip.py`, PuLP/CBC, single thread, 10 s limit): integer trucks and cartons,
+  binary air (flat price covers up to the shortfall) and binary whole-order reschedule.
+  Options that cannot arrive by the deadline are excluded *before* solving and listed in
+  `excluded` with the reason. Constraints are typed: `safety_stock` (Critic) and
+  `exclude_supplier` (rejected bridge PO). A 1e-4 IDR/carton ε breaks ties toward moving
+  less stock; reported costs are recomputed from the solution, never from the objective.
+  Infeasible results carry a deterministic `infeasible_reason` (max coverable vs required).
+- `compare` gives saving vs a baseline and exposure avoided (max exposure minus penalties
+  accepted via reschedule). `timing` re-checks an action at the actual approval time.
+- One dispatch table (`operations.py`) serves FastAPI and the Lambda handler; the handler
+  accepts a direct `{"operation", "payload"}` invoke or an API Gateway proxy event.
+  How AgentCore Gateway invokes Lambda targets is to be verified in Phase 7.
+- Single shared deadline per solve (all demo orders share day 2 18:00); multi-cutoff
+  plans are out of scope for the prototype.
+- `siaga_common/money.py`: `format_idr(11400000) == "Rp 11.400.000"`.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
   `InvalidClientTokenId`. Model list + Converse check still to run.
-- `BEDROCK_MODEL_ID` not chosen yet.
-- Air charter "arrives day 2" has no time of day; the solver needs one to compare with
-  the day 2 18:00 cutoff (asked at the Phase 1 checkpoint).
+- `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
+  before the end of Phase 4).

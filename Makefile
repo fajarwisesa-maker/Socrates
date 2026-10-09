@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock demo-inputs demo demo-reset replay rehearse destroy
+.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo demo-inputs demo demo-reset replay rehearse destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -34,6 +34,12 @@ seed: ## Load seed data (data/seed) into the mock SAP SQLite DB; DAY0=YYYY-MM-DD
 
 sap-mock: ## Run the mock S/4HANA API on :8001
 	$(UV) uvicorn --factory services.sap_mock.app:create_app --host 127.0.0.1 --port 8001 --reload
+
+solver: ## Run the solver API on :8002
+	$(UV) uvicorn --factory services.solver.app:create_app --host 127.0.0.1 --port 8002 --reload
+
+solver-demo: ## Print risk + options A, B (first solve), B (replan) from the seed data
+	$(UV) python scripts/solver_demo.py $(if $(DAY0),--day0 $(DAY0),)
 
 demo-reset: ## Restore demo state (via the running mock SAP, else directly in SQLite)
 	$(UV) python scripts/demo_reset.py

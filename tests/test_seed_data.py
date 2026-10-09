@@ -66,7 +66,7 @@ def test_lanes_and_air_quote(sap):
     assert one(sap, "/A_TransportLane('SMG-JKT')")["Corridor"] == "Pantura"
     quote = one(sap, "/A_FreightQuote('Q-AIR-0001')")
     assert (quote["PriceIDR"], quote["PricingBasis"]) == (31_000_000, "FLAT")
-    assert quote["YY1_ArrivalDate"] == "2026-10-31"  # day 2
+    assert day_offset(DAY0, from_iso(quote["YY1_DeliveryDateTime"])) == (2, "12:00")
 
 
 def test_product_and_plants(sap):
