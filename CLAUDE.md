@@ -103,6 +103,30 @@ tests/          pytest
   profile ID (prefers `apac.*`).
 - Legacy models (Claude Instant, v2, 3.x) are filtered out of the model list.
 
+### Business decisions (agreed with the product owner, Phase 0 check-in)
+
+1. **Exposure — store both.** `max_exposure` = full penalty / lost margin of every at-risk
+   order (UI headline). `expected_exposure` = Σ stockout probability × penalty (used for
+   ranking and justification). Demo: both = Rp 340,000,000 (asserted in tests).
+2. **`reschedule_customer`** costs that order's full penalty or lost margin, is always
+   Tier 3, and applies to whole orders only (no partial reschedules).
+3. **Bridge PO rejected.** Keep the already-executed transfer. Replan the *remaining*
+   shortfall without V-2002 (counts as one replan); this will likely produce a new Tier 3
+   approval for air freight (the Rp 31M charter is a flat price regardless of quantity).
+   If no feasible plan remains or replans are exhausted, escalate the whole case to a
+   human. Rejection takes an optional free-text reason that the agent reads in the replan.
+4. **VERIFY success path:** mock SAP posts the transfer and confirms the PO on creation;
+   VERIFY passes if both exist with the expected quantities and projected supply at
+   DC-CKR covers the 1,000 cartons by the cutoff. Phase 6 adds a hidden
+   `POST /admin/inject` (e.g. `event=transfer_delayed`) that makes VERIFY fail and
+   reopens the case — not part of the main demo.
+5. **Time anchor.** Day 0 00:00 = midnight Asia/Jakarta (WIB, UTC+7) on the case start
+   date. Real timestamps are stored internally (UTC ISO-8601); the UI shows both forms,
+   e.g. "Day 2 18:00 · Sat 31 Oct WIB".
+6. **Original PO 4500018231: no action.** The case summary carries a Tier 0 note: it will
+   arrive late (day 3–4) and leave extra stock at DC-CKR; a planner may want to reverse
+   part of the transfer later.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
