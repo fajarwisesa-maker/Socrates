@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     audit_backend: Literal["local", "s3"] = Field("local", alias="AUDIT_BACKEND")
     kb_backend: Literal["local", "bedrock"] = Field("local", alias="KB_BACKEND")
     policy_backend: Literal["local", "agentcore"] = Field("local", alias="POLICY_BACKEND")
+    solver_backend: Literal["inprocess", "http", "lambda"] = Field(
+        "inprocess", alias="SOLVER_BACKEND"
+    )
 
     # --- Local service endpoints and paths ---
     sap_mock_url: str = Field("http://127.0.0.1:8001", alias="SAP_MOCK_URL")

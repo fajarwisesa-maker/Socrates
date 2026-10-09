@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo demo-inputs demo demo-reset replay rehearse destroy
+.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-reset replay rehearse destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -40,6 +40,9 @@ solver: ## Run the solver API on :8002
 
 solver-demo: ## Print risk + options A, B (first solve), B (replan) from the seed data
 	$(UV) python scripts/solver_demo.py $(if $(DAY0),--day0 $(DAY0),)
+
+policy-demo: ## Show Tier 2 allowed, Tier 3 blocked/approved, Rp 60M escalated + audit chain
+	$(UV) python scripts/policy_demo.py
 
 demo-reset: ## Restore demo state (via the running mock SAP, else directly in SQLite)
 	$(UV) python scripts/demo_reset.py

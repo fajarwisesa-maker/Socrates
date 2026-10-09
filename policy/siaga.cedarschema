@@ -1,0 +1,14 @@
+entity Agent;
+entity Case;
+
+type ToolContext = {
+  observe_only: Bool,
+  draft_only: Bool,
+  internal: Bool,
+  reversible: Bool,
+  external_commitment: Bool,
+  spot_air: Bool,
+  sla_change: Bool,
+  amount_idr: Long,
+  has_approval: Bool,
+};

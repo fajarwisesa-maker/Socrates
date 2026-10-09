@@ -37,6 +37,8 @@ from services.solver.models import (
 
 EPSILON = 1e-4
 TIME_LIMIT_S = 10
+# Note: do not pass threads=1 together with timeLimit to CBC 2.10 (PuLP 2.9 bundle): that
+# combination intermittently stalls until the time limit (seen ~1 in 20 solves).
 
 
 def _int(v: float | None) -> int:
@@ -115,7 +117,7 @@ def solve(req: SolveRequest) -> SolveResult:
     prob += pulp.lpSum(cost_terms) + EPSILON * pulp.lpSum(move_terms)
     prob += pulp.lpSum(cover_terms) >= req.required_quantity, "cover_shortfall"
 
-    status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=TIME_LIMIT_S, threads=1))
+    status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=TIME_LIMIT_S))
     solve_ms = round((time.perf_counter() - t0) * 1000, 1)
 
     base = dict(
@@ -125,14 +127,19 @@ def solve(req: SolveRequest) -> SolveResult:
         excluded=excluded,
         solve_ms=solve_ms,
     )
-    if pulp.LpStatus[status] != "Optimal":
+    # sol_status distinguishes a proven optimum from a time-limited incumbent.
+    if pulp.LpStatus[status] != "Optimal" or prob.sol_status != pulp.LpSolutionOptimal:
         return SolveResult(
             status="infeasible",
             covered_quantity=0,
             total_cost=0,
             actions=[],
             stock_after=[],
-            infeasible_reason=_infeasible_reason(req, transfers, bridges, airs, resched),
+            infeasible_reason=(
+                _infeasible_reason(req, transfers, bridges, airs, resched)
+                if pulp.LpStatus[status] == "Infeasible"
+                else f"solver stopped without a proven optimum ({pulp.LpStatus[status]})"
+            ),
             **base,
         )
 

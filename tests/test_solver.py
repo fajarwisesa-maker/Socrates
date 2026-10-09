@@ -261,3 +261,15 @@ def test_allocation_protects_higher_penalty_order_first():
 def test_no_shortfall_when_inbound_is_on_time():
     r = assess(_req(100))
     assert r.shortfall == 0 and r.deadline is None and r.max_exposure == 0
+
+
+def test_solver_latency_is_stable(plan):
+    """Regression: CBC with threads=1 + timeLimit stalled ~1 in 20 solves for 10 s."""
+    import time
+
+    worst = 0.0
+    for _ in range(40):
+        t0 = time.perf_counter()
+        assert plan(B, [SafetyStockConstraint()]).total_cost == 11_400_000
+        worst = max(worst, time.perf_counter() - t0)
+    assert worst < 2.0

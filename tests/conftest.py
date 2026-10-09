@@ -86,3 +86,35 @@ def plan(risk, sapdata):
         return req if request_only else solve(req)
 
     return _plan
+
+
+# ---- agent runtime wired to the in-memory mock SAP, local policy/audit/store/KB ----
+
+
+@pytest.fixture
+def runtime(sap, tmp_path):
+    from agent.audit import LocalAuditWriter
+    from agent.case_store import SqliteCaseStore
+    from agent.clients import HttpSapClient, InProcessSolver
+    from agent.runtime import build_runtime
+    from siaga_common.settings import Settings
+
+    clock = lambda: NOW  # noqa: E731
+    return build_runtime(
+        Settings(_env_file=None),
+        sap=HttpSapClient(client=sap),
+        solver=InProcessSolver(),
+        store=SqliteCaseStore(":memory:", clock),
+        audit=LocalAuditWriter(tmp_path / "audit", clock),
+        clock=clock,
+    )
+
+
+@pytest.fixture
+def case(runtime):
+    return runtime.store.create_case(case_id="case-test", day0="2026-10-28T17:00:00Z")
+
+
+@pytest.fixture
+def ctx(runtime, case):
+    return runtime.context(case.case_id)

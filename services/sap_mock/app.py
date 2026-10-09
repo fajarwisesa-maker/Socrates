@@ -7,6 +7,8 @@ Reads (any entity set in store.KEYS):
 Actions:
     POST /StockTransfer        internal DC-to-DC transfer (posts immediately, IN_TRANSIT)
     POST /A_PurchaseOrder      create PO (deep insert of items; supplier confirms at once)
+    POST /FreightOrder         book a quoted air charter (quote -> BOOKED)
+    POST /SalesOrderReschedule move a sales order's loading cutoff (status RESCHEDULED)
 Admin:
     POST /admin/reset          restore the seed state (optional {"day0": "YYYY-MM-DD"})
     GET  /admin/state          day 0 and entity counts
@@ -77,6 +79,25 @@ class PurchaseOrderIn(BaseModel):
     YY1_CaseId: str | None = None
     YY1_ApprovalId: str | None = None
     IdempotencyKey: str | None = None
+
+
+class FreightOrderIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    FreightQuote: str
+    Quantity: int = Field(gt=0)
+    YY1_CaseId: str | None = None
+    YY1_ApprovalId: str | None = None
+    IdempotencyKey: str | None = None
+
+
+class SalesOrderRescheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    SalesOrder: str
+    NewLoadingCutoffDateTime: datetime | None = None
+    YY1_CaseId: str | None = None
+    YY1_ApprovalId: str | None = None
 
 
 class ResetIn(BaseModel):
@@ -283,6 +304,65 @@ def create_app(
         return JSONResponse(
             odata.entity("A_PurchaseOrder", {**po, "to_PurchaseOrderItem": items}), status_code=201
         )
+
+    @app.post("/FreightOrder", status_code=201)
+    def create_freight_order(body: FreightOrderIn) -> JSONResponse:
+        with store.transaction():
+            if body.IdempotencyKey and (
+                hit := _find_by(store, "FreightOrder", "IdempotencyKey", body.IdempotencyKey)
+            ):
+                return JSONResponse(odata.entity("FreightOrder", hit), status_code=200)
+            quote = store.get("A_FreightQuote", body.FreightQuote)
+            if quote is None or quote["YY1_Status"] != "QUOTED":
+                raise SapError(400, "BadQuote", f"{body.FreightQuote} is not an open quote")
+            dst = store.get("A_MaterialStock", f"{quote['Material']}|{quote['DestinationPlant']}")
+            n = store.next_number("FreightOrder", 1)
+            fo = {
+                "FreightOrder": f"FO-{n:06d}",
+                "FreightQuote": body.FreightQuote,
+                "Mode": quote["Mode"],
+                "Material": quote["Material"],
+                "DestinationPlant": quote["DestinationPlant"],
+                "Quantity": body.Quantity,
+                "PriceIDR": quote["PriceIDR"],
+                "Status": "BOOKED",
+                "PlannedArrivalDateTime": quote["YY1_DeliveryDateTime"],
+                "BookedDateTime": to_iso(now()),
+                "YY1_CaseId": body.YY1_CaseId,
+                "YY1_ApprovalId": body.YY1_ApprovalId,
+                "IdempotencyKey": body.IdempotencyKey,
+            }
+            store.put("A_FreightQuote", {**quote, "YY1_Status": "BOOKED"})
+            if dst is not None:
+                store.put(
+                    "A_MaterialStock",
+                    {**dst, "InTransitQuantity": dst["InTransitQuantity"] + body.Quantity},
+                )
+            store.put("FreightOrder", fo)
+        return JSONResponse(odata.entity("FreightOrder", fo), status_code=201)
+
+    @app.post("/SalesOrderReschedule")
+    def reschedule_sales_order(body: SalesOrderRescheduleIn) -> dict[str, Any]:
+        with store.transaction():
+            so = store.get("A_SalesOrder", body.SalesOrder)
+            if so is None:
+                raise SapError(404, "NotFound", f"sales order {body.SalesOrder} does not exist")
+            if so["YY1_Status"] != "OPEN":
+                raise SapError(400, "NotOpen", f"{body.SalesOrder} is {so['YY1_Status']}")
+            so = {
+                **so,
+                "YY1_Status": "RESCHEDULED",
+                "YY1_OriginalLoadingCutoffDateTime": so["YY1_LoadingCutoffDateTime"],
+                "YY1_LoadingCutoffDateTime": (
+                    to_iso(body.NewLoadingCutoffDateTime)
+                    if body.NewLoadingCutoffDateTime
+                    else so["YY1_LoadingCutoffDateTime"]
+                ),
+                "YY1_CaseId": body.YY1_CaseId,
+                "YY1_ApprovalId": body.YY1_ApprovalId,
+            }
+            store.put("A_SalesOrder", so)
+        return odata.entity("A_SalesOrder", so)
 
     # ----- generic reads (registered last so the routes above win) -----
 

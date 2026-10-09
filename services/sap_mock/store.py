@@ -29,6 +29,7 @@ KEYS: dict[str, tuple[str, ...]] = {
     "A_TransportLane": ("TransportLane",),
     "A_FreightQuote": ("FreightQuote",),
     "StockTransfer": ("StockTransfer",),
+    "FreightOrder": ("FreightOrder",),
 }
 
 

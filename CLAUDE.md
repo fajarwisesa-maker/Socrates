@@ -11,8 +11,9 @@ and the decisions made. **Update it every phase.**
 | --- | --- |
 | 0 Setup and check-in | scaffold done; **AWS access blocked** (see Open items) |
 | 1 Seed data + mock S/4HANA | done |
-| 2 Solver and risk | done — awaiting checkpoint review |
-| 3–8 | not started |
+| 2 Solver and risk | done |
+| 3 Tool layer, policy, audit, case store | done — awaiting checkpoint review |
+| 4–8 | not started |
 
 ## How to run
 
@@ -44,6 +45,13 @@ make solver                  # solver API on http://127.0.0.1:8002 (/risk /solve
 make solver-demo [DAY0=…]    # risk + option A, B first solve, B replan from the seed data
 ```
 
+Phase 3 (tools, policy, audit):
+
+```bash
+make policy-demo             # Tier 2 allowed, Tier 3 blocked then approved, Rp 60M escalated
+                             # + the case's hash-chained audit trail and its verification
+```
+
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
 
 ## Environment variables
@@ -58,6 +66,7 @@ See `.env.example` for the full list.
 | `AWS_REGION` | `ap-southeast-1` | |
 | `REPLAY` | `0` | Phase 6 replay mode |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
+| `SOLVER_BACKEND` | `inprocess` | `inprocess` \| `http` (`SOLVER_URL`) \| `lambda` (Phase 7) |
 | `SAP_MOCK_URL` / `SOLVER_URL` / `CASE_API_URL` | `127.0.0.1:8001/8002/8000` | local services |
 | `SQLITE_PATH` / `SAP_DB_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
 | `MAX_TOOL_CALLS` / `MAX_REPLANS` | `20` / `2` | enforced by the state machine |
@@ -223,6 +232,58 @@ tests/          pytest
 - Single shared deadline per solve (all demo orders share day 2 18:00); multi-cutoff
   plans are out of scope for the prototype.
 - `siaga_common/money.py`: `format_idr(11400000) == "Rp 11.400.000"`.
+
+### Phase 3 decisions (tool layer, policy, audit, case store)
+
+- **Call path** (`agent/tools/base.py` `ToolRegistry.invoke`): budget check → argument
+  validation → tier assessment in code → approval lookup → Cedar `authorize()` → tool
+  `run()` (which re-checks its tier in code) → audit. Denials, errors, bad arguments and
+  budget exhaustion return a structured `ToolCallResult`; nothing raises into the agent.
+- **Tier mapping per tool:** each tool declares `policy_context(args)` — facts computed
+  from its arguments and SAP data (`observe_only`, `draft_only`, `internal`, `reversible`,
+  `external_commitment`, `spot_air`, `sla_change`, `amount_idr`). The LLM never supplies
+  these. `classify()` maps facts → tier 0–3 (brief §2.3) for the in-code check; Cedar
+  decides independently from the same facts. An exhaustive test (768 combinations ×
+  3 amounts) proves the two agree.
+- **Cedar** (`policy/siaga.cedar`): four permits (tier0-observe, tier1-draft,
+  tier2-execute, tier3-approved) and four Tier 3 forbids (amount ≥ Rp 50M, spot air,
+  SLA change, external commitment) each `unless { context.has_approval }`; default deny
+  for anything else. Every policy has an `@id`; decisions report those ids. Policies are
+  validated against `policy/siaga.cedarschema` + an action list generated from the
+  registry. Principal `Agent::"siaga"`, resource `Case::"<id>"`, action = tool name.
+  How AgentCore Policy names principals/actions is to be verified in Phase 7.
+- **Approvals bind to exact arguments**: an approval carries tool + canonical-JSON hash of
+  the arguments; `has_approval` is true only for an APPROVED request with the same hash.
+  The approval ID is the SAP idempotency key, so a retried Tier 3 call never duplicates
+  a PO / freight order.
+- **Defence in depth:** `Tool.guard()` at the top of every action tool recomputes the tier
+  and looks up the approval itself; tested with a misconfigured allow-all policy engine
+  and with direct `run()` calls.
+- **Budget:** the registry refuses the call that would exceed `MAX_TOOL_CALLS`
+  (`budget_exceeded`, not counted). Every attempted call counts, including denials.
+- **Tools** (11): Tier 0 `find_inbound_purchase_orders`, `assess_impact` (SAP reads +
+  risk function), `search_precedents`, `simulate_option` (solver, using the case's risk;
+  requirement reduced by supply already executed in the case), `get_action_status`,
+  `request_human_approval` (alert only; refuses actions that are not Tier 3);
+  Tier 1 `draft_rfq`; actions `execute_stock_transfer` (2 or 3),
+  `create_purchase_order`, `book_spot_air`, `reschedule_customer_order` (always 3).
+  Action tools and `request_human_approval` are not offered to the LLM
+  (`llm_visible=False`): ACT executes the chosen solver plan in code. `Tool.spec()` gives
+  the Bedrock Converse `toolSpec` (later the Gateway tool definition).
+- **Mock SAP additions:** `POST /FreightOrder` (book the air quote; quote → BOOKED, stock
+  in transit) and `POST /SalesOrderReschedule` (SO → RESCHEDULED), so every Tier 3
+  action has something real to execute.
+- **Audit** (`agent/audit.py`): JSONL per case, `hash = sha256(canonical entry without
+  hash)`, chained by `prev_hash` from a zero genesis; `verify()` reports the first broken
+  entry. Kinds: `policy_decision`, `tool_call`, `approval` (stage transitions come with
+  the state machine in Phase 4).
+- **Case store** (`agent/case_store.py`): `CaseRecord` working memory, events with
+  per-case `seq` for `?after=` polling, approvals. SQLite now; DynamoDB in Phase 7.
+- **KB:** local BM25 over title (×2), tags (×2) and body; the demo query ranks P-001 first.
+- **CBC stall fix:** `PULP_CBC_CMD(threads=1, timeLimit=…)` stalled for the full time limit
+  in ~1 of 20 solves. `threads` is no longer passed (200/200 solves ≤ 14 ms; regression
+  test added), and a time-limited, unproven solution is reported as not optimal.
+- `make demo-reset` also clears the local case store.
 
 ## Open items
 
