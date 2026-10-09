@@ -695,10 +695,14 @@ class Agent:
         clean = {
             f["option_id"] for f in self.store.get_case(case.case_id).critic_findings if f["clean"]
         }
+        # Compare against a different plan (comparing air with an earlier air option says
+        # nothing, e.g. after a rejected bridge PO).
         others = [
             o
             for o in case.solver_results
-            if o["option_id"] != chosen["option_id"] and o["option_id"] in clean
+            if o["option_id"] != chosen["option_id"]
+            and o["option_id"] in clean
+            and o["strategies"] != chosen["strategies"]
         ]
         baseline = next(
             (o for o in reversed(others) if o["strategies"] == ["spot_air"]),

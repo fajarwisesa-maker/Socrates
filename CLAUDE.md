@@ -14,7 +14,8 @@ and the decisions made. **Update it every phase.**
 | 2 Solver and risk | done |
 | 3 Tool layer, policy, audit, case store | done |
 | 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
-| 5–8 | not started |
+| 5 Case API and dashboard | done — awaiting checkpoint review |
+| 6–8 | not started |
 
 ## How to run
 
@@ -64,6 +65,21 @@ uv run python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
     [--auto-approve] [--verify-delay N]
 ```
 
+Phase 5 (Case API + dashboard):
+
+```bash
+make install                 # once: Python deps, pre-commit, web/ npm ci
+make dev                     # mock SAP :8001 + Case API :8000 + dashboard :3000 (Ctrl-C stops all)
+                             # LLM per .env; LLM_PROVIDER=fake make dev for the scripted LLM
+open http://localhost:3000   # Load demo WhatsApp -> Load forwarder PDF -> Start case -> Approve
+make api / make web          # one at a time (EMBEDDED_SAP=1 make api: no separate mock SAP)
+make web-check               # tsc + eslint + production build
+make web-smoke               # Playwright: full demo + reject path on a production build,
+                             # with its own API/ports; screenshots in web/e2e/screenshots/
+```
+
+Screenshots of a full local run (fake LLM): `docs/screenshots/`.
+
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
 
 ## Environment variables
@@ -80,6 +96,8 @@ See `.env.example` for the full list.
 | `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |
 | `LLM_TEMPERATURE` | `0` | sent to Bedrock; dropped automatically if the model rejects it; `off` = never |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
+| `EMBEDDED_SAP` | `0` | Case API runs the mock S/4HANA in-process |
+| `SIAGA_API_URL` (web) | `http://127.0.0.1:8000` | where the dashboard's `/api/*` rewrite points |
 | `SOLVER_BACKEND` | `inprocess` | `inprocess` \| `http` (`SOLVER_URL`) \| `lambda` (Phase 7) |
 | `SAP_MOCK_URL` / `SOLVER_URL` / `CASE_API_URL` | `127.0.0.1:8001/8002/8000` | local services |
 | `SQLITE_PATH` / `SAP_DB_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
@@ -349,6 +367,40 @@ tests/          pytest
   production PERCEIVE path and the scoring rules of `data/demo/PERCEIVE_TESTSET.md`.
 - `scripts/aws_check.py --probe` now uses `toolChoice` auto and reports whether each model
   accepts temperature 0.
+
+### Phase 5 decisions (Case API and dashboard)
+
+- **Case API** (`api/app.py`): the endpoints of brief §Phase 5, plus `GET /cases`,
+  `GET /cases/{id}/audit` (entries + chain verification), `GET /config` (provider and
+  replay flag for UI badges) and `GET /demo/inputs/{whatsapp,pdf}` (preload buttons).
+  `POST /cases` and approval decisions return 202; the agent runs in a thread pool with
+  a lock per case; a scheduler thread fires VERIFY when `verify_due_at` passes.
+  Approval preconditions are checked synchronously (409 if the case is not waiting or
+  the approval is not pending). `POST /demo/reset` resets SAP and clears cases.
+- **SAP for the API:** HTTP to `SAP_MOCK_URL` by default (`make dev` runs the mock on
+  :8001); `EMBEDDED_SAP=1` runs it in-process (`services/sap_mock/embedded.py`).
+- **Dashboard** (`web/`, Next.js 16.4 App Router + TS + Tailwind 4): one page, a server
+  `page.tsx` rendering a client `Dashboard` that polls `/cases/{id}` and
+  `/events?after=` every second and stops once the case is finished. Browser traffic goes
+  to `/api/*`, rewritten to the Case API (`SIAGA_API_URL`), so no CORS is needed.
+  Panels: signal inbox (with demo preload), live 7-stage timeline (status, elapsed time,
+  expandable details + event log), impact, options comparison (A vs B1 rejected vs B2
+  replan; cost, latest ETA, max tier, outcome), approval cards (approve / reject with
+  reason; SAP number after approval), agent explanation, audit trail (hash-chain status),
+  demo clock (signal → verified, "~3 days → minutes"). It reloads into the latest case.
+- **Formatting:** `web/lib/format.ts` mirrors `money.py` / `timeline.py`
+  (`Rp 11.400.000`, `Day 2 18:00 · Sat 31 Oct WIB`). UI text is English; signal text and
+  evidence quotes keep the original Bahasa (`lang="id"`, italic).
+- **Next 16 specifics** (read from `node_modules/next/dist/docs` as `web/AGENTS.md` asks):
+  Cache Components is on, so client components must not read `Date.now()` during render
+  (clocks start in an effect); only one `next dev` per directory, so the smoke test builds
+  into its own `distDir` (`SIAGA_DIST_DIR=.next-smoke`) and runs `next start`;
+  `allowedDevOrigins: ["127.0.0.1"]`; dev indicator off; system fonts only (no Google
+  Fonts download, the demo laptop may be offline).
+- **Comparison baseline** skips options with the same strategies as the chosen one (so a
+  replan to air after a rejected bridge PO shows no "saving vs air").
+- **Playwright** `@playwright/test` is pinned to 1.56.1 to match the preinstalled
+  Chromium; on a laptop run `npx playwright install chromium` once.
 
 ## Open items
 

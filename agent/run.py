@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-import warnings
 from pathlib import Path
 
 import httpx
@@ -46,16 +45,9 @@ COLOUR = {
 
 
 def embedded_sap() -> HttpSapClient:
-    warnings.filterwarnings("ignore", message="Using `httpx` with `starlette.testclient`")
-    from fastapi.testclient import TestClient
+    from services.sap_mock.embedded import embedded_sap as make
 
-    from services.sap_mock.app import create_app
-    from services.sap_mock.seed import reset_store
-    from services.sap_mock.store import SqliteSapStore
-
-    store = SqliteSapStore(":memory:")
-    reset_store(store)
-    return HttpSapClient(client=TestClient(create_app(store)))
+    return make()[0]
 
 
 def main(argv: list[str] | None = None) -> int:

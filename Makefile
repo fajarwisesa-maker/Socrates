@@ -3,14 +3,15 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay rehearse destroy
+.PHONY: help install dev api web web-check web-smoke test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay rehearse destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
-install: ## Install Python deps and pre-commit hook
+install: ## Install Python + web deps and the pre-commit hook
 	uv sync
 	$(UV) pre-commit install
+	cd web && npm ci
 
 test: ## Run the test suite
 	$(UV) pytest -q
@@ -55,8 +56,24 @@ define not_yet
 	@echo "'$@' is implemented in Phase $(1)."; exit 1
 endef
 
-dev: ## Run mock SAP, solver, Case API and dashboard locally (Phase 5)
-	$(call not_yet,5)
+api: ## Run the Case API on :8000 (EMBEDDED_SAP=1 to skip the separate mock SAP)
+	$(UV) uvicorn --factory api.app:create_app --host 127.0.0.1 --port 8000
+
+web: ## Run the dashboard on :3000 (proxies /api to SIAGA_API_URL, default :8000)
+	cd web && npm run dev
+
+web-check: ## Typecheck, lint and production-build the dashboard
+	cd web && npx tsc --noEmit && npx eslint . && npx next build
+
+web-smoke: ## Playwright smoke test of the full demo (starts its own API + dashboard)
+	./scripts/web_smoke.sh
+
+dev: ## Run mock SAP (:8001), Case API (:8000) and dashboard (:3000) together; Ctrl-C stops all
+	@trap 'kill 0' INT TERM EXIT; \
+	$(UV) uvicorn --factory services.sap_mock.app:create_app --host 127.0.0.1 --port 8001 & \
+	$(UV) uvicorn --factory api.app:create_app --host 127.0.0.1 --port 8000 & \
+	(cd web && npm run dev) & \
+	wait
 
 demo: ## Run the demo case from the CLI (LLM per .env; auto-approve; VERIFY after 5 s)
 	$(UV) python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \

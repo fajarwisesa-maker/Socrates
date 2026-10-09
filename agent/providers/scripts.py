@@ -137,8 +137,12 @@ def reflect(req: LLMRequest, n: int) -> dict[str, Any]:
             f"cutoff, putting {cmp['max_exposure_display']} at risk. SIAGA recommends option "
             f"{chosen} at {cmp['chosen_cost_display']}.",
             "recommendation_rationale": f"Option {chosen} covers the full shortfall before the "
-            f"cutoff, keeps every donor DC at its safety stock, and saves "
-            f"{cmp.get('saving_display', 'n/a')} against the air charter.",
+            "cutoff and keeps every donor DC at its safety stock"
+            + (
+                f", saving {cmp['saving_display']} against option {cmp['baseline']}."
+                if "saving_display" in cmp
+                else "."
+            ),
             "rejected_options": rejected,
             "risks": ["The bridge PO must be approved before its approve-by time."],
         },

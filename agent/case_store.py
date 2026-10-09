@@ -100,6 +100,7 @@ def args_hash(tool: str, args: dict[str, Any]) -> str:
 class CaseStore(Protocol):
     def create_case(self, **fields: Any) -> CaseRecord: ...
     def get_case(self, case_id: str) -> CaseRecord: ...
+    def list_cases(self, status: str | None = None) -> list[CaseRecord]: ...
     def update_case(self, case_id: str, **fields: Any) -> CaseRecord: ...
     def increment_tool_calls(self, case_id: str) -> int: ...
     def append_event(
@@ -176,6 +177,14 @@ class SqliteCaseStore:
         if not hit:
             raise NotFound(case_id)
         return CaseRecord.model_validate_json(hit[0])
+
+    def list_cases(self, status: str | None = None) -> list[CaseRecord]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM cases").fetchall()
+        cases = [CaseRecord.model_validate_json(d) for (d,) in rows]
+        if status:
+            cases = [c for c in cases if c.status == status]
+        return sorted(cases, key=lambda c: c.created_at, reverse=True)
 
     def update_case(self, case_id: str, **fields: Any) -> CaseRecord:
         with self._lock:

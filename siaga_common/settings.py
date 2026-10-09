@@ -44,6 +44,8 @@ class Settings(BaseSettings):
 
     # --- Local service endpoints and paths ---
     sap_mock_url: str = Field("http://127.0.0.1:8001", alias="SAP_MOCK_URL")
+    # Case API only: run the mock S/4HANA in-process instead of calling SAP_MOCK_URL.
+    embedded_sap: bool = Field(False, alias="EMBEDDED_SAP")
     solver_url: str = Field("http://127.0.0.1:8002", alias="SOLVER_URL")
     case_api_url: str = Field("http://127.0.0.1:8000", alias="CASE_API_URL")
     sqlite_path: Path = Field(REPO_ROOT / "var" / "siaga.db", alias="SQLITE_PATH")
