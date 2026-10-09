@@ -47,8 +47,19 @@ class CaseRecord(BaseModel):
     approvals: list[str] = []
     notes: list[dict[str, Any]] = []
     tool_call_count: int = 0
+    llm_call_count: int = 0
     replan_count: int = 0
+    plan_round: int = 0
+    stage: str | None = None
     stage_timestamps: dict[str, dict[str, str]] = {}
+    constraints: list[dict[str, Any]] = []
+    ruled_out_strategies: list[str] = []
+    rejection_reasons: list[str] = []
+    chosen_option: str | None = None
+    explanation: dict[str, Any] | None = None
+    summary: dict[str, Any] | None = None
+    verify_due_at: str | None = None
+    verification: dict[str, Any] | None = None
     escalation_reason: str | None = None
 
 

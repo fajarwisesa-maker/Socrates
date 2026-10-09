@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     bedrock_model_id: str | None = Field(None, alias="BEDROCK_MODEL_ID")
     aws_region: str = Field("ap-southeast-1", alias="AWS_REGION")
     replay: bool = Field(False, alias="REPLAY")
+    # Brief: temperature 0. Current Claude models reject non-default sampling parameters;
+    # the Bedrock provider then drops it automatically. "off" never sends it.
+    llm_temperature: str = Field("0", alias="LLM_TEMPERATURE")
+    replay_path: Path = Field(REPO_ROOT / "data" / "golden" / "llm.jsonl", alias="REPLAY_PATH")
+    llm_record_path: Path | None = Field(None, alias="LLM_RECORD_PATH")
 
     # --- Backends (local now, AWS in Phase 7) ---
     case_store: Literal["sqlite", "dynamodb"] = Field("sqlite", alias="CASE_STORE")

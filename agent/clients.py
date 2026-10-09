@@ -84,6 +84,10 @@ class HttpSapClient:
     def post(self, path: str, body: dict[str, Any]) -> Row:
         return self._check(self.http.post(path, json=body))
 
+    def day0(self) -> str | None:
+        """Mock-SAP only: the demo's day 0 (display anchor for the timeline)."""
+        return self._check(self.http.get("/admin/state")).get("day0")
+
 
 class SolverClient(Protocol):
     def risk(self, req: RiskRequest) -> RiskResult: ...

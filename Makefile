@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-reset replay rehearse destroy
+.PHONY: help install dev test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay rehearse destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -58,8 +58,16 @@ endef
 dev: ## Run mock SAP, solver, Case API and dashboard locally (Phase 5)
 	$(call not_yet,5)
 
-demo: ## Run the demo case from the CLI (Phase 4)
-	$(call not_yet,4)
+demo: ## Run the demo case from the CLI (LLM per .env; auto-approve; VERIFY after 5 s)
+	$(UV) python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
+		--pdf data/demo/forwarder_notice.pdf --auto-approve --verify-delay 5
+
+demo-fake: ## Same with the scripted fake LLM (no AWS needed)
+	$(UV) python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
+		--pdf data/demo/forwarder_notice.pdf --auto-approve --verify-delay 1 --provider fake
+
+eval-perceive: ## PERCEIVE accuracy on data/demo/perceive_testset.jsonl (needs Bedrock)
+	$(UV) python scripts/eval_perceive.py
 
 replay: ## Run the full system on the recorded golden run (Phase 6)
 	$(call not_yet,6)

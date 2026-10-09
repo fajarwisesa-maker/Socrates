@@ -6,7 +6,9 @@ Usage:
     uv run python scripts/aws_check.py --model-id X    # one tiny Converse + tool-use call on X
 
 `list-foundation-models` does not report tool-use support, so "supports tool use" is
-proven empirically: a Converse call with a forced tool must come back as a toolUse block.
+proven empirically: a Converse call offering one tool (toolChoice auto - current Claude
+models reject forced tool choice) must come back as a toolUse block. temperature=0 is
+tried first; if the model rejects it the probe retries without and reports that.
 """
 
 from __future__ import annotations
@@ -77,13 +79,24 @@ def invocation_id(model: dict) -> str:
 
 def converse_ping(region: str, model_id: str) -> dict:
     client = boto3.client("bedrock-runtime", region_name=region)
+    kwargs = {
+        "modelId": model_id,
+        "system": [{"text": "You are a connectivity probe. Always answer by calling the tool."}],
+        "messages": [{"role": "user", "content": [{"text": "Call report_status with status ok."}]}],
+        "inferenceConfig": {"maxTokens": 256, "temperature": 0},
+        "toolConfig": {"tools": [PING_TOOL], "toolChoice": {"auto": {}}},
+    }
+    temperature_ok = True
     t0 = time.perf_counter()
-    resp = client.converse(
-        modelId=model_id,
-        messages=[{"role": "user", "content": [{"text": "Call report_status with status ok."}]}],
-        inferenceConfig={"maxTokens": 64, "temperature": 0},
-        toolConfig={"tools": [PING_TOOL], "toolChoice": {"tool": {"name": "report_status"}}},
-    )
+    try:
+        resp = client.converse(**kwargs)
+    except ClientError as e:
+        if "temperature" not in e.response["Error"].get("Message", "").lower():
+            raise
+        temperature_ok = False
+        del kwargs["inferenceConfig"]["temperature"]
+        t0 = time.perf_counter()
+        resp = client.converse(**kwargs)
     elapsed = time.perf_counter() - t0
     blocks = resp["output"]["message"]["content"]
     tool_use = next((b["toolUse"] for b in blocks if "toolUse" in b), None)
@@ -91,6 +104,7 @@ def converse_ping(region: str, model_id: str) -> dict:
         "model_id": model_id,
         "latency_s": round(elapsed, 2),
         "stop_reason": resp["stopReason"],
+        "temperature_0_accepted": temperature_ok,
         "tool_use": tool_use and {"name": tool_use["name"], "input": tool_use["input"]},
         "usage": resp.get("usage"),
     }
@@ -100,6 +114,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--region", default=None)
     ap.add_argument("--probe", action="store_true", help="probe tool use on every Sonnet model")
+    ap.add_argument("--all", action="store_true", help="with --probe: every Claude model")
     ap.add_argument("--model-id", help="make one tiny Converse + tool call with this ID")
     args = ap.parse_args()
 
@@ -122,15 +137,16 @@ def main() -> int:
                 f"profiles={','.join(m['_profiles']) or '-'}"
             )
         if args.probe:
-            print("\nTool-use probe (forced toolChoice, temperature 0):")
+            print("\nTool-use probe (toolChoice auto; temperature 0 if accepted):")
             for m in models:
-                if "sonnet" not in m["modelId"].lower():
+                if not args.all and "sonnet" not in m["modelId"].lower():
                     continue
                 mid = invocation_id(m)
                 try:
                     r = converse_ping(region, mid)
                     ok = bool(r["tool_use"])
-                    print(f"  {'OK ' if ok else 'NO '} {mid:<55} {r['latency_s']}s")
+                    temp = "" if r["temperature_0_accepted"] else "  (temperature rejected)"
+                    print(f"  {'OK ' if ok else 'NO '} {mid:<55} {r['latency_s']}s{temp}")
                 except ClientError as e:
                     err = e.response["Error"]
                     print(f"  ERR {mid:<55} {err['Code']}: {err['Message'][:90]}")

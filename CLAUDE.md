@@ -12,8 +12,9 @@ and the decisions made. **Update it every phase.**
 | 0 Setup and check-in | scaffold done; **AWS access blocked** (see Open items) |
 | 1 Seed data + mock S/4HANA | done |
 | 2 Solver and risk | done |
-| 3 Tool layer, policy, audit, case store | done — awaiting checkpoint review |
-| 4–8 | not started |
+| 3 Tool layer, policy, audit, case store | done |
+| 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
+| 5–8 | not started |
 
 ## How to run
 
@@ -52,6 +53,17 @@ make policy-demo             # Tier 2 allowed, Tier 3 blocked then approved, Rp 
                              # + the case's hash-chained audit trail and its verification
 ```
 
+Phase 4 (agent):
+
+```bash
+make demo-fake               # full case with the scripted LLM, embedded mock SAP, auto-approve
+make demo                    # same with the LLM from .env (Bedrock once credentials exist)
+make eval-perceive           # PERCEIVE accuracy on the 20-item test set (needs Bedrock)
+uv run python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
+    --pdf data/demo/forwarder_notice.pdf [--provider fake|bedrock|replay] [--embedded-sap] \
+    [--auto-approve] [--verify-delay N]
+```
+
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
 
 ## Environment variables
@@ -64,7 +76,9 @@ See `.env.example` for the full list.
 | `LLM_PROVIDER` | `bedrock` | `bedrock` \| `fake` \| `replay` |
 | `BEDROCK_MODEL_ID` | **none** | model or inference-profile ID; no default in code by design |
 | `AWS_REGION` | `ap-southeast-1` | |
-| `REPLAY` | `0` | Phase 6 replay mode |
+| `REPLAY` / `REPLAY_PATH` | `0` / `data/golden/llm.jsonl` | replay recorded LLM responses (no network) |
+| `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |
+| `LLM_TEMPERATURE` | `0` | sent to Bedrock; dropped automatically if the model rejects it; `off` = never |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
 | `SOLVER_BACKEND` | `inprocess` | `inprocess` \| `http` (`SOLVER_URL`) \| `lambda` (Phase 7) |
 | `SAP_MOCK_URL` / `SOLVER_URL` / `CASE_API_URL` | `127.0.0.1:8001/8002/8000` | local services |
@@ -285,9 +299,62 @@ tests/          pytest
   test added), and a time-limited, unproven solution is reported as not optimal.
 - `make demo-reset` also clears the local case store.
 
+### Phase 4 decisions (agent state machine)
+
+- **`agent/machine.py`** runs PERCEIVE → ASSESS → PLAN → SIMULATE → REFLECT → (replan →
+  PLAN …) → ACT → VERIFY. Legal transitions are a table; `_enter()` refuses anything else.
+  Every stage writes `started`/`completed` events (with elapsed time), every tool and LLM
+  call writes an event, and stage transitions and LLM calls are audited too.
+- **What the LLM does:** PERCEIVE (structured disruption via `report_disruption`),
+  ASSESS (chooses `find_inbound_purchase_orders` / `assess_impact` calls), PLAN
+  (`search_precedents`, then `propose_candidates` — strategies only, no numbers),
+  REFLECT (`write_explanation` of results it is given, amounts pre-formatted).
+  **What code does:** SIMULATE (one solver call per candidate with the active
+  constraints), the Critic rules, option selection, ACT, VERIFY, approvals, replans.
+- **Code guards on the LLM:** structured outputs are validated with Pydantic; an invalid
+  or missing tool call gets the validation error back, plus one nudge; 5 turns max, then
+  escalate. ASSESS rejects an `assess_impact` call whose delay differs from PERCEIVE's;
+  if the model never completes ASSESS, a deterministic fallback makes the same two calls
+  (visible as an event). Strategies the planner ruled out are stripped from candidates.
+- **Critic** (`agent/critic.py`): feasible, safety_stock, incoterm (DDP only),
+  supplier_capacity, cutoff_met, tier_mapping. **Selection:** cheapest feasible option of
+  the round; if it violates a rule that a solver constraint fixes (safety_stock →
+  `safety_stock`, incoterm → `exclude_supplier`), add the constraint and replan; if the
+  replan cap is reached or nothing can fix it, escalate. Options are named
+  `<letter><round>`: A1/B1 first round, A2/B2 after the replan.
+- **Comparison baseline** = the latest clean spot-air-only option (else the most
+  expensive clean option); saving and exposure avoided come from the solver's `compare`.
+- **ACT:** each chosen action is mapped to a tool call in code (`agent/actions.py`); its
+  tier is computed dry; Tier ≤ 2 executes through the registry, Tier 3 raises an approval
+  with a card (what, why, cost, alternatives, if rejected, approve by). Tier 0 note added
+  for each delayed PO (decision 6).
+- **Approvals:** approve → timing re-check at the actual time (solver `/timing`) → execute
+  or mark EXPIRED and replan; reject → keep executed actions, `exclude_supplier` (bridge)
+  or rule out the strategy (air / reschedule), store the reason for the PLAN prompt,
+  replan the remaining shortfall. Replans from rejections count toward the cap.
+- **VERIFY:** reads SAP status of every executed action; passes if quantities, statuses
+  and ETAs match and usable stock + secured supply ≥ demand; otherwise re-opens the case.
+  `verify_due_at` = now + `VERIFY_DELAY_SECONDS`; the CLI sleeps, the Case API (Phase 5)
+  will schedule it.
+- **Escalations** (case → ESCALATED with a reason): budget exhausted, replan cap, no
+  feasible option, invalid LLM output, LLM unavailable, unexpected internal error.
+- **Providers** (`agent/providers/`): `bedrock` (boto3 Converse; `toolChoice` always
+  `auto` because current Claude models reject forced tool choice; `temperature` 0 sent
+  and auto-dropped if rejected; adaptive retries), `fake` (scripts in
+  `providers/scripts.py` that read the request like the model would — used by tests and
+  `make demo-fake`), `replay` + `RecordingProvider` (JSONL per purpose; Phase 6 golden run).
+- **Prompts** are `agent/prompts/<stage>.v<N>.md`; the version used is recorded with
+  every LLM call in the audit trail.
+- **PERCEIVE eval** (`agent/perceive_eval.py`, `make eval-perceive`) reuses the
+  production PERCEIVE path and the scoring rules of `data/demo/PERCEIVE_TESTSET.md`.
+- `scripts/aws_check.py --probe` now uses `toolChoice` auto and reports whether each model
+  accepts temperature 0.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
-  `InvalidClientTokenId`. Model list + Converse check still to run.
+  `InvalidClientTokenId`. Still to run once they exist: `make aws-probe`, pick the model,
+  `make eval-perceive` (target ≥ 18/20), `make demo` with Bedrock ×3 for stability and
+  per-stage timings.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).
