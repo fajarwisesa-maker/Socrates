@@ -76,3 +76,9 @@ export function dayShort(day0Iso: string | null | undefined, iso: string | null 
   const full = dayLabel(day0Iso, iso);
   return full.includes("·") ? `${full.split(" · ")[0]} WIB` : full;
 }
+
+/** 252 -> "4m 12s" (the real elapsed time in the final line). */
+export function minutesSeconds(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}m ${(s % 60).toString().padStart(2, "0")}s`;
+}

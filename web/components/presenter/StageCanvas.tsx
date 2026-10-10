@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { stageRounds } from "@/lib/present";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { ActCanvas } from "./canvases/Act";
@@ -25,6 +26,7 @@ export function StageCanvas({
   record: CaseRecord;
   onDecided: () => void;
 }) {
+  const reduce = useReducedMotion();
   const evs = stageRounds(events, stage)[round - 1] ?? [];
   const last = evs.at(-1);
   const retrying = last?.status === "retry";
@@ -45,12 +47,18 @@ export function StageCanvas({
       case "ACT":
         return <ActCanvas record={record} round={round} onDecided={onDecided} />;
       case "VERIFY":
-        return <VerifyCanvas record={record} round={round} />;
+        return <VerifyCanvas record={record} events={events} round={round} />;
     }
   })();
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    // each step slides in as the previous one collapses into the rail
+    <motion.div
+      className="relative flex h-full min-h-0 flex-col"
+      initial={reduce ? false : { opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+    >
       <div className="min-h-0 flex-1">{body}</div>
       {retrying && (
         <p className="mt-3 flex items-center gap-2 text-xl text-ink-2" data-testid="retry-note">
@@ -69,6 +77,6 @@ export function StageCanvas({
           </span>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

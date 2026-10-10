@@ -70,7 +70,7 @@ test("rejecting the bridge PO replans the remaining shortfall to air", async ({ 
 
 test("presenter mode: rail, impact meter and clock follow the case", async ({ page }) => {
   await page.request.post("/api/demo/reset");
-  await page.goto("/?mode=presenter");
+  await page.goto("/?mode=presenter&auto=1"); // no dwell: the view follows the agent
   await expect(page.getByTestId("start-canvas")).toBeVisible();
   await page.getByTestId("load-whatsapp").click();
   await page.getByTestId("load-pdf").click();
@@ -99,4 +99,59 @@ test("presenter mode: rail, impact meter and clock follow the case", async ({ pa
   await expect(page.getByTestId("timeline")).toBeVisible();
   await page.keyboard.press("p");
   await expect(page.getByTestId("presenter")).toBeVisible();
+});
+
+test("presenter pacing: dwell, Space, H and R walk the story without re-running the agent", async ({ page }) => {
+  await page.request.post("/api/demo/reset");
+  await page.goto("/?mode=presenter&dwell=30"); // long dwell: only the keys move the view
+  await page.getByTestId("load-whatsapp").click();
+  await page.getByTestId("load-pdf").click();
+  await page.getByTestId("presenter-start").click();
+  const canvas = page.getByTestId("stage-canvas");
+  await expect(canvas).toHaveAttribute("data-stage", "PERCEIVE");
+  // the agent is already waiting for approval, but the view and the meter have not run ahead
+  await expect(page.getByTestId("next-step")).toContainText("Next: Assess", { timeout: 30_000 });
+  await expect(page.getByTestId("meter-at-risk")).toContainText("—");
+  await expect(page.getByTestId("evidence-links").locator("path")).toHaveCount(5);
+
+  await page.keyboard.press("Space");
+  await expect(canvas).toHaveAttribute("data-stage", "ASSESS");
+  await expect(page.getByTestId("meter-at-risk")).toContainText("Rp 340 jt");
+  await page.keyboard.press("h");
+  await expect(page.getByTestId("held")).toBeVisible();
+  // stages ahead of the narration are not clickable on the rail; → steps forward
+  await expect(page.getByTestId("rail-REFLECT").getByRole("button")).toBeDisabled();
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+  await expect(canvas).toHaveAttribute("data-stage", "REFLECT");
+  await expect(canvas).toHaveAttribute("data-round", "1");
+  await expect(page.getByTestId("rejected-stamp")).toBeVisible();
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+  await expect(canvas).toHaveAttribute("data-round", "2");
+  await expect(page.getByTestId("meter-plan-cost")).toContainText("Rp 11,4 jt");
+  // clicking the shown stage on the rail steps back through its rounds
+  await page.getByTestId("rail-REFLECT").getByRole("button").click();
+  await expect(canvas).toHaveAttribute("data-round", "1");
+  await page.keyboard.press("r"); // restart the view (the agent is not re-run)
+  await expect(canvas).toHaveAttribute("data-stage", "PERCEIVE");
+  await page.keyboard.press("h");
+  await page.getByTestId("follow-live").click(); // shown while held
+  await expect(canvas).toHaveAttribute("data-stage", "ACT");
+  await page.keyboard.press("r");
+  await page.keyboard.press("l"); // L jumps to live too
+  await expect(canvas).toHaveAttribute("data-stage", "ACT");
+});
+
+test.describe("reduced motion", () => {
+  test.use({ contextOptions: { reducedMotion: "reduce" } });
+  test("presenter: the story still lands, without movement", async ({ page }) => {
+  await page.request.post("/api/demo/reset");
+  await page.goto("/?mode=presenter&auto=1");
+  await page.getByTestId("load-whatsapp").click();
+  await page.getByTestId("load-pdf").click();
+  await page.getByTestId("presenter-start").click();
+  await expect(page.getByTestId("presenter-approve")).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId("presenter-approve").click();
+  await expect(page.getByTestId("final-line")).toHaveText("Rp 340 jt protected for Rp 11,4 jt", { timeout: 60_000 });
+  await expect(page.getByTestId("time-line")).toContainText("3 days");
+  });
 });

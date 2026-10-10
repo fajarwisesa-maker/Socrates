@@ -1,4 +1,7 @@
+"use client";
+
 import { RotateCcw, ShieldCheck, XCircle } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { juta } from "@/lib/format";
 import { stageRounds } from "@/lib/present";
 import type { CaseEvent, CaseRecord, CriticFinding } from "@/lib/types";
@@ -7,6 +10,7 @@ import { Frame } from "./Frame";
 
 /** The Critic's verdict on the cheapest plan of a round (all rules run in code). */
 export function ReflectCanvas({ record, events, round }: { record: CaseRecord; events: CaseEvent[]; round: number }) {
+  const reduce = useReducedMotion();
   const rounds = stageRounds(events, "REFLECT");
   const done = (r: number) => rounds[r - 1]?.find((e) => e.status === "completed");
   // the last rejection up to this round, and this round's choice
@@ -45,6 +49,7 @@ export function ReflectCanvas({ record, events, round }: { record: CaseRecord; e
             record={record}
             state="rejected"
             compact
+            play={thisRoundRejected ? "reject" : undefined}
             note={
               <span className="flex gap-2 font-semibold text-risk-ink" data-testid="critic-reason">
                 <XCircle className="mt-0.5 size-6 shrink-0" aria-hidden />
@@ -61,6 +66,7 @@ export function ReflectCanvas({ record, events, round }: { record: CaseRecord; e
             record={record}
             state="chosen"
             compact
+            play={rejected ? "enter" : undefined}
             note={
               <span className="flex flex-col gap-1">
                 <span className="flex gap-2 font-semibold text-brand-ink" data-testid="critic-kept">
@@ -76,10 +82,21 @@ export function ReflectCanvas({ record, events, round }: { record: CaseRecord; e
             }
           />
         ) : thisRoundRejected ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border-2 border-dashed border-line p-5 text-center text-xl text-ink-2">
-            <RotateCcw className="size-10 text-risk-ink" aria-hidden />
+          <motion.div
+            className="flex h-full flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border-2 border-dashed border-line p-5 text-center text-xl text-ink-2"
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: reduce ? 0 : 2, duration: 0.4 }}
+          >
+            <motion.span
+              initial={reduce ? false : { rotate: 0 }}
+              animate={{ rotate: -360 }}
+              transition={{ delay: reduce ? 0 : 2, duration: 0.8, ease: "easeInOut" }}
+            >
+              <RotateCcw className="size-10 text-risk-ink" aria-hidden />
+            </motion.span>
             Back to Plan with {keptRule === "safety_stock" ? "safety stock as a hard rule" : "a new constraint"}
-          </div>
+          </motion.div>
         ) : null}
       </div>
     </Frame>

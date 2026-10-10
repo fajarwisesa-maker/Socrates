@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Check, RotateCcw, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { STAGE_LABEL, STAGES, stageInfo, type StageState } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
@@ -24,15 +25,23 @@ export function StageRail({
   onSelect?: (stage: Stage) => void;
 }) {
   const now = useNow(500);
+  const reduce = useReducedMotion();
   const infos = STAGES.map((s) => (record ? stageInfo(s, events, record, now) : null));
-  const replans = record?.replan_count ?? 0;
+  // replans known as of the events on screen (the rail follows the narration)
+  const replans = events.filter(
+    (e) => (e.stage === "REFLECT" && e.status === "completed" && !!e.data.rejected) ||
+      (e.stage === "ACT" && e.status === "info" && e.title.startsWith("Replanning")),
+  ).length;
   const plan = STAGES.indexOf("PLAN");
   const reflect = STAGES.indexOf("REFLECT");
 
   return (
     <nav aria-label="Agent stages" data-testid="stage-rail" className="relative">
       {replans > 0 && (
-        <svg
+        <motion.svg
+          initial={reduce ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: reduce ? 0 : 1.6, duration: 0.2 }}
           className="absolute top-0 left-0"
           style={{ width: "1.75rem", height: `${ROW * STAGES.length}rem` }}
           viewBox={`0 0 1.75 ${ROW * STAGES.length}`}
@@ -43,7 +52,10 @@ export function StageRail({
               <path d="M0,0 L10,5 L0,10 z" fill="var(--risk-ink)" />
             </marker>
           </defs>
-          <path
+          <motion.path
+            initial={reduce ? false : { pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: reduce ? 0 : 0.9, ease: "easeInOut", delay: reduce ? 0 : 1.6 }}
             d={`M1.7 ${(reflect + 0.5) * ROW} C 0.15 ${(reflect + 0.5) * ROW}, 0.15 ${(plan + 0.5) * ROW}, 1.6 ${(plan + 0.5) * ROW}`}
             fill="none"
             stroke="var(--risk-ink)"
@@ -51,7 +63,7 @@ export function StageRail({
             strokeLinecap="round"
             markerEnd="url(#replan-arrow)"
           />
-        </svg>
+        </motion.svg>
       )}
       <ol>
         {STAGES.map((stage, i) => {

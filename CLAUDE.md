@@ -18,7 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
-| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases done; **step 3 checkpoint** |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing done; **step 4 checkpoint** |
 
 ## How to run
 
@@ -86,6 +86,9 @@ Screenshots of a full local run (fake LLM): `docs/screenshots/`.
 Dashboard modes (UI redesign): **Presenter** (default, projector) and **Planner** (dense view).
 Toggle with `P` or the header switch; `?mode=planner|presenter` overrides (the choice is
 remembered per browser). The style tile of the visual system is at `/design`.
+Presenter pacing: each stage stays on screen ≥ 5 s (`?dwell=N` seconds, `?auto=1` = no
+dwell for tests and rehearse); `Space`/`→` next, `←` back, `H` hold, `R` restart the view
+(the agent is not re-run), `L` jump to live; clicking a rail step shows it (and holds).
 
 Phase 6 (replay + hardening):
 
@@ -558,6 +561,44 @@ additive (no field removed).
     highlights, the Critic sentence, approve-by, one-click approve and the final line.
   - Dev note: kill a stale `next dev` by PID (`ps aux | grep next-server`). `lsof -i:3000`
     can miss it, and a stale server serves an outdated Tailwind scan.
+
+- **Step 4 (wow moments and pacing).**
+  - **Pacing** (`lib/pacing.ts`): the case is a list of *steps*. A step is a run of
+    consecutive events of one stage, e.g. Plan round 2.
+    - The view shows one step and moves on after the dwell (default 5 s; at least 3 s on
+      Perceive and 3.5 s on Reflect, the longest animations).
+    - The rail and the impact meter use only the events up to the shown step, so the
+      meter never runs ahead of the narration. The clock stays real time.
+    - A case started here plays from its first step; a case loaded on page open shows its
+      latest step.
+    - An approval restarts the dwell, so the card's amber → green change stays on screen.
+  - **Wow moments** (`motion`):
+    1. Perceive: the slang phrases light up one after another. Lines then draw from each
+       WhatsApp phrase to the field it produced (`EvidenceLinks` measures the DOM). The
+       PDF phrases arrive, then the confidence moves from Medium to High.
+    2. Reflect: the REJECTED stamp lands on the cheapest card, its price is struck
+       through, and the Critic's sentence appears. The rail's loop arrow draws itself. On
+       the replan round the chosen card slides in and the meter counts up.
+    3. Act: one card goes amber → green in place. The button reads "Creating PO in SAP…",
+       then the PO number pops in with a check.
+    4. Verify: the header clock stops with one pulse, then the final line lands in two
+       beats: "Rp 340 jt protected for Rp 11,4 jt", then "3 days → 0m 52s". The time is
+       real: Start case → verified.
+  - Also animated: each step slides in, and on Assess the order cards turn red while the
+    stockout probability counts up to 100%.
+  - The Perceive headline no longer uses SAP names ("Flood · 48–72 h delay"). It no
+    longer changes when Assess finishes, and it fits on one line.
+  - **Reduced motion:** `MotionConfig reducedMotion="user"`, and each animation checks
+    `useReducedMotion()` and shows its end state at once (no slide, stamp or count-up).
+    There is an e2e test for it.
+  - e2e:
+    - the existing Presenter test runs with `auto=1`;
+    - a new pacing test checks:
+      - the view and the meter don't run ahead of the narration;
+      - Space, → and H move or hold the view;
+      - clicking the rail steps back through rounds;
+      - R restarts the view; L jumps to live;
+    - both new Presenter tests also run in the replay smoke.
 
 ## Open items
 

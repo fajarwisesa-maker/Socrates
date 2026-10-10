@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import { useEffect } from "react";
 import { setMode, useMode } from "@/lib/mode";
 import { useCase } from "@/lib/useCase";
@@ -27,9 +28,15 @@ export default function Dashboard() {
   }, [mode]);
 
   const toggle = <ModeSwitch mode={mode} onChange={setMode} />;
-  return mode === "presenter" ? (
-    <PresenterView state={state} modeSwitch={toggle} />
-  ) : (
-    <PlannerView state={state} modeSwitch={toggle} />
+  // reducedMotion="user": with prefers-reduced-motion, transforms are skipped; components
+  // also check useReducedMotion() and show the end state at once.
+  return (
+    <MotionConfig reducedMotion="user">
+      {mode === "presenter" ? (
+        <PresenterView state={state} modeSwitch={toggle} />
+      ) : (
+        <PlannerView state={state} modeSwitch={toggle} />
+      )}
+    </MotionConfig>
   );
 }

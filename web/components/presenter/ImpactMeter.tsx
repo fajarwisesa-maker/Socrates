@@ -1,19 +1,32 @@
 "use client";
 
 import { dayShort, juta } from "@/lib/format";
-import type { CaseRecord } from "@/lib/types";
+import type { CaseEvent, CaseRecord, Risk, Summary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { CountUp } from "./CountUp";
 
 /**
  * Always visible: money at risk, what the plan costs, and what it protects (net).
  * Every figure comes from the backend (risk function, solver); the UI only formats.
  */
-export function ImpactMeter({ record }: { record: CaseRecord | null }) {
-  const risk = record?.risk ?? null;
-  const summary = record?.summary ?? null;
-  const resolved = record?.status === "RESOLVED";
-  const escalated = record?.status === "ESCALATED";
-  const reopened = record?.status === "REOPENED";
+export function ImpactMeter({
+  record,
+  viewEvents,
+  isLatest,
+}: {
+  record: CaseRecord | null;
+  /** events as of the step on screen: the meter never runs ahead of the narration */
+  viewEvents: CaseEvent[];
+  isLatest: boolean;
+}) {
+  const risk = (viewEvents.findLast((e) => e.stage === "ASSESS" && e.status === "completed")?.data.risk ??
+    null) as Risk | null;
+  const summary = (viewEvents.findLast((e) => e.stage === "REFLECT" && e.status === "completed" && e.data.summary)
+    ?.data.summary ?? null) as Summary | null;
+  const status = isLatest ? record?.status : undefined;
+  const resolved = status === "RESOLVED";
+  const escalated = status === "ESCALATED";
+  const reopened = status === "REOPENED";
   const chosen = summary ? record?.candidates.find((c) => c.option_id === summary.chosen) : null;
   const orders = risk?.orders.filter((o) => o.stockout_probability > 0).length ?? 0;
 
@@ -25,7 +38,7 @@ export function ImpactMeter({ record }: { record: CaseRecord | null }) {
     >
       <Metric
         label="At risk"
-        value={risk ? juta(risk.max_exposure) : null}
+        value={risk ? risk.max_exposure : null}
         pending="after Assess"
         hero
         tone="risk"
@@ -38,7 +51,7 @@ export function ImpactMeter({ record }: { record: CaseRecord | null }) {
       />
       <Metric
         label="Plan cost"
-        value={summary && !escalated ? juta(summary.case_cost ?? summary.chosen_cost) : null}
+        value={summary && !escalated ? (summary.case_cost ?? summary.chosen_cost) : null}
         pending={escalated ? "Handed to a human planner" : "after Reflect"}
         tone="ink"
         note={
@@ -52,7 +65,7 @@ export function ImpactMeter({ record }: { record: CaseRecord | null }) {
       />
       <Metric
         label="Protected (net)"
-        value={summary && !escalated ? juta(summary.net_protected) : null}
+        value={summary && !escalated ? summary.net_protected : null}
         pending={escalated ? "No verified plan" : "after Reflect"}
         tone={resolved ? "ok" : reopened ? "muted" : "ink"}
         note={
@@ -80,7 +93,7 @@ function Metric({
   testId,
 }: {
   label: string;
-  value: string | null;
+  value: number | null;
   pending: string;
   note?: string | null;
   hero?: boolean;
@@ -97,7 +110,7 @@ function Metric({
           value === null || tone === "muted" ? "text-ink-2" : tone === "risk" ? "text-risk-ink" : tone === "ok" ? "text-ok-ink" : "text-ink",
         )}
       >
-        {value ?? "—"}
+        {value === null ? "—" : <CountUp value={value} format={juta} />}
       </div>
       <div className="mt-1 text-xl leading-snug text-ink-2">{value === null ? pending : note}</div>
     </div>

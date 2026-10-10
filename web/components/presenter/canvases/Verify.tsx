@@ -1,15 +1,19 @@
 "use client";
 
-import { Info } from "lucide-react";
-import { dayShort, juta, thousands } from "@/lib/format";
+import { Info, Timer } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { caseClock } from "@/lib/caseClock";
+import { dayShort, juta, minutesSeconds, thousands } from "@/lib/format";
 import { plantName, supplierName } from "@/lib/present";
-import type { CaseAction, CaseRecord, Labels } from "@/lib/types";
+import type { CaseAction, CaseEvent, CaseRecord, Labels } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { LaneMap, type Flow } from "../LaneMap";
 import { Frame } from "./Frame";
 
-export function VerifyCanvas({ record, round }: { record: CaseRecord; round: number }) {
+export function VerifyCanvas({ record, events, round }: { record: CaseRecord; events: CaseEvent[]; round: number }) {
   const now = useNow(500);
+  const reduce = useReducedMotion();
+  const clock = caseClock(events, now);
   const labels = record.affected?.labels;
   const a = record.affected;
   const v = record.verification;
@@ -48,7 +52,7 @@ export function VerifyCanvas({ record, round }: { record: CaseRecord; round: num
           cutoff={risk?.deadline ? `Cutoff ${dayShort(record.day0, risk.deadline)}` : undefined}
           dimBlocked
         />
-        {v && (
+        {v && !verified && (
           <p className={failed ? "text-xl font-semibold text-risk-ink" : "text-xl text-ink"} data-testid="coverage">
             {thousands(v.projected_supply)} of {thousands(v.demand)} cartons {v.covered ? "covered" : "projected"} by the
             cutoff
@@ -56,9 +60,31 @@ export function VerifyCanvas({ record, round }: { record: CaseRecord; round: num
           </p>
         )}
         {verified && summary && (
-          <p className="text-[1.75rem] leading-tight font-bold text-ink" data-testid="final-line">
-            <span className="text-ok-ink">{juta(summary.exposure_avoided)} protected</span> for {juta(summary.case_cost ?? summary.chosen_cost)}
-          </p>
+          // wow moment 4: the clock has stopped; the result lands in two beats
+          <div className="flex flex-col gap-1">
+            <motion.p
+              className="text-[1.75rem] leading-tight font-bold text-ink"
+              data-testid="final-line"
+              initial={reduce ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduce ? 0 : 0.4, duration: 0.5 }}
+            >
+              <span className="text-ok-ink">{juta(summary.exposure_avoided)} protected</span> for{" "}
+              {juta(summary.case_cost ?? summary.chosen_cost)}
+            </motion.p>
+            {clock.stoppedBy === "resolved" && (
+              <motion.p
+                className="flex items-center gap-2 text-[1.75rem] leading-tight font-bold text-ink"
+                data-testid="time-line"
+                initial={reduce ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: reduce ? 0 : 1.2, duration: 0.5 }}
+              >
+                <Timer className="size-7 text-ok-ink" aria-hidden />
+                <span className="text-ink-2">3 days</span> → <span className="text-ok-ink">{minutesSeconds(clock.seconds)}</span>
+              </motion.p>
+            )}
+          </div>
         )}
         {inbound && !failed && (
           <p className="mt-auto flex gap-2 text-xl text-ink-2" data-testid="tier0-note">

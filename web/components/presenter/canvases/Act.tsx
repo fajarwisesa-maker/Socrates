@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Clock, Loader2, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -31,7 +32,14 @@ export function ActCanvas({ record, round, onDecided }: { record: CaseRecord; ro
     headline =
       (autoDone.length ? `${VERB[autoDone[0].kind] ?? "Action"} executed · ` : "") +
       `${pending.length} decision${pending.length > 1 ? "s" : ""} need${pending.length > 1 ? "" : "s"} you`;
-  else headline = executed.length === shown.length ? "Every action executed in SAP" : "Executing the plan…";
+  else {
+    const approved = executed.filter((a) => a.tier >= 3).at(-1);
+    headline = approved
+      ? `Approved · ${VERB[approved.kind] ?? "action"} ${approved.sap_ref ?? ""} in SAP`
+      : executed.length === shown.length
+        ? "Every action executed in SAP"
+        : "Executing the plan…";
+  }
 
   return (
     <Frame
@@ -42,13 +50,9 @@ export function ActCanvas({ record, round, onDecided }: { record: CaseRecord; ro
     >
       <div className="flex h-full flex-col gap-4">
         <div className="grid grid-cols-2 items-stretch gap-4">
-          {shown.slice(0, 3).map((a) =>
-            a.status === "PENDING_APPROVAL" ? (
-              <ApprovalCard key={a.action_id} action={a} record={record} onDecided={onDecided} />
-            ) : (
-              <ExecutedCard key={a.action_id} action={a} record={record} />
-            ),
-          )}
+          {shown.slice(0, 3).map((a) => (
+            <ActionCard key={a.action_id} action={a} record={record} onDecided={onDecided} />
+          ))}
         </div>
         {dropped.length > 0 && (
           <p className="flex items-start gap-2 text-xl text-ink-2" data-testid="dropped-action">
@@ -70,33 +74,16 @@ export function ActCanvas({ record, round, onDecided }: { record: CaseRecord; ro
   );
 }
 
-function ExecutedCard({ action: a, record }: { action: CaseAction; record: CaseRecord }) {
-  const labels = record.affected?.labels;
-  return (
-    <div
-      data-testid="executed-card"
-      className="flex flex-col rounded-[var(--radius-card)] border-2 border-ok bg-ok-soft p-5"
-    >
-      <div className="flex items-center gap-2 text-lg font-semibold text-ok-ink">
-        <Check className="size-5" strokeWidth={3} aria-hidden />
-        {a.tier <= 2 ? `Executed automatically · Tier ${a.tier}` : `Approved · executed · Tier ${a.tier}`}
-      </div>
-      <div className="mt-2 text-xl font-semibold text-ink">{actionTitle(a, labels, record.affected?.plant ?? "")}</div>
-      <div className="mt-auto pt-3 text-[2.25rem] leading-none font-semibold text-ink">{juta(a.cost)}</div>
-      <div className="mt-2 text-xl text-ink-2">
-        SAP <span className="font-mono font-semibold text-ink" data-testid="presenter-sap-ref">{a.sap_ref}</span>
-        {a.eta && <> · arrives {eta(record, a.eta)}</>}
-      </div>
-    </div>
-  );
-}
-
-function ApprovalCard({ action: a, record, onDecided }: { action: CaseAction; record: CaseRecord; onDecided: () => void }) {
+function ActionCard({ action: a, record, onDecided }: { action: CaseAction; record: CaseRecord; onDecided: () => void }) {
+  const reduce = useReducedMotion();
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // the card was pending when it was first shown: its approval is the wow moment
+  const [wasPending] = useState(a.status === "PENDING_APPROVAL");
   const labels = record.affected?.labels;
+  const pending = a.status === "PENDING_APPROVAL";
 
   async function decide(decision: "approve" | "reject") {
     if (!a.approval_id) return;
@@ -112,58 +99,93 @@ function ApprovalCard({ action: a, record, onDecided }: { action: CaseAction; re
   }
 
   return (
-    <div
-      data-testid="presenter-approval"
-      className="flex flex-col rounded-[var(--radius-card)] border-2 border-human bg-human-soft p-5"
+    <motion.div
+      data-testid={pending ? "presenter-approval" : "executed-card"}
+      className="flex flex-col rounded-[var(--radius-card)] border-2 p-5"
+      initial={false}
+      animate={
+        pending
+          ? { backgroundColor: "#fdf3e2", borderColor: "#d97706" }
+          : { backgroundColor: "#e8f6ec", borderColor: "#16a34a" }
+      }
+      transition={{ duration: reduce ? 0 : 0.5 }}
     >
-      <div className="flex items-center gap-2 text-lg font-semibold text-human-ink">
-        <Clock className="size-5" aria-hidden /> Needs your approval · Tier {a.tier}
+      <div className={cn("flex items-center gap-2 text-lg font-semibold", pending ? "text-human-ink" : "text-ok-ink")}>
+        {pending ? <Clock className="size-5" aria-hidden /> : <Check className="size-5" strokeWidth={3} aria-hidden />}
+        {pending
+          ? `Needs your approval · Tier ${a.tier}`
+          : a.tier <= 2
+            ? `Executed automatically · Tier ${a.tier}`
+            : `Approved · executed · Tier ${a.tier}`}
       </div>
       <div className="mt-2 text-xl font-semibold text-ink">{actionTitle(a, labels, record.affected?.plant ?? "")}</div>
       <div className="mt-3 text-[2.25rem] leading-none font-semibold text-ink">{juta(a.cost)}</div>
-      {a.card?.approve_by && (
-        <div className="mt-2 text-xl font-semibold text-human-ink" data-testid="approve-by">
-          Approve by {dayShort(record.day0, a.card.approve_by)}
-        </div>
-      )}
-      {!rejecting ? (
-        <div className="mt-auto flex items-center gap-3 pt-4">
-          <Button
-            size="lg"
-            variant="approve"
-            className="flex-1 text-xl"
-            disabled={!!busy}
-            onClick={() => decide("approve")}
-            data-testid="presenter-approve"
-          >
-            {busy === "approve" ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />}
-            {busy === "approve" ? "Approving…" : "Approve"}
-          </Button>
-          <Button size="lg" variant="danger" disabled={!!busy} onClick={() => setRejecting(true)} data-testid="presenter-reject">
-            Reject
-          </Button>
-        </div>
+      {pending ? (
+        <>
+          {a.card?.approve_by && (
+            <div className="mt-2 text-xl font-semibold text-human-ink" data-testid="approve-by">
+              Approve by {dayShort(record.day0, a.card.approve_by)}
+            </div>
+          )}
+          {!rejecting ? (
+            <div className="mt-auto flex items-center gap-3 pt-4">
+              <Button
+                size="lg"
+                variant="approve"
+                className="flex-1 text-xl"
+                disabled={!!busy}
+                onClick={() => decide("approve")}
+                data-testid="presenter-approve"
+              >
+                {busy === "approve" ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Check aria-hidden />}
+                {busy === "approve" ? "Creating PO in SAP…" : "Approve"}
+              </Button>
+              {!busy && (
+                <Button size="lg" variant="danger" onClick={() => setRejecting(true)} data-testid="presenter-reject">
+                  Reject
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="mt-auto flex flex-col gap-2 pt-4">
+              <input
+                autoFocus
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason (optional, the agent reads it)"
+                className="h-12 rounded-[var(--radius-control)] border-2 border-line bg-surface px-3 text-lg text-ink outline-none focus:border-brand"
+                data-testid="presenter-reject-reason"
+              />
+              <div className="flex gap-2">
+                <Button size="md" variant="danger" disabled={!!busy} onClick={() => decide("reject")} data-testid="presenter-reject-confirm">
+                  {busy === "reject" ? "Rejecting…" : "Reject and replan"}
+                </Button>
+                <Button size="md" variant="ghost" disabled={!!busy} onClick={() => setRejecting(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+          {error && <p className="mt-2 text-lg text-risk-ink">{error}</p>}
+        </>
       ) : (
-        <div className="mt-auto flex flex-col gap-2 pt-4">
-          <input
-            autoFocus
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason (optional, the agent reads it)"
-            className="h-12 rounded-[var(--radius-control)] border-2 border-line bg-surface px-3 text-lg text-ink outline-none focus:border-brand"
-            data-testid="presenter-reject-reason"
-          />
-          <div className="flex gap-2">
-            <Button size="md" variant="danger" disabled={!!busy} onClick={() => decide("reject")} data-testid="presenter-reject-confirm">
-              {busy === "reject" ? "Rejecting…" : "Reject and replan"}
-            </Button>
-            <Button size="md" variant="ghost" disabled={!!busy} onClick={() => setRejecting(false)}>
-              Cancel
-            </Button>
-          </div>
+        <div className="mt-2 flex items-center gap-2 text-xl text-ink-2">
+          <span>
+            SAP{" "}
+            <motion.span
+              className="inline-flex items-center gap-1 font-mono font-semibold text-ink"
+              data-testid="presenter-sap-ref"
+              initial={wasPending && !reduce ? { opacity: 0, scale: 0.6 } : false}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 420, damping: 18 }}
+            >
+              {wasPending && <Check className="size-5 text-ok-ink" strokeWidth={3} aria-hidden />}
+              {a.sap_ref}
+            </motion.span>
+            {a.eta && <> · arrives {eta(record, a.eta)}</>}
+          </span>
         </div>
       )}
-      {error && <p className={cn("mt-2 text-lg text-risk-ink")}>{error}</p>}
-    </div>
+    </motion.div>
   );
 }
