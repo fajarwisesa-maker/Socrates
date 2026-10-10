@@ -16,7 +16,8 @@ and the decisions made. **Update it every phase.**
 | 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
 | 5 Case API and dashboard | done |
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
-| 7–8 | not started |
+| 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
+| 8 | not started |
 
 ## How to run
 
