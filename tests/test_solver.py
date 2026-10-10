@@ -101,6 +101,13 @@ def test_saving_and_exposure_avoided(plan, risk):
     )
     assert no_baseline.saving_vs_baseline is None
     assert no_baseline.net_protected == 328_600_000
+    with_spent = compare(
+        CompareRequest(
+            chosen=plan(["spot_air"]), max_exposure=risk.max_exposure, already_spent=3_900_000
+        )
+    )
+    assert with_spent.case_cost == 31_000_000 + 3_900_000
+    assert with_spent.net_protected == 340_000_000 - 34_900_000
 
 
 # ------------------------------------------------------------ approval timing

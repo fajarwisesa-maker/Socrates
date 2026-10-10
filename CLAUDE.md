@@ -18,7 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
-| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell done; **step 2 checkpoint** |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases done; **step 3 checkpoint** |
 
 ## How to run
 
@@ -530,6 +530,34 @@ additive (no field removed).
     `useSyncExternalStore`, so there is no hydration mismatch).
   - The Planner e2e tests open `/?mode=planner`. A Presenter e2e test checks the rail,
     the meter (Rp 340 jt / 11,4 jt / 328,6 jt) and the `P` toggle.
+
+- **Step 3 (stage canvases).**
+  - `components/presenter/canvases/*`: one canvas per stage, built only from the case
+    record and events.
+    - Perceive: WhatsApp bubble and PDF phrases with the code-located highlights, the
+      disruption card with source icons per field, and confidence "Medium → High".
+    - Assess: lane schematic, the stuck PO, the orders at risk.
+    - Plan: strategy chips and cited precedents.
+    - Simulate: priced option cards, labelled "calculated by the solver, not AI".
+    - Reflect: rejected card with the Critic's template sentence, next to the chosen card.
+    - Act: executed card next to the approval card (Approve / Reject with a reason).
+    - Verify: lane after mitigation, coverage, the final line, and the Tier 0 note.
+  - Words come from `lib/present.ts`; names come from SAP labels; numbers from the backend.
+  - **View cursor:** clicking a rail step shows that stage; clicking it again steps back
+    through its rounds (e.g. Reflect 2 → 1). "Back to live" follows the agent again. Step 4
+    builds the dwell queue on this.
+  - **Case cost:** the solver's `compare` takes `already_spent` (actions executed earlier
+    in the case) and returns `case_cost`. `net_protected` = exposure avoided − case cost.
+    After a rejected bridge PO the meter shows Rp 34,9 jt (air Rp 31 jt + the Rp 3,9 jt
+    transfer already executed), not Rp 31 jt.
+  - The confidence basis carries `progression` (the grade after each signal), so the UI
+    never re-implements the rule.
+  - The meter shows no plan figures on an escalated case, and a muted "not confirmed"
+    figure on a re-opened one.
+  - The replay smoke run now also runs the Presenter e2e test. That test covers Perceive
+    highlights, the Critic sentence, approve-by, one-click approve and the final line.
+  - Dev note: kill a stale `next dev` by PID (`ps aux | grep next-server`). `lsof -i:3000`
+    can miss it, and a stale server serves an outdated Tailwind scan.
 
 ## Open items
 

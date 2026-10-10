@@ -82,7 +82,19 @@ def locate_evidence(
 
 def grade_confidence(located: list[LocatedEvidence]) -> tuple[ConfidenceLabel, dict[str, Any]]:
     """Low: nothing located. Medium: one source. High: a second, independent signal
-    agrees on lane and delay (each of those fields is quoted from >= 2 signals)."""
+    agrees on lane and delay (each of those fields is quoted from >= 2 signals).
+
+    The basis also records `progression`: the grade after each signal is added in order
+    (e.g. WhatsApp alone Medium, + PDF High), for the dashboard's "Medium -> High"."""
+    label, basis = _grade(located)
+    progression = []
+    for n in sorted({e.signal for e in located}):
+        step, _ = _grade([e for e in located if e.signal <= n])
+        progression.append({"up_to_signal": n, "label": step})
+    return label, {**basis, "progression": progression}
+
+
+def _grade(located: list[LocatedEvidence]) -> tuple[ConfidenceLabel, dict[str, Any]]:
     by_field: dict[str, list[int]] = {}
     for e in located:
         sigs = by_field.setdefault(e.field, [])

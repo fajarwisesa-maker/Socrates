@@ -60,6 +60,10 @@ def test_confidence_medium_for_one_source_high_when_pdf_agrees_on_lane_and_delay
     assert label == "High"
     assert basis["corroborated_fields"] == ["lane", "delay"]
     assert basis["signals_by_field"] == {"delay": [1, 2], "lane": [1, 2]}
+    assert basis["progression"] == [
+        {"up_to_signal": 1, "label": "Medium"},
+        {"up_to_signal": 2, "label": "High"},
+    ]
 
 
 def test_confidence_low_when_nothing_located_and_ignores_dropped_quotes():

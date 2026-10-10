@@ -68,6 +68,7 @@ def test_golden_path(agent, runtime, signals, sap):
     assert c.summary["saving_vs_baseline"] == 19_600_000
     assert c.summary["exposure_avoided"] == 340_000_000
     assert c.summary["net_protected"] == 328_600_000
+    assert c.summary["case_cost"] == 11_400_000 and c.summary["already_spent"] == 0
     assert c.summary["net_protected_display"] == "Rp 328.600.000"
     # the Critic's sentence comes from a template filled with the solver's numbers
     b1_finding = next(f for f in c.critic_findings if f["option_id"] == "B1")
@@ -152,6 +153,11 @@ def test_reject_bridge_replans_remaining_shortfall_to_air(agent, runtime, signal
     air = pending(c)
     assert (air["kind"], air["tier"], air["cost"]) == ("spot_air", 3, 31_000_000)
     assert air["quantity"] == 500  # remaining shortfall after the executed transfer
+    # what the case costs includes the transfer already executed (solver compare)
+    assert c.summary["chosen_cost"] == 31_000_000
+    assert c.summary["already_spent"] == 3_900_000
+    assert c.summary["case_cost"] == 34_900_000
+    assert c.summary["net_protected"] == 340_000_000 - 34_900_000
     # the planner's reason reached the PLAN prompt
     plan_reqs = [r for r in llm.requests if r.purpose == "plan"]
     assert reason in plan_reqs[-1].messages[0]["content"][0]["text"]

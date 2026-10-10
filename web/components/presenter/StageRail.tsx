@@ -16,10 +16,12 @@ export function StageRail({
   events,
   record,
   focus,
+  onSelect,
 }: {
   events: CaseEvent[];
   record: CaseRecord | null;
   focus: Stage | null;
+  onSelect?: (stage: Stage) => void;
 }) {
   const now = useNow(500);
   const infos = STAGES.map((s) => (record ? stageInfo(s, events, record, now) : null));
@@ -76,7 +78,13 @@ export function StageRail({
                 />
               )}
               <Indicator state={state} human={human} resolved={resolved} />
-              <div className="pt-[0.2rem]">
+              <button
+                type="button"
+                onClick={() => onSelect?.(stage)}
+                disabled={state === "pending"}
+                className="pt-[0.2rem] text-left disabled:cursor-default"
+                aria-current={isFocus ? "step" : undefined}
+              >
                 <div
                   className={cn(
                     "text-xl leading-tight",
@@ -93,7 +101,7 @@ export function StageRail({
                 ) : (
                   <SubLabel stage={stage} state={state} record={record} now={now} />
                 )}
-              </div>
+              </button>
             </li>
           );
         })}

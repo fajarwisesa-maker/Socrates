@@ -265,12 +265,15 @@ def check_timing(req: TimingCheckRequest) -> TimingCheckResult:
 
 
 def compare(req: CompareRequest) -> CompareResult:
-    """Saving of the chosen plan vs a baseline, the exposure it avoids, and the net amount
-    protected (exposure avoided minus what the plan costs)."""
+    """Saving of the chosen plan vs a baseline, the exposure it avoids, what the case costs
+    (chosen plan + actions already executed) and the net amount protected."""
     chosen = req.chosen
     if chosen.status != "optimal" or chosen.covered_quantity < chosen.required_quantity:
         return CompareResult(
-            saving_vs_baseline=0 if req.baseline else None, exposure_avoided=0, net_protected=0
+            saving_vs_baseline=0 if req.baseline else None,
+            exposure_avoided=0,
+            case_cost=req.already_spent,
+            net_protected=0,
         )
     accepted_losses = sum(a.cost for a in chosen.actions if a.kind == "reschedule_customer")
     avoided = req.max_exposure - accepted_losses
@@ -279,5 +282,6 @@ def compare(req: CompareRequest) -> CompareResult:
             req.baseline.total_cost - chosen.total_cost if req.baseline is not None else None
         ),
         exposure_avoided=avoided,
-        net_protected=avoided - chosen.total_cost,
+        case_cost=chosen.total_cost + req.already_spent,
+        net_protected=avoided - chosen.total_cost - req.already_spent,
     )

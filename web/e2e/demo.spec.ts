@@ -82,6 +82,18 @@ test("presenter mode: rail, impact meter and clock follow the case", async ({ pa
   await expect(page.getByTestId("meter-plan-cost")).toContainText("Rp 11,4 jt");
   await expect(page.getByTestId("meter-protected")).toContainText("Rp 328,6 jt");
 
+  // canvases from the event stream: the Critic's sentence, the approval card, one-click approve
+  await page.getByTestId("rail-REFLECT").getByRole("button").click();
+  await expect(page.getByTestId("critic-reason")).toHaveText(/Bandung DC would drop to 50 cartons, below its safety stock of 400/);
+  await page.getByTestId("rail-PERCEIVE").getByRole("button").click();
+  await expect(page.getByTestId("confidence")).toContainText("Medium→High");
+  await expect(page.locator('[data-testid="signal-whatsapp"] mark')).toContainText(["macet total"]);
+  await page.getByTestId("follow-live").click();
+  await expect(page.getByTestId("approve-by")).toContainText("Approve by Day 1 18:00");
+  await page.getByTestId("presenter-approve").click();
+  await expect(page.getByTestId("rail-VERIFY")).toHaveAttribute("data-state", "done", { timeout: 60_000 });
+  await expect(page.getByTestId("final-line")).toHaveText("Rp 340 jt protected for Rp 11,4 jt");
+
   // P switches to Planner mode and back
   await page.keyboard.press("p");
   await expect(page.getByTestId("timeline")).toBeVisible();

@@ -57,7 +57,14 @@ export interface CriticFinding {
   option_id: string;
   round: number;
   clean: boolean;
-  checks: { rule: string; passed: boolean; detail: string }[];
+  checks: {
+    rule: string;
+    passed: boolean;
+    detail: string;
+    /** sentence built in code from the solver's numbers (never by the LLM) */
+    plain?: string;
+    facts?: Record<string, unknown>;
+  }[];
   tiers: { kind: string; reference: string; tool: string; tier: number; reasons: string[] }[];
 }
 
@@ -77,6 +84,8 @@ export interface CaseAction {
   approval_id?: string;
   rejection_reason?: string | null;
   card?: ApprovalCard;
+  args?: Record<string, unknown>;
+  planned?: PlannedAction & { lead_hours?: number };
 }
 
 export interface ApprovalCard {
@@ -179,19 +188,52 @@ export interface Disruption {
   delay_hours_max: number | null;
   references: string[];
   confidence: "Low" | "Medium" | "High";
+  confidence_basis?: {
+    corroborated_fields: string[];
+    signals_with_evidence: number[];
+    progression?: { up_to_signal: number; label: "Low" | "Medium" | "High" }[];
+  };
   evidence_quotes: string[];
+  /** quotes located in their signal by code (offsets into signals[signal - 1].text) */
+  evidence?: Evidence[];
+}
+
+export interface Evidence {
+  quote: string;
+  signal: number;
+  source: string;
+  field: "is_disruption" | "cause" | "location" | "lane" | "delay" | "references";
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Labels {
+  plants: Record<string, string | null>;
+  suppliers: Record<string, { name: string | null; city: string | null; region: string | null; role: string | null }>;
+  lanes: Record<string, { from: string | null; to: string | null; corridor: string | null; description: string | null }>;
+}
+
+export interface Precedent {
+  id: string;
+  title: string;
+  period: string | null;
+  synthetic: boolean;
 }
 
 export interface PurchaseOrderRow {
   PurchaseOrder: string;
   Supplier: string;
+  YY1_TransportLane?: string | null;
   items: { Material: string; Plant: string; OrderQuantity: number }[];
 }
 
 export interface SalesOrderRow {
   SalesOrder: string;
   YY1_SoldToPartyName: string;
+  YY1_Channel?: string;
   RequestedQuantity: number;
+  YY1_PenaltyAmountIDR?: number;
 }
 
 export interface Affected {
@@ -201,6 +243,7 @@ export interface Affected {
   purchase_orders: PurchaseOrderRow[];
   sales_orders: SalesOrderRow[];
   stock: { OnHandQuantity: number; SafetyStockQuantity: number };
+  labels?: Labels;
 }
 
 export interface Candidate {
@@ -224,7 +267,12 @@ export interface Summary {
   saving_vs_baseline?: number;
   exposure_avoided: number;
   exposure_avoided_display: string;
-  /** exposure avoided minus the chosen plan's cost, computed by the solver */
+  /** chosen plan + actions already executed in the case, computed by the solver */
+  case_cost: number;
+  case_cost_display: string;
+  already_spent: number;
+  already_spent_display: string;
+  /** exposure avoided minus the case cost, computed by the solver */
   net_protected: number;
   net_protected_display: string;
 }

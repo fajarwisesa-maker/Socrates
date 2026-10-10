@@ -786,9 +786,14 @@ class Agent:
                 baseline=SolveResult.model_validate(baseline["result"]) if baseline else None,
                 chosen=SolveResult.model_validate(chosen["result"]),
                 max_exposure=risk.max_exposure,
+                already_spent=sum(a["cost"] for a in case.actions if a["status"] == "EXECUTED"),
             )
         )
         out |= {
+            "already_spent": c.case_cost - chosen["result"]["total_cost"],
+            "already_spent_display": format_idr(c.case_cost - chosen["result"]["total_cost"]),
+            "case_cost": c.case_cost,
+            "case_cost_display": format_idr(c.case_cost),
             "exposure_avoided": c.exposure_avoided,
             "exposure_avoided_display": format_idr(c.exposure_avoided),
             "net_protected": c.net_protected,

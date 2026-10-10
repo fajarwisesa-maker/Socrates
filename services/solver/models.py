@@ -205,6 +205,9 @@ class SolveResult(_Model):
 
 class CompareRequest(_Model):
     baseline: SolveResult | None = None
+    # cost of actions already executed in the case before this plan (e.g. the transfer
+    # kept after a rejected bridge PO); it counts towards what the case costs
+    already_spent: int = Field(0, ge=0)
     chosen: SolveResult
     max_exposure: int
 
@@ -212,7 +215,8 @@ class CompareRequest(_Model):
 class CompareResult(_Model):
     saving_vs_baseline: int | None = None  # None without a baseline
     exposure_avoided: int
-    net_protected: int = 0  # exposure avoided minus the cost of the chosen plan
+    case_cost: int = 0  # chosen plan + already spent
+    net_protected: int = 0  # exposure avoided minus the case cost
 
 
 class TimingCheckRequest(_Model):
