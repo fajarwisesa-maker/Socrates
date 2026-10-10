@@ -213,12 +213,20 @@ export interface Candidate {
 
 export interface Summary {
   chosen: string;
+  chosen_cost: number;
   chosen_cost_display: string;
+  max_exposure: number;
   max_exposure_display: string;
+  expected_exposure: number;
   baseline?: string;
+  baseline_cost_display?: string;
   saving_display?: string;
   saving_vs_baseline?: number;
-  exposure_avoided_display?: string;
+  exposure_avoided: number;
+  exposure_avoided_display: string;
+  /** exposure avoided minus the chosen plan's cost, computed by the solver */
+  net_protected: number;
+  net_protected_display: string;
 }
 
 export interface Verification {

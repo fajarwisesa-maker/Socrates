@@ -4,7 +4,7 @@ const shots = (name: string) => ({ path: `e2e/screenshots/${name}.png`, fullPage
 
 test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await request.post("/api/demo/reset");
-  await page.goto("/");
+  await page.goto("/?mode=planner"); // the dense view keeps the full set of test ids
   await expect(page.getByTestId("signal-inbox")).toBeVisible();
   if (process.env.SIAGA_EXPECT_REPLAY) {
     await expect(page.getByTestId("replay-badge")).toContainText("REPLAY");
@@ -45,7 +45,7 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
 
 test("rejecting the bridge PO replans the remaining shortfall to air", async ({ page, request }) => {
   await request.post("/api/demo/reset");
-  await page.goto("/");
+  await page.goto("/?mode=planner"); // the dense view keeps the full set of test ids
   await page.getByRole("button", { name: "Load demo WhatsApp" }).click();
   await page.getByRole("button", { name: "Load forwarder PDF" }).click();
   await expect(page.getByTestId("pdf-name")).toHaveText("forwarder_notice.pdf");
@@ -66,4 +66,25 @@ test("rejecting the bridge PO replans the remaining shortfall to air", async ({ 
   await expect(page.getByTestId("stage-ACT")).toHaveAttribute("data-state", "waiting");
   await expect(bridge).toHaveAttribute("data-status", "REJECTED");
   await page.screenshot(shots("4-rejected-replanned-to-air"));
+});
+
+test("presenter mode: rail, impact meter and clock follow the case", async ({ page }) => {
+  await page.request.post("/api/demo/reset");
+  await page.goto("/?mode=presenter");
+  await expect(page.getByTestId("start-canvas")).toBeVisible();
+  await page.getByTestId("load-whatsapp").click();
+  await page.getByTestId("load-pdf").click();
+  await page.getByTestId("presenter-start").click();
+
+  await expect(page.getByTestId("rail-ACT")).toHaveAttribute("data-state", "waiting", { timeout: 60_000 });
+  await expect(page.getByTestId("rail-replans")).toHaveText(/1 replan/);
+  await expect(page.getByTestId("meter-at-risk")).toContainText("Rp 340 jt");
+  await expect(page.getByTestId("meter-plan-cost")).toContainText("Rp 11,4 jt");
+  await expect(page.getByTestId("meter-protected")).toContainText("Rp 328,6 jt");
+
+  // P switches to Planner mode and back
+  await page.keyboard.press("p");
+  await expect(page.getByTestId("timeline")).toBeVisible();
+  await page.keyboard.press("p");
+  await expect(page.getByTestId("presenter")).toBeVisible();
 });

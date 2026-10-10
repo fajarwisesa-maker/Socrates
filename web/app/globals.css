@@ -1,20 +1,90 @@
 @import "tailwindcss";
 
+/*
+ * SIAGA visual system (redesign step 2).
+ * Colour means something: brand teal = SIAGA; red = money at risk / rejected;
+ * amber = waiting for a human; green = resolved / executed. Status colours are never
+ * decorative. Text never lighter than ink-2 (#475569). Text-on-tint uses the *-ink shades
+ * (>= 4.5:1 on white and on their soft tint); the base hues are for fills, icons and
+ * large numbers.
+ */
 :root {
-  --background: #f6f7f9;
-  --foreground: #14171c;
+  --canvas: #f4f5f3; /* off-white page: less projector glare than pure white */
+  --surface: #ffffff;
+  --surface-2: #eceeeb; /* filled areas instead of hairline borders */
+  --line: #cbd2d9; /* 2px borders only */
+  --ink: #0f172a;
+  --ink-2: #475569;
+
+  --brand: #0f766e;
+  --brand-ink: #0b5d57;
+  --brand-soft: #e3f1ef;
+
+  --risk: #dc2626;
+  --risk-ink: #b91c1c;
+  --risk-soft: #fdecec;
+
+  --human: #d97706;
+  --human-ink: #92400e;
+  --human-soft: #fdf3e2;
+
+  --ok: #16a34a;
+  --ok-ink: #166534;
+  --ok-soft: #e8f6ec;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  /* System fonts only: the demo laptop may be offline. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-risk: var(--risk);
+  --color-risk-ink: var(--risk-ink);
+  --color-risk-soft: var(--risk-soft);
+  --color-human: var(--human);
+  --color-human-ink: var(--human-ink);
+  --color-human-soft: var(--human-soft);
+  --color-ok: var(--ok);
+  --color-ok-ink: var(--ok-ink);
+  --color-ok-soft: var(--ok-soft);
+
+  /* Geist via next/font/local (bundled with the app: works offline on the demo laptop) */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px rgb(15 23 42 / 0.06);
+}
+
+/*
+ * Presenter mode scales the whole UI with the viewport: 1rem = 16px at 1280x720 and
+ * 24px at 1920x1080 (same 16:9 layout, bigger type). Body text is text-xl (20px at 1280),
+ * stage titles >= 2.5rem, hero numbers >= 4rem.
+ */
+html.presenter {
+  font-size: clamp(14px, min(1.25vw, 2.2222vh), 32px);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1; /* tabular figures everywhere */
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes siaga-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
+  70% { box-shadow: 0 0 0 0.6rem color-mix(in srgb, currentColor 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+}
+.siaga-pulse { animation: siaga-pulse 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .siaga-pulse { animation: none; }
 }

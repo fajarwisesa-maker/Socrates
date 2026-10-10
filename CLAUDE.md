@@ -18,7 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
-| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit done (`docs/ui-redesign-audit.md`); backend additions A–G and step 2 in progress |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell done; **step 2 checkpoint** |
 
 ## How to run
 
@@ -82,6 +82,10 @@ make web-smoke               # Playwright: full demo + reject path on a producti
 ```
 
 Screenshots of a full local run (fake LLM): `docs/screenshots/`.
+
+Dashboard modes (UI redesign): **Presenter** (default, projector) and **Planner** (dense view).
+Toggle with `P` or the header switch; `?mode=planner|presenter` overrides (the choice is
+remembered per browser). The style tile of the visual system is at `/design`.
 
 Phase 6 (replay + hardening):
 
@@ -499,6 +503,33 @@ additive (no field removed).
 - **G. Throttling retries are visible.** The Bedrock provider retries throttling itself and
   writes an `llm` event with status `retry`; the UI shows a small neutral "Retrying…" note
   on the current stage, and error styling only when retries run out (escalation).
+
+- **Step 2 (visual system and shell).**
+  - Tokens live in `web/app/globals.css`: off-white canvas, white cards, teal brand
+    `#0F766E`, status colours used only for status. Each status has a base hue (fills,
+    icons, numbers ≥ 24px) and an `-ink` shade (≥ 4.5:1) for text. The style tile with
+    measured contrast is at `/design`.
+  - Font: Geist via `next/font/local` (the `geist` package). The font is bundled, so the
+    demo laptop needs no font download. Figures use tabular-nums.
+  - Presenter mode scales the root font size with the viewport
+    (`html.presenter { font-size: min(1.25vw, 2.2222vh) }`). 1rem = 16px at 1280×720 and
+    24px at 1920×1080, so both have the same layout.
+  - Presenter type sizes:
+    - content text ≥ `text-xl` (20px at 1280×720);
+    - stage titles 2.5rem;
+    - hero number 4rem;
+    - only chrome (key hints, the mode switch, badges) is smaller.
+  - shadcn/ui primitives (`components/ui/`) are written by hand in the shadcn shape, because
+    the shadcn registry is blocked by the network policy. They use `radix-ui`, `cva`,
+    `clsx` and `tailwind-merge`.
+  - UI dependencies are pinned exactly, to releases at least two weeks old: `motion`,
+    `lucide-react`, `radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`,
+    `geist`. No other UI dependency.
+  - State: `lib/useCase.ts` (polling, shared by both modes), `lib/stages.ts` (stage state;
+    VERIFY now shows `failed` on a re-opened case), `lib/mode.ts` (mode as a
+    `useSyncExternalStore`, so there is no hydration mismatch).
+  - The Planner e2e tests open `/?mode=planner`. A Presenter e2e test checks the rail,
+    the meter (Rp 340 jt / 11,4 jt / 328,6 jt) and the `P` toggle.
 
 ## Open items
 

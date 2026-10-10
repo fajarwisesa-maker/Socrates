@@ -2,18 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { dayLabel, rupiah, thousands } from "@/lib/format";
+import { stageInfo, type StageState } from "@/lib/stages";
 import { STAGES, type CaseEvent, type CaseRecord, type Stage } from "@/lib/types";
 import { Badge, Empty, Panel, TierBadge, type Tone } from "./ui";
-
-type StageState = "pending" | "running" | "done" | "waiting" | "escalated";
-
-interface StageInfo {
-  state: StageState;
-  rounds: number;
-  replans: number;
-  elapsed: number;
-  events: CaseEvent[];
-}
 
 const STATE_TONE: Record<StageState, Tone> = {
   pending: "slate",
@@ -21,35 +12,8 @@ const STATE_TONE: Record<StageState, Tone> = {
   done: "emerald",
   waiting: "amber",
   escalated: "red",
+  failed: "red",
 };
-
-function stageInfo(
-  stage: Stage,
-  events: CaseEvent[],
-  record: CaseRecord,
-  now: number | null,
-): StageInfo {
-  const evs = events.filter((e) => e.stage === stage);
-  const rounds = evs.filter((e) => e.status === "started").length;
-  const replans = evs.filter((e) => e.status === "completed" && e.title.includes("replanning")).length;
-  let elapsed = evs
-    .filter((e) => e.status === "completed")
-    .reduce((s, e) => s + (Number(e.data?.elapsed_s) || 0), 0);
-  const last = evs[evs.length - 1];
-  let state: StageState;
-  if (!last) state = "pending";
-  else if (evs.some((e) => e.status === "escalated")) state = "escalated";
-  else if (last.status === "scheduled") state = "waiting";
-  else if (last.status === "completed" || last.status === "info" || last.status === "executed")
-    state = stage === "ACT" && record.status === "AWAITING_APPROVAL" ? "waiting" : "done";
-  else {
-    state = "running";
-    const started = [...evs].reverse().find((e) => e.status === "started");
-    if (started && now) elapsed += Math.max(0, (now - Date.parse(started.ts)) / 1000);
-  }
-  if (state === "running" && record.status !== "RUNNING") state = "done";
-  return { state, rounds, replans, elapsed, events: evs };
-}
 
 export default function StageTimeline({
   events,

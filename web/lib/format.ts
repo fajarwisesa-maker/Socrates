@@ -55,3 +55,24 @@ export function clock(seconds: number): string {
 export function pct(p: number): string {
   return `${Math.round(p * 100)}%`;
 }
+
+/** Presenter short form in juta (millions): 340000000 -> "Rp 340 jt", 11400000 -> "Rp 11,4 jt". */
+export function juta(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return "—";
+  const sign = amount < 0 ? "−" : "";
+  const abs = Math.abs(amount);
+  if (abs >= 1e9) return `${sign}Rp ${trim1(abs / 1e9)} M`;
+  if (abs >= 1e6) return `${sign}Rp ${trim1(abs / 1e6)} jt`;
+  return `${sign}${rupiah(abs)}`;
+}
+
+function trim1(x: number): string {
+  const r = Math.round(x * 10) / 10;
+  return (Number.isInteger(r) ? r.toFixed(0) : r.toFixed(1)).replace(".", ",");
+}
+
+/** "Day 0 17:50 WIB": the short presenter form of dayLabel. */
+export function dayShort(day0Iso: string | null | undefined, iso: string | null | undefined): string {
+  const full = dayLabel(day0Iso, iso);
+  return full.includes("·") ? `${full.split(" · ")[0]} WIB` : full;
+}
