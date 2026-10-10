@@ -67,6 +67,28 @@ def test_golden_path(agent, runtime, signals, sap):
     assert a1["result"]["total_cost"] == 31_000_000
     assert c.summary["saving_vs_baseline"] == 19_600_000
     assert c.summary["exposure_avoided"] == 340_000_000
+    assert c.summary["net_protected"] == 328_600_000
+    assert c.summary["net_protected_display"] == "Rp 328.600.000"
+    # the Critic's sentence comes from a template filled with the solver's numbers
+    b1_finding = next(f for f in c.critic_findings if f["option_id"] == "B1")
+    ss = next(x for x in b1_finding["checks"] if x["rule"] == "safety_stock")
+    assert ss["plain"] == "Bandung DC would drop to 50 cartons, below its safety stock of 400"
+    assert ss["facts"] == {"plant": "DC-BDG", "plant_name": "Bandung DC", "left": 50,
+                           "safety_stock": 400}  # fmt: skip
+    b2_finding = next(f for f in c.critic_findings if f["option_id"] == "B2")
+    ok = next(x for x in b2_finding["checks"] if x["rule"] == "safety_stock")
+    assert ok["plain"].startswith("Safety stock respected: Bandung DC keeps 400 cartons")
+    # display labels from SAP (C) and cited precedents with their period (D)
+    labels = c.affected["labels"]
+    assert labels["plants"]["DC-CKR"] == "Cikarang DC"
+    assert labels["suppliers"]["V-2002"]["name"] == "PT Agro Pangan Tangerang"
+    assert labels["lanes"]["SMG-JKT"]["corridor"] == "Pantura"
+    plan1 = next(
+        e for e in runtime.store.list_events(c.case_id)
+        if e.stage == "PLAN" and e.status == "completed"
+    )  # fmt: skip
+    p001 = plan1.data["precedents"][0]
+    assert p001["id"] == "P-001" and p001["period"] == "2025-02" and p001["synthetic"] is True
     assert c.risk["max_exposure"] == c.risk["expected_exposure"] == 340_000_000
     # transfer auto-executed (Tier 2), bridge PO pending approval (Tier 3)
     transfer = next(a for a in c.actions if a["kind"] == "stock_transfer")
@@ -90,7 +112,15 @@ def test_perceive_fuses_pdf_into_higher_confidence(agent, runtime, signals):
     both = run_golden(agent, signals)
     assert wa_only.disruption["references"] == []
     assert both.disruption["references"] == ["4500018231"]
-    assert both.disruption["confidence"] > wa_only.disruption["confidence"]
+    assert wa_only.disruption["confidence"] == "Medium"
+    assert both.disruption["confidence"] == "High"
+    assert both.disruption["confidence_basis"]["corroborated_fields"] == ["lane", "delay"]
+    # every highlighted span is the exact text of the signal it points at
+    for e in both.disruption["evidence"]:
+        text = both.signals[e["signal"] - 1]["text"]
+        assert text[e["start"] : e["end"]] == e["text"]
+    quoted = {e["quote"] for e in wa_only.disruption["evidence"]}
+    assert {"macet total", "ga gerak sm sekali", "bs 2-3 hari"} <= quoted
 
 
 def test_approve_then_verify_resolves(agent, runtime, signals, sap):
@@ -175,8 +205,8 @@ def test_no_disruption_closes_case(runtime, signals):
                 "lane": None,
                 "location": None,
                 "references": [],
-                "confidence": 0.95,
-                "evidence_quotes": ["izin ya, anak sakit"],
+                "model_confidence": 0.95,
+                "evidence": [{"quote": "izin", "signal": 1, "field": "is_disruption"}],
             },
         )
     }
@@ -239,3 +269,22 @@ def test_illegal_stage_transition_is_refused(agent, signals):
 
 def test_stage_list():
     assert STAGES == ["PERCEIVE", "ASSESS", "PLAN", "SIMULATE", "REFLECT", "ACT", "VERIFY"]
+
+
+class ThrottledOnce(FakeProvider):
+    """Fake that reports one throttling retry on the first PERCEIVE call."""
+
+    def converse(self, req, on_retry=None):
+        if req.purpose == "perceive" and self.calls["perceive"] == 0 and on_retry:
+            on_retry(2, 6, 2.0, "throttled")
+        return super().converse(req, on_retry)
+
+
+def test_llm_retry_is_an_event_not_an_error(runtime, signals):
+    agent = Agent(runtime, ThrottledOnce(golden_scripts()))
+    c = agent.run(agent.start_case(signals).case_id)
+    assert c.status == "AWAITING_APPROVAL"
+    retry = [e for e in runtime.store.list_events(c.case_id) if e.status == "retry"]
+    assert len(retry) == 1 and retry[0].stage == "PERCEIVE"
+    assert retry[0].data == {"reason": "throttled", "attempt": 2, "max_attempts": 6, "wait_s": 2.0}
+    assert "llm_retry" in {e.kind for e in runtime.audit.read(c.case_id)}

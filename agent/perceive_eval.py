@@ -99,11 +99,10 @@ def run_eval(llm: LLMProvider) -> dict[str, Any]:
         )
     by_id = {r["id"]: r for r in rows}
     t01, t02 = by_id["T01"]["got"], by_id["T02"]["got"]
-    fusion_ok = bool(
-        t01 and t02 and t02["confidence"] >= 0.75 and t02["confidence"] > t01["confidence"]
-    )
+    # Confidence is graded in code from the located evidence (agent/evidence.py).
+    fusion_ok = bool(t01 and t02 and t01["confidence"] == "Medium" and t02["confidence"] == "High")
     if not fusion_ok:
-        by_id["T02"]["fails"].append("confidence (fusion must be >= 0.75 and > T01)")
+        by_id["T02"]["fails"].append("confidence (T01 must be Medium, T02 High)")
     passed = sum(1 for r in rows if not r["fails"])
     return {
         "passed": passed,

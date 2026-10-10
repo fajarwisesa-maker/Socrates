@@ -16,7 +16,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from agent.providers.base import LLMError, LLMProvider, LLMRequest, LLMResponse
+from agent.providers.base import LLMError, LLMProvider, LLMRequest, LLMResponse, RetryHook
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +35,8 @@ class RecordingProvider:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text("")
 
-    def converse(self, req: LLMRequest) -> LLMResponse:
-        resp = self.inner.converse(req)
+    def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
+        resp = self.inner.converse(req, on_retry)
         entry = {
             "purpose": req.purpose,
             "index": self.counts[req.purpose],
@@ -64,7 +64,7 @@ class ReplayProvider:
         self.pos: dict[tuple[str | None, str], int] = defaultdict(int)
         self.mismatches = 0
 
-    def converse(self, req: LLMRequest) -> LLMResponse:
+    def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
         key = (req.case_id, req.purpose)
         entries = self.queue[req.purpose]
         i = self.pos[key]

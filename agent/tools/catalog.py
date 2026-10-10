@@ -92,6 +92,9 @@ class AssessImpactOut(_Out):
     risk: RiskResult
     stock: dict[str, Any]
     sales_orders: list[dict[str, Any]]
+    labels: dict[str, Any] = Field(
+        {}, description="display names from SAP: plants, suppliers, lanes"
+    )
 
 
 class AssessImpact(Tool):
@@ -128,7 +131,34 @@ class AssessImpact(Tool):
             delay_hours_min=args.delay_hours_min,
             delay_hours_max=args.delay_hours_max,
         )
-        return AssessImpactOut(risk=ctx.solver.risk(req), stock=stock, sales_orders=sos)
+        return AssessImpactOut(
+            risk=ctx.solver.risk(req), stock=stock, sales_orders=sos, labels=_labels(ctx)
+        )
+
+
+def _labels(ctx: ToolContext) -> dict[str, Any]:
+    """Display names for the dashboard (plant, supplier, lane), read from SAP master data."""
+    return {
+        "plants": {p["Plant"]: p.get("PlantName") for p in ctx.sap.query("A_Plant")},
+        "suppliers": {
+            s["Supplier"]: {
+                "name": s.get("SupplierName"),
+                "city": s.get("CityName"),
+                "region": s.get("Region"),
+                "role": s.get("YY1_SupplierRole"),
+            }
+            for s in ctx.sap.query("A_Supplier")
+        },
+        "lanes": {
+            ln["TransportLane"]: {
+                "from": ln.get("FromLocation"),
+                "to": ln.get("ToLocation"),
+                "corridor": ln.get("Corridor"),
+                "description": ln.get("Description"),
+            }
+            for ln in ctx.sap.query("A_TransportLane")
+        },
+    }
 
 
 class SearchPrecedentsIn(_In):

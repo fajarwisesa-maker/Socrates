@@ -204,14 +204,15 @@ class SolveResult(_Model):
 
 
 class CompareRequest(_Model):
-    baseline: SolveResult
+    baseline: SolveResult | None = None
     chosen: SolveResult
     max_exposure: int
 
 
 class CompareResult(_Model):
-    saving_vs_baseline: int
+    saving_vs_baseline: int | None = None  # None without a baseline
     exposure_avoided: int
+    net_protected: int = 0  # exposure avoided minus the cost of the chosen plan
 
 
 class TimingCheckRequest(_Model):

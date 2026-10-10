@@ -64,9 +64,28 @@ def test_bedrock_drops_rejected_temperature_once():
 
 
 def test_bedrock_errors_become_llm_error():
-    stub = StubClient([client_error("ThrottlingException", "slow down")])
-    with pytest.raises(LLMError, match="ThrottlingException"):
+    stub = StubClient([client_error("AccessDeniedException", "no model access")])
+    with pytest.raises(LLMError, match="AccessDeniedException"):
         BedrockProvider("m", "ap-southeast-1", client=stub).converse(REQ)
+    assert len(stub.calls) == 1  # not retried
+
+
+def test_bedrock_retries_throttling_visibly():
+    stub = StubClient([client_error("ThrottlingException", "slow down")] * 2 + [OK])
+    waits, seen = [], []
+    p = BedrockProvider("m", "ap-southeast-1", client=stub, sleep=waits.append)
+    resp = p.converse(REQ, on_retry=lambda *a: seen.append(a))
+    assert resp.text() == "ok" and len(stub.calls) == 3
+    assert waits == [2.0, 4.0]
+    assert seen == [(2, 6, 2.0, "throttled"), (3, 6, 4.0, "throttled")]
+
+
+def test_bedrock_gives_up_after_max_attempts():
+    stub = StubClient([client_error("ThrottlingException", "slow down")] * 6)
+    p = BedrockProvider("m", "ap-southeast-1", client=stub, sleep=lambda s: None)
+    with pytest.raises(LLMError, match="after 6 attempts"):
+        p.converse(REQ)
+    assert len(stub.calls) == 6
 
 
 def test_record_then_replay(tmp_path):

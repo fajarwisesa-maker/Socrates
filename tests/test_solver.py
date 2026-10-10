@@ -95,6 +95,12 @@ def test_saving_and_exposure_avoided(plan, risk):
     )
     assert result.saving_vs_baseline == 19_600_000
     assert result.exposure_avoided == 340_000_000
+    assert result.net_protected == 340_000_000 - 11_400_000
+    no_baseline = compare(
+        CompareRequest(chosen=plan(B, [SafetyStockConstraint()]), max_exposure=risk.max_exposure)
+    )
+    assert no_baseline.saving_vs_baseline is None
+    assert no_baseline.net_protected == 328_600_000
 
 
 # ------------------------------------------------------------ approval timing

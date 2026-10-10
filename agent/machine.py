@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 from agent import critic
 from agent.actions import describe, tool_call_for
 from agent.case_store import CaseEvent, CaseRecord
+from agent.evidence import grade_confidence, locate_evidence
 from agent.prompts import load_prompt
 from agent.providers.base import (
     LLMError,
@@ -39,6 +40,7 @@ from agent.schemas import (
     CandidatePlan,
     Disruption,
     Explanation,
+    PerceivedDisruption,
 )
 from agent.tools.base import ToolCallResult, ToolContext
 from services.solver.models import (
@@ -211,7 +213,24 @@ class Agent:
 
     def _llm(self, case_id: str, stage: str, req: LLMRequest, prompt_version: str) -> LLMResponse:
         t0 = time.perf_counter()
-        resp = self.llm.converse(req.model_copy(update={"case_id": case_id}))
+
+        def on_retry(attempt: int, max_attempts: int, wait_s: float, reason: str) -> None:
+            info = {"attempt": attempt, "max_attempts": max_attempts, "wait_s": wait_s}
+            self.rt.audit.append(
+                case_id,
+                "llm_retry",
+                {"stage": stage, "purpose": req.purpose, "reason": reason} | info,
+            )
+            self._event(
+                case_id,
+                stage,
+                "retry",
+                f"Retrying the model call ({reason})",
+                f"attempt {attempt} of {max_attempts} in {wait_s:.0f} s",
+                {"reason": reason, **info},
+            )
+
+        resp = self.llm.converse(req.model_copy(update={"case_id": case_id}), on_retry)
         case = self.store.get_case(case_id)
         self.store.update_case(case_id, llm_call_count=case.llm_call_count + 1)
         wall = round(time.perf_counter() - t0, 3)
@@ -322,16 +341,17 @@ class Agent:
             tools=[REPORT_DISRUPTION],
             max_tokens=2048,
         )
-        d: Disruption = self._structured(
+        raw: Disruption = self._structured(
             case_id, "PERCEIVE", req, version, "report_disruption", Disruption
         )
-        self.store.update_case(case_id, disruption=d.model_dump())
+        d = self._ground_evidence(case_id, raw, case.signals)
+        self.store.update_case(case_id, disruption=d.model_dump(mode="json"))
         if not d.is_disruption:
             self._leave(
                 case_id,
                 "PERCEIVE",
                 "No disruption in the signals",
-                data={"disruption": d.model_dump()},
+                data={"disruption": d.model_dump(mode="json")},
             )
             self.store.update_case(case_id, status="RESOLVED")
             self._event(case_id, "CASE", "resolved", "Closed: no disruption")
@@ -339,10 +359,14 @@ class Agent:
         detail = (
             f"{d.cause} on {d.lane or 'unknown lane'} at {d.location}; delay "
             f"{d.delay_hours_min}-{d.delay_hours_max} h; refs {d.references or '-'}; "
-            f"confidence {d.confidence:.2f}"
+            f"confidence {d.confidence}"
         )
         self._leave(
-            case_id, "PERCEIVE", "Disruption identified", detail, {"disruption": d.model_dump()}
+            case_id,
+            "PERCEIVE",
+            "Disruption identified",
+            detail,
+            {"disruption": d.model_dump(mode="json")},
         )
         if d.delay_hours_min is None or d.delay_hours_max is None:
             raise Escalate("disruption has no delay estimate; a human must assess it")
@@ -350,11 +374,36 @@ class Agent:
             raise Escalate("disruption cannot be mapped to a lane or a document")
         return True
 
+    def _ground_evidence(
+        self, case_id: str, raw: Disruption, signals: list[dict[str, Any]]
+    ) -> PerceivedDisruption:
+        """Locate every quote in its signal (code, not the model); grade confidence."""
+        located, dropped = locate_evidence(raw.evidence, signals)
+        label, basis = grade_confidence(located)
+        if dropped:
+            log.warning("case %s: dropped evidence not found in signals: %s", case_id, dropped)
+            self.rt.audit.append(case_id, "evidence_dropped", {"dropped": dropped})
+            self._event(
+                case_id,
+                "PERCEIVE",
+                "info",
+                f"Dropped {len(dropped)} evidence quote(s) not found in the signals",
+                "; ".join(f"\u201c{x['quote']}\u201d ({x['reason']})" for x in dropped),
+                {"dropped": dropped},
+            )
+        return PerceivedDisruption(
+            **raw.model_dump(exclude={"evidence", "model_confidence"}),
+            evidence=located,
+            evidence_quotes=[e.quote for e in located],
+            confidence=label,
+            confidence_basis=basis,
+        )
+
     # ---------------------------------------------------------------- ASSESS
 
     def _assess(self, case_id: str) -> bool:
         self._enter(case_id, "ASSESS")
-        d = Disruption.model_validate(self.store.get_case(case_id).disruption)
+        d = PerceivedDisruption.model_validate(self.store.get_case(case_id).disruption)
         prompt, version = load_prompt("assess")
         allowed = {"find_inbound_purchase_orders", "assess_impact"}
         tools = [s for s in self.registry.specs() if s["toolSpec"]["name"] in allowed]
@@ -384,7 +433,7 @@ class Agent:
                 impact.update(args=args, output=r.output)
             return r.output
 
-        messages = [user_text(f"Disruption:\n{d.model_dump_json(indent=2)}")]
+        messages = [user_text(f"Disruption:\n{json.dumps(d.for_llm(), indent=2)}")]
         for _ in range(MAX_LLM_TURNS):
             resp = self._llm(
                 case_id,
@@ -424,6 +473,7 @@ class Agent:
             "purchase_orders": found["purchase_orders"],
             "sales_orders": out["sales_orders"],
             "stock": out["stock"],
+            "labels": out.get("labels", {}),
         }
         self.store.update_case(case_id, affected=affected, risk=risk.model_dump(mode="json"))
         day0 = self._day0(case_id)
@@ -446,7 +496,7 @@ class Agent:
         return True
 
     def _assess_fallback(
-        self, case_id: str, d: Disruption, found: dict[str, Any]
+        self, case_id: str, d: PerceivedDisruption, found: dict[str, Any]
     ) -> dict[str, Any]:
         if not found["purchase_orders"]:
             r = self._tool(
@@ -491,7 +541,7 @@ class Agent:
         day0 = self._day0(case_id)
         context: dict[str, Any] = {
             "round": rnd,
-            "disruption": case.disruption,
+            "disruption": PerceivedDisruption.model_validate(case.disruption).for_llm(),
             "material": case.affected["material"],
             "plant": case.affected["plant"],
             "shortfall_cartons": risk.shortfall,
@@ -543,8 +593,22 @@ class Agent:
             "; ".join(
                 f"{c['option_id']} {c['label']}: {'+'.join(c['strategies'])}" for c in candidates
             ),
-            {"candidates": candidates, "precedent_ids": plan.precedent_ids},
+            {
+                "candidates": candidates,
+                "precedent_ids": plan.precedent_ids,
+                "precedents": self._cited_precedents(case_id, plan.precedent_ids),
+            },
         )
+
+    def _cited_precedents(self, case_id: str, ids: list[str]) -> list[dict[str, Any]]:
+        """Precedents the model cited that a search in this case actually returned."""
+        hits: dict[str, dict[str, Any]] = {}
+        for e in self.store.list_events(case_id):
+            if e.data.get("tool") == "search_precedents" and e.data.get("status") == "ok":
+                for h in e.data["output"]["hits"]:
+                    hits.setdefault(h["id"], h)
+        keys = ("id", "title", "period", "synthetic")
+        return [{k: hits[i].get(k) for k in keys} for i in ids if i in hits]
 
     # ---------------------------------------------------------------- SIMULATE
 
@@ -610,6 +674,7 @@ class Agent:
                 suppliers=suppliers,
                 registry=self.registry,
                 ctx=ctx,
+                plant_names=(case.affected.get("labels") or {}).get("plants"),
             )
             reviews[o["option_id"]] = rv
             findings.append(
@@ -631,7 +696,7 @@ class Agent:
                     if rv.clean
                     else "violates " + ", ".join(v.rule for v in rv.violations)
                 ),
-                "; ".join(c.detail for c in rv.violations) or "",
+                "; ".join(c.plain or c.detail for c in rv.violations) or "",
                 findings[-1],
             )
         self.store.update_case(case_id, critic_findings=[*case.critic_findings, *findings])
@@ -716,21 +781,25 @@ class Agent:
             "max_exposure_display": format_idr(risk.max_exposure),
             "expected_exposure": risk.expected_exposure,
         }
-        if baseline:
-            c = self.rt.solver.compare(
-                CompareRequest(
-                    baseline=SolveResult.model_validate(baseline["result"]),
-                    chosen=SolveResult.model_validate(chosen["result"]),
-                    max_exposure=risk.max_exposure,
-                )
+        c = self.rt.solver.compare(
+            CompareRequest(
+                baseline=SolveResult.model_validate(baseline["result"]) if baseline else None,
+                chosen=SolveResult.model_validate(chosen["result"]),
+                max_exposure=risk.max_exposure,
             )
+        )
+        out |= {
+            "exposure_avoided": c.exposure_avoided,
+            "exposure_avoided_display": format_idr(c.exposure_avoided),
+            "net_protected": c.net_protected,
+            "net_protected_display": format_idr(c.net_protected),
+        }
+        if baseline:
             out |= {
                 "baseline": baseline["option_id"],
                 "baseline_cost_display": baseline["total_cost_display"],
                 "saving_vs_baseline": c.saving_vs_baseline,
-                "saving_display": format_idr(c.saving_vs_baseline),
-                "exposure_avoided": c.exposure_avoided,
-                "exposure_avoided_display": format_idr(c.exposure_avoided),
+                "saving_display": format_idr(c.saving_vs_baseline or 0),
             }
         return out
 

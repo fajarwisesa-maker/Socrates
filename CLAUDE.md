@@ -18,6 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit done (`docs/ui-redesign-audit.md`); backend additions A–G and step 2 in progress |
 
 ## How to run
 
@@ -465,6 +466,39 @@ tests/          pytest
   `make replay` (same UI, REPLAY badge visible); nothing else changes.
 - `web_smoke.sh` waits until its ports are free on exit, so smoke runs can go back to back;
   `SMOKE_LLM=replay` runs the golden-path test on the recording.
+
+### UI redesign — locked decisions (agreed at the step 1 check-in)
+
+Audit and field gap list: `docs/ui-redesign-audit.md`. The backend additions A–G are
+additive (no field removed).
+
+- **A. Evidence spans are located by code, never by the model.** `report_disruption`
+  returns `evidence: [{quote, source: whatsapp|pdf, field}]`. Code finds each quote in that
+  signal's text (whitespace- and case-normalised, otherwise exact) and stores `start`/`end`
+  offsets. A quote that cannot be found is dropped and logged, never guessed. The UI
+  highlights only spans that passed this check. `evidence_quotes` stays, derived from it.
+- **Confidence is computed in code from the located evidence** (no extra LLM call, same
+  result every run): one informal source → **Medium**; a second source that agrees on
+  **lane and delay** (the forwarder PDF) → **High**. Agreement is counted per field from
+  each evidence item's `source` and `field`. The UI shows labels (Medium → High), never
+  percentages. The model's own numeric confidence is kept in the audit trail only.
+- **C.** `assess_impact` also returns display labels (plant names, supplier name + city,
+  lane from/to/corridor) read from SAP; no extra tool call; the UI never hard-codes names.
+- **D. Precedent period** (`period: 2025-02`) is carried in search hits and in the PLAN
+  `completed` event (`precedents: [{id, title, period, synthetic}]`). Planner mode and the
+  details drawer label them **"synthetic precedent"**; Presenter mode may show just
+  "Similar: Pantura flood, Feb 2025".
+- **E. Critic sentence from a code template** filled with the solver's numbers
+  (e.g. "Bandung DC would drop to 50 cartons, below its safety stock of 400"), plus the
+  structured `facts`. The LLM may write the longer explanation but never produces the
+  numbers in that sentence.
+- **F. Net protected** = `exposure_avoided − chosen_cost`, computed by the solver's
+  `compare` (`net_protected`, with a display form in `summary`). The impact meter shows it
+  as **"Protected (net)"**; the final line keeps the gross wording:
+  "Rp 340 jt protected for Rp 11,4 jt". The UI does no money arithmetic.
+- **G. Throttling retries are visible.** The Bedrock provider retries throttling itself and
+  writes an `llm` event with status `retry`; the UI shows a small neutral "Retrying…" note
+  on the current stage, and error styling only when retries run out (escalation).
 
 ## Open items
 

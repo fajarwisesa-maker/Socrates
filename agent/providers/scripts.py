@@ -36,10 +36,42 @@ def _first_json(req: LLMRequest) -> dict[str, Any]:
     return json.loads(text[text.index("{") :])
 
 
+# (quote, field) the scripted model points at, per signal type. Code locates them.
+_EVIDENCE = {
+    "whatsapp": [
+        ("lalin Pantura", "lane"),
+        ("macet total", "is_disruption"),
+        ("banjir di Brebes", "cause"),
+        ("ga gerak sm sekali", "is_disruption"),
+        ("bs 2-3 hari", "delay"),
+    ],
+    "pdf": [
+        ("severe flooding", "cause"),
+        ("Jalur Pantura", "lane"),
+        ("between Brebes and Tegal", "location"),
+        ("48–72 hours", "delay"),
+        ("4500018231", "references"),
+    ],
+}
+
+
+def _signal_blocks(req: LLMRequest) -> list[tuple[int, str, str]]:
+    """(number, type, text) per "### Signal N (type...)" block of the PERCEIVE prompt."""
+    text = _all_text(req)
+    parts = re.split(r"^### Signal (\d+) \((\w+)[^)]*\)\n", text, flags=re.M)
+    return [(int(parts[i]), parts[i + 1], parts[i + 2]) for i in range(1, len(parts) - 2, 3)]
+
+
 def perceive(req: LLMRequest, n: int) -> dict[str, Any]:
     text = _all_text(req)
     refs = sorted(set(re.findall(r"\b45\d{8}\b", text)))
     has_notice = "force majeure" in text.lower()
+    evidence = [
+        {"quote": q, "signal": num, "field": f}
+        for num, kind, body in _signal_blocks(req)
+        for q, f in _EVIDENCE.get(kind, [])
+        if q in body
+    ]
     return tool_call(
         "report_disruption",
         {
@@ -50,12 +82,8 @@ def perceive(req: LLMRequest, n: int) -> dict[str, Any]:
             "delay_hours_min": 48,
             "delay_hours_max": 72,
             "references": refs,
-            "confidence": 0.92 if has_notice else 0.6,
-            "evidence_quotes": [
-                q
-                for q in ("banjir di Brebes", "bs 2-3 hari", "48–72 hours", "4500018231")
-                if q in text
-            ],
+            "evidence": evidence,
+            "model_confidence": 0.92 if has_notice else 0.6,
         },
     )
 
@@ -101,7 +129,7 @@ def plan(req: LLMRequest, n: int) -> dict[str, Any]:
                 {
                     "label": "Air charter",
                     "strategies": ["spot_air"],
-                    "rationale": "Fastest ground-independent option; precedent P-020.",
+                    "rationale": "Fastest option and independent of the flooded road.",
                 },
                 {
                     "label": "Transfer + bridge order",

@@ -1,10 +1,10 @@
 {
-  "recorded_at": "2026-10-10T05:33:04+00:00",
+  "recorded_at": "2026-10-10T10:49:02+00:00",
   "provider": "fake",
   "model": "fake",
   "prompts": [
     "assess.v1",
-    "perceive.v1",
+    "perceive.v2",
     "plan.v1",
     "reflect.v1"
   ],
@@ -59,18 +59,18 @@
     }
   ],
   "stage_timings_s": {
-    "PERCEIVE": "0.003",
-    "ASSESS": "0.051",
-    "PLAN": "0.096",
-    "SIMULATE": "0.745",
-    "REFLECT": "0.026",
-    "PLAN#2": "0.005",
-    "SIMULATE#2": "0.091",
-    "REFLECT#2": "0.029",
-    "ACT": "0.05",
-    "VERIFY": "0.016"
+    "PERCEIVE": "0.004",
+    "ASSESS": "0.059",
+    "PLAN": "0.017",
+    "SIMULATE": "0.073",
+    "REFLECT": "0.029",
+    "PLAN#2": "0.013",
+    "SIMULATE#2": "0.081",
+    "REFLECT#2": "0.032",
+    "ACT": "0.057",
+    "VERIFY": "0.018"
   },
-  "seconds_to_approval_card": 1.17,
+  "seconds_to_approval_card": 0.43,
   "outcome": {
     "chosen_option": "B2",
     "summary": {
@@ -80,12 +80,14 @@
       "max_exposure": 340000000,
       "max_exposure_display": "Rp 340.000.000",
       "expected_exposure": 340000000,
+      "exposure_avoided": 340000000,
+      "exposure_avoided_display": "Rp 340.000.000",
+      "net_protected": 328600000,
+      "net_protected_display": "Rp 328.600.000",
       "baseline": "A2",
       "baseline_cost_display": "Rp 31.000.000",
       "saving_vs_baseline": 19600000,
-      "saving_display": "Rp 19.600.000",
-      "exposure_avoided": 340000000,
-      "exposure_avoided_display": "Rp 340.000.000"
+      "saving_display": "Rp 19.600.000"
     },
     "tool_calls": 11,
     "llm_calls": 8,

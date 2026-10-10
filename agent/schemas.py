@@ -19,9 +19,16 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Disruption(_Strict):
-    """PERCEIVE output: one fused disruption from all signals."""
+EvidenceField = Literal["is_disruption", "cause", "location", "lane", "delay", "references"]
 
+
+class EvidenceItem(_Strict):
+    quote: str = Field(description="verbatim phrase copied from the signal, slang and typos kept")
+    signal: int = Field(ge=1, description="number of the signal the quote comes from")
+    field: EvidenceField = Field(description="the disruption field this quote supports")
+
+
+class _DisruptionFields(BaseModel):
     is_disruption: bool
     cause: Cause
     lane: Lane | None = Field(description="affected transport lane, null if unknown / none")
@@ -29,8 +36,6 @@ class Disruption(_Strict):
     delay_hours_min: float | None = Field(None, ge=0)
     delay_hours_max: float | None = Field(None, ge=0)
     references: list[str] = Field(description="document numbers (PO/SO/shipment), not SKUs")
-    confidence: float = Field(ge=0, le=1)
-    evidence_quotes: list[str] = Field(description="short verbatim quotes from the signals")
 
     @field_validator("delay_hours_max")
     @classmethod
@@ -39,6 +44,44 @@ class Disruption(_Strict):
         if v is not None and lo is not None and v < lo:
             raise ValueError("delay_hours_max < delay_hours_min")
         return v
+
+
+class Disruption(_DisruptionFields):
+    """PERCEIVE output from the model: one fused disruption from all signals."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evidence: list[EvidenceItem] = Field(
+        description="quotes supporting the fields, each tagged with its signal and field"
+    )
+    model_confidence: float = Field(
+        ge=0, le=1, description="your own confidence; recorded in the audit trail only"
+    )
+
+
+class LocatedEvidence(BaseModel):
+    """An evidence quote that code found in its signal (offsets computed in code)."""
+
+    quote: str
+    signal: int
+    source: str  # signal type: whatsapp | email | pdf
+    field: EvidenceField
+    start: int
+    end: int
+    text: str  # the signal text between start and end, as written
+
+
+class PerceivedDisruption(_DisruptionFields):
+    """The stored disruption: model fields + code-located evidence + code-graded confidence."""
+
+    evidence: list[LocatedEvidence] = []
+    evidence_quotes: list[str] = []
+    confidence: Literal["Low", "Medium", "High"]
+    confidence_basis: dict[str, Any] = {}
+
+    def for_llm(self) -> dict[str, Any]:
+        """What later stages show the model (no offsets)."""
+        return self.model_dump(mode="json", exclude={"evidence", "confidence_basis"})
 
 
 class Candidate(_Strict):

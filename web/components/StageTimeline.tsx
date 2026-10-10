@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { dayLabel, pct, rupiah, thousands } from "@/lib/format";
+import { dayLabel, rupiah, thousands } from "@/lib/format";
 import { STAGES, type CaseEvent, type CaseRecord, type Stage } from "@/lib/types";
 import { Badge, Empty, Panel, TierBadge, type Tone } from "./ui";
 
@@ -195,7 +195,7 @@ function StageDetails({ stage, record }: { stage: Stage; record: CaseRecord }) {
           <KV k="Location" v={d.location ?? "-"} />
           <KV k="Delay" v={d.delay_hours_min != null ? `${d.delay_hours_min}–${d.delay_hours_max} h` : "unknown"} />
           <KV k="References" v={(d.references ?? []).join(", ") || "-"} />
-          <KV k="Confidence" v={pct(d.confidence)} />
+          <KV k="Confidence" v={d.confidence} />
           <div className="pt-1 text-xs text-slate-500">Evidence (quoted from the signals)</div>
           <ul className="space-y-0.5">
             {(d.evidence_quotes ?? []).map((q: string) => (

@@ -178,7 +178,7 @@ export interface Disruption {
   delay_hours_min: number | null;
   delay_hours_max: number | null;
   references: string[];
-  confidence: number;
+  confidence: "Low" | "Medium" | "High";
   evidence_quotes: string[];
 }
 

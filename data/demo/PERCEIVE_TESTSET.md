@@ -16,7 +16,10 @@ A signal is `{"type": "whatsapp"|"email", "text": ...}` or `{"type": "pdf", "pat
   (Bandung → Cikarang via Cipularang/Cikampek), `SBY-JKT` (Surabaya → Jakarta),
   `TPR-CKR` (Tanjung Priok port → Cikarang), `MRK-BKS` (Merak–Bakauheni ferry), or `null`.
 - `references`: document numbers only (PO, SO, shipment); not SKUs.
-- `confidence_band`: `high` ≥ 0.75, `medium` 0.40–0.75, `low` < 0.40.
+- `confidence_band`: `high` / `medium` / `low`. Since the UI redesign, confidence is graded
+  in code from the evidence quotes that code located in the signals (`agent/evidence.py`):
+  nothing located = low, one source = medium, a second signal agreeing on lane and delay =
+  high. The model's own number is kept in the audit trail only.
 
 ## Scoring (applied in Phase 4)
 
@@ -28,5 +31,5 @@ An item passes when all of these hold:
 - `references` match as a set.
 
 `location` and `confidence_band` are reported but not pass/fail, with two exceptions:
-T02 (demo fusion) must have confidence ≥ 0.75 and higher than T01.
+T01 (WhatsApp alone) must be Medium and T02 (demo fusion) High.
 Target: ≥ 18/20 with T01 and T02 passing.

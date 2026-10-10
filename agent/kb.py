@@ -18,6 +18,8 @@ _WORD = re.compile(r"[a-z0-9]+")
 class Precedent(BaseModel):
     id: str
     title: str
+    period: str | None = None  # "YYYY-MM" from the front matter
+    synthetic: bool = False
     tags: list[str]
     text: str
     path: str
@@ -26,6 +28,8 @@ class Precedent(BaseModel):
 class PrecedentHit(BaseModel):
     id: str
     title: str
+    period: str | None = None
+    synthetic: bool = False
     tags: list[str]
     score: float
     excerpt: str
@@ -50,6 +54,8 @@ def load_precedents(directory: Path = PRECEDENT_DIR) -> list[Precedent]:
             Precedent(
                 id=meta["id"].strip(),
                 title=meta["title"].strip(),
+                period=meta.get("period", "").strip() or None,
+                synthetic=meta.get("synthetic", "").strip().lower() == "true",
                 tags=tags,
                 text=body.strip(),
                 path=str(f.relative_to(REPO_ROOT)),
@@ -80,6 +86,8 @@ class LocalBM25KB:
             PrecedentHit(
                 id=d.id,
                 title=d.title,
+                period=d.period,
+                synthetic=d.synthetic,
                 tags=d.tags,
                 score=round(float(s), 3),
                 excerpt=_excerpt(d.text),

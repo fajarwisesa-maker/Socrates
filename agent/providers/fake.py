@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
-from agent.providers.base import LLMRequest, LLMResponse
+from agent.providers.base import LLMRequest, LLMResponse, RetryHook
 
 Script = Callable[[LLMRequest, int], dict[str, Any]]  # (request, call_no) -> message
 
@@ -33,7 +33,7 @@ class FakeProvider:
         self.calls: dict[str, int] = defaultdict(int)
         self.requests: list[LLMRequest] = []
 
-    def converse(self, req: LLMRequest) -> LLMResponse:
+    def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
         self.requests.append(req)
         n = self.calls[req.purpose]
         self.calls[req.purpose] += 1

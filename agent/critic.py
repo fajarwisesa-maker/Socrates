@@ -3,6 +3,9 @@
 Rules: feasible, safety_stock, incoterm, supplier_capacity, cutoff_met, tier_mapping.
 A failed rule that a solver constraint can fix carries that constraint, which the state
 machine adds before replanning.
+
+Each check also carries `facts` (the numbers it used) and `plain`, a sentence built from a
+fixed template with those numbers and SAP display names. The LLM never writes it.
 """
 
 from __future__ import annotations
@@ -24,6 +27,15 @@ class RuleCheck(BaseModel):
     passed: bool
     detail: str
     constraint: dict[str, Any] | None = None
+    facts: dict[str, Any] = {}
+    plain: str = ""
+
+
+def _n(x: float | int | None) -> str:
+    """Indonesian thousands separator: 1200 -> "1.200"."""
+    if x is None:
+        return "unknown"
+    return f"{x:,.0f}".replace(",", ".")
 
 
 class ActionTier(BaseModel):
@@ -58,7 +70,16 @@ def review(
     suppliers: dict[str, dict[str, Any]],
     registry: ToolRegistry,
     ctx: ToolContext,
+    plant_names: dict[str, str] | None = None,
 ) -> OptionReview:
+    names = plant_names or {}
+
+    def plant_name(code: str) -> str:
+        return names.get(code) or code
+
+    def supplier_name(code: str) -> str:
+        return suppliers.get(code, {}).get("SupplierName") or code
+
     checks: list[RuleCheck] = []
     feasible = result.status == "optimal" and result.covered_quantity >= result.required_quantity
     checks.append(
@@ -69,6 +90,19 @@ def review(
                 f"covers {result.covered_quantity} of {result.required_quantity} cartons"
                 if result.status == "optimal"
                 else result.infeasible_reason or "infeasible"
+            ),
+            facts={
+                "covered": result.covered_quantity,
+                "required": result.required_quantity,
+                "status": result.status,
+            },
+            plain=(
+                f"Covers all {_n(result.required_quantity)} cartons of the shortfall"
+                if feasible
+                else f"Covers only {_n(result.covered_quantity)} of "
+                f"{_n(result.required_quantity)} cartons"
+                if result.status == "optimal"
+                else f"No feasible plan: {result.infeasible_reason or 'the solver found none'}"
             ),
         )
     )
@@ -84,11 +118,44 @@ def review(
                     detail=f"{s.plant} left at {s.on_hand_after}, "
                     f"below safety stock {s.safety_stock}",
                     constraint={"type": "safety_stock"},
+                    facts={
+                        "plant": s.plant,
+                        "plant_name": plant_name(s.plant),
+                        "left": s.on_hand_after,
+                        "safety_stock": s.safety_stock,
+                    },
+                    plain=f"{plant_name(s.plant)} would drop to {_n(s.on_hand_after)} cartons, "
+                    f"below its safety stock of {_n(s.safety_stock)}",
                 )
             )
     if not any(c.rule == "safety_stock" for c in checks):
+        kept = [
+            {
+                "plant": s.plant,
+                "plant_name": plant_name(s.plant),
+                "left": s.on_hand_after,
+                "safety_stock": s.safety_stock,
+            }
+            for s in result.stock_after
+        ]
         checks.append(
-            RuleCheck(rule="safety_stock", passed=True, detail="all donor DCs keep safety stock")
+            RuleCheck(
+                rule="safety_stock",
+                passed=True,
+                detail="all donor DCs keep safety stock",
+                facts={"donors": kept},
+                plain="Safety stock respected"
+                + (
+                    ": "
+                    + ", ".join(
+                        f"{k['plant_name']} keeps {_n(k['left'])} cartons "
+                        f"(safety stock {_n(k['safety_stock'])})"
+                        for k in kept
+                    )
+                    if kept
+                    else " (no donor DC used)"
+                ),
+            )
         )
 
     for a in result.actions:
@@ -104,6 +171,15 @@ def review(
                 constraint=None
                 if inc in ACCEPTED_INCOTERMS
                 else {"type": "exclude_supplier", "supplier": a.reference},
+                facts={
+                    "supplier": a.reference,
+                    "supplier_name": supplier_name(a.reference),
+                    "incoterm": inc,
+                },
+                plain=f"{supplier_name(a.reference)} delivers {inc} to our DC"
+                if inc in ACCEPTED_INCOTERMS
+                else f"{supplier_name(a.reference)} quotes {inc or 'no Incoterm'}; "
+                f"only {', '.join(sorted(ACCEPTED_INCOTERMS))} is accepted",
             )
         )
         cap = v.get("YY1_CapacityCartons")
@@ -112,6 +188,19 @@ def review(
                 rule="supplier_capacity",
                 passed=cap is not None and a.quantity <= cap,
                 detail=f"{a.reference} {a.quantity} of capacity {cap}",
+                facts={
+                    "supplier": a.reference,
+                    "supplier_name": supplier_name(a.reference),
+                    "quantity": a.quantity,
+                    "capacity": cap,
+                },
+                plain=(
+                    f"{supplier_name(a.reference)} can supply {_n(a.quantity)} cartons "
+                    f"(capacity {_n(cap)})"
+                    if cap is not None and a.quantity <= cap
+                    else f"{supplier_name(a.reference)} cannot supply {_n(a.quantity)} cartons "
+                    f"(capacity {_n(cap)})"
+                ),
             )
         )
 
@@ -125,6 +214,10 @@ def review(
             detail="all supply arrives before the loading cutoff"
             if not late
             else f"{len(late)} action(s) arrive after the cutoff",
+            facts={"late": [a.reference for a in late]},
+            plain="All supply arrives before the loading cutoff"
+            if not late
+            else f"{len(late)} shipment(s) would arrive after the loading cutoff",
         )
     )
 
@@ -148,6 +241,13 @@ def review(
             passed=True,
             detail=", ".join(f"{t.kind} {t.reference}: Tier {t.tier}" for t in tiers)
             + f" (total {format_idr(result.total_cost)})",
+            facts={"tiers": [t.tier for t in tiers], "total_cost": result.total_cost},
+            plain=(
+                "Needs a human approval"
+                if any(t.tier >= 3 for t in tiers)
+                else "Can run without approval"
+            )
+            + f" · total {format_idr(result.total_cost)}",
         )
     )
     return OptionReview(option_id=option_id, checks=checks, tiers=tiers)

@@ -107,6 +107,7 @@ def check_card_stage(case: dict[str, Any]) -> None:
     chosen = options[case["chosen_option"]]
     expect(chosen["result"]["total_cost"] == 11_400_000, "chosen plan != Rp 11.400.000")
     expect(case["summary"].get("saving_vs_baseline") == 19_600_000, "saving != Rp 19.600.000")
+    expect(case["summary"].get("net_protected") == 328_600_000, "net protected != Rp 328.600.000")
     transfer = [a for a in case["actions"] if a["kind"] == "stock_transfer"]
     expect(
         len(transfer) == 1 and transfer[0]["status"] == "EXECUTED" and transfer[0]["tier"] == 2,

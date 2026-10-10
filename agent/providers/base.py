@@ -10,6 +10,7 @@ toolChoice=auto; stages say in the prompt which tool to call and validate the re
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from pydantic import BaseModel
@@ -44,10 +45,15 @@ class LLMError(Exception):
     """Provider failure the state machine turns into an escalation."""
 
 
+# on_retry(attempt, max_attempts, wait_s, reason): called before a provider waits to retry
+# a throttled / transient call, so the agent can show it. The provider still decides.
+RetryHook = Callable[[int, int, float, str], None]
+
+
 class LLMProvider(Protocol):
     name: str
 
-    def converse(self, req: LLMRequest) -> LLMResponse: ...
+    def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse: ...
 
 
 def user_text(text: str) -> Message:
