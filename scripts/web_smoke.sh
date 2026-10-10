@@ -10,7 +10,14 @@ TMP="$(mktemp -d)"
 PIDS=()
 # Each server runs in its own process group (setsid) so cleanup also stops the node /
 # python children that npx and uv spawn.
-cleanup() { for p in "${PIDS[@]}"; do kill -TERM -- "-$p" 2>/dev/null || true; done; rm -rf "$TMP"; }
+cleanup() {
+  for p in "${PIDS[@]}"; do kill -TERM -- "-$p" 2>/dev/null || true; done
+  for _ in $(seq 1 20); do  # wait until both ports are free so back-to-back runs work
+    curl -s -o /dev/null "http://127.0.0.1:$API_PORT/" || curl -s -o /dev/null "http://127.0.0.1:$WEB_PORT/" || break
+    sleep 0.5
+  done
+  rm -rf "$TMP"
+}
 trap cleanup EXIT
 
 wait_for() {  # url
@@ -24,7 +31,10 @@ for port in "$API_PORT" "$WEB_PORT"; do
     echo "port $port is already in use; set API_PORT / WEB_PORT" >&2; exit 1
   fi
 done
-EMBEDDED_SAP=1 LLM_PROVIDER=fake VERIFY_DELAY_SECONDS=3 \
+# SMOKE_LLM=replay runs the same test on the golden recording (and checks the badge).
+SMOKE_LLM="${SMOKE_LLM:-fake}"
+if [ "$SMOKE_LLM" = replay ]; then export REPLAY=1 REPLAY_SPEED=0 SIAGA_EXPECT_REPLAY=1; fi
+EMBEDDED_SAP=1 LLM_PROVIDER="$SMOKE_LLM" VERIFY_DELAY_SECONDS=3 \
   SQLITE_PATH="$TMP/siaga.db" AUDIT_DIR="$TMP/audit" \
   setsid uv run uvicorn --factory api.app:create_app --host 127.0.0.1 --port "$API_PORT" \
   >"$TMP/api.log" 2>&1 &
@@ -39,6 +49,8 @@ wait_for "http://127.0.0.1:$API_PORT/health"
 wait_for "http://127.0.0.1:$WEB_PORT/"
 
 cd web
-SIAGA_WEB_URL="http://127.0.0.1:$WEB_PORT" npx playwright test || {
+# The reject path leaves the recorded run, so replay mode runs the golden-path test only.
+GREP=(); [ "$SMOKE_LLM" = replay ] && GREP=(--grep "verified")
+SIAGA_WEB_URL="http://127.0.0.1:$WEB_PORT" npx playwright test "${GREP[@]}" || {
   echo "--- api log"; tail -40 "$TMP/api.log"; echo "--- web log"; tail -40 "$TMP/web.log"; exit 1
 }

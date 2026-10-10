@@ -14,7 +14,8 @@ import StageTimeline from "./StageTimeline";
 import { Badge } from "./ui";
 
 const POLL_MS = 1000;
-const TERMINAL = new Set(["RESOLVED", "ESCALATED", "FAILED"]);
+const TERMINAL = new Set(["RESOLVED", "REOPENED", "ESCALATED", "FAILED"]);
+const finished = (c: CaseRecord) => TERMINAL.has(c.status);
 
 export default function Dashboard() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -60,7 +61,7 @@ export default function Dashboard() {
         setApprovals(c.approvals);
         setApiDown(false);
         // Stop polling once the case is finished and its final event has arrived.
-        done.current = TERMINAL.has(c.case.status) && ev.events.length === 0;
+        done.current = finished(c.case) && ev.events.length === 0;
       } catch {
         if (alive) setApiDown(true);
       }
@@ -83,7 +84,7 @@ export default function Dashboard() {
     lastSeq.current = -1;
   }
 
-  const running = !!record && !TERMINAL.has(record.status) && record.status !== "AWAITING_APPROVAL";
+  const running = !!record && !finished(record) && record.status !== "AWAITING_APPROVAL";
 
   return (
     <main className="mx-auto max-w-[1600px] p-5">
@@ -92,8 +93,18 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">SIAGA</h1>
             {config?.replay && (
-              <span data-testid="replay-badge">
-                <Badge tone="violet">REPLAY · recorded run</Badge>
+              <span
+                data-testid="replay-badge"
+                title={
+                  config.replay_source
+                    ? `Recorded ${config.replay_source.recorded_at} from ${config.replay_source.provider}` +
+                      (config.replay_source.model ? ` (${config.replay_source.model})` : "")
+                    : "Recorded run"
+                }
+              >
+                <Badge tone="violet">
+                  REPLAY · recorded run{config.replay_source ? ` (${config.replay_source.provider})` : ""}
+                </Badge>
               </span>
             )}
             {config && <Badge tone="slate">LLM: {config.llm_provider}</Badge>}
@@ -155,7 +166,9 @@ export default function Dashboard() {
 
 function StatusBadge({ status }: { status: string }) {
   const tone =
-    status === "RESOLVED"
+    status === "REOPENED"
+      ? "red"
+      : status === "RESOLVED"
       ? "emerald"
       : status === "ESCALATED"
         ? "red"

@@ -14,8 +14,9 @@ and the decisions made. **Update it every phase.**
 | 2 Solver and risk | done |
 | 3 Tool layer, policy, audit, case store | done |
 | 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
-| 5 Case API and dashboard | done — awaiting checkpoint review |
-| 6–8 | not started |
+| 5 Case API and dashboard | done |
+| 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
+| 7–8 | not started |
 
 ## How to run
 
@@ -80,6 +81,22 @@ make web-smoke               # Playwright: full demo + reject path on a producti
 
 Screenshots of a full local run (fake LLM): `docs/screenshots/`.
 
+Phase 6 (replay + hardening):
+
+```bash
+make record-golden           # record the demo with the LLM from .env -> data/golden/
+                             # (accepted only if it reaches Rp 11.4M, approve, RESOLVED)
+make replay                  # REPLAY=1 make dev: full stack on the recording, no Bedrock calls
+make replay-cli              # the recording through the CLI, instant
+make rehearse N=10           # reset -> case -> approve -> VERIFY, N times, via the Case API at
+                             # CASE_API_URL (or an in-process one); report in var/rehearse/
+make rehearse-fault N=3      # inject a delayed transfer: passes only if VERIFY re-opens the case
+make web-smoke-replay        # Playwright on the recording; checks the REPLAY badge
+make preflight               # demo-day checklist (LLM / golden / API / SAP day 0 / web / CBC / Cedar)
+curl -XPOST localhost:8000/demo/inject -H 'content-type: application/json' \
+     -d '{"event":"transfer_delayed"}'   # hidden fault (or po_cancelled); not in the UI
+```
+
 `make help` lists all targets; targets for later phases exit with "implemented in Phase N".
 
 ## Environment variables
@@ -93,6 +110,7 @@ See `.env.example` for the full list.
 | `BEDROCK_MODEL_ID` | **none** | model or inference-profile ID; no default in code by design |
 | `AWS_REGION` | `ap-southeast-1` | |
 | `REPLAY` / `REPLAY_PATH` | `0` / `data/golden/llm.jsonl` | replay recorded LLM responses (no network) |
+| `REPLAY_SPEED` | `1.0` | 1.0 = recorded model latency (looks live), 0 = instant |
 | `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |
 | `LLM_TEMPERATURE` | `0` | sent to Bedrock; dropped automatically if the model rejects it; `off` = never |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
@@ -402,11 +420,57 @@ tests/          pytest
 - **Playwright** `@playwright/test` is pinned to 1.56.1 to match the preinstalled
   Chromium; on a laptop run `npx playwright install chromium` once.
 
+### Phase 6 decisions (replay and demo hardening)
+
+- **Golden run** (`scripts/record_golden.py`, `make record-golden`): one full demo case is
+  run in-process with the configured LLM wrapped in `RecordingProvider`; the recording is
+  written to `data/golden/llm.jsonl` (+ `meta.json`: provider, model, prompt versions,
+  per-call latency/usage, stage timings, outcome) **only if** the run reaches the golden
+  outcome (one replan, Rp 11.400.000, transfer executed, bridge approved, RESOLVED).
+  **The committed recording is a placeholder from the fake LLM** (`meta.json` says
+  `"provider": "fake"`, the UI badge says "(fake)", `make preflight` warns); re-record
+  with Bedrock once credentials exist.
+- **Replay** (`agent/providers/replay.py`): responses are served in recorded order per
+  purpose **per case** (requests now carry `case_id`, never sent to the model), so one
+  API process can replay the demo any number of times. No AWS client is ever built
+  (tested with boto3 patched to fail, and rehearsed with credentials removed and the
+  HTTPS proxy pointed at a dead port). Request digests are recorded for diagnostics only:
+  display dates move with day 0, so they are not enforced. Leaving the recorded path
+  (e.g. rejecting the bridge PO) escalates with "the case left the golden path".
+  `REPLAY_SPEED=1` replays at the recorded model latency so the stage timeline looks live.
+  A test replays the committed recording end to end, so a change to prompts or stage
+  flow that breaks it fails CI until `make record-golden` is re-run.
+- **Fault injection (decision 4):** mock SAP `POST /admin/inject`
+  (`transfer_delayed`: status DELAYED and ETA +48 h; `po_cancelled`: PO
+  CANCELLED_BY_SUPPLIER; latest document unless `ref` given) and a hidden Case API
+  passthrough `POST /demo/inject` (not in the OpenAPI schema or the UI). VERIFY then fails
+  and the case becomes **`REOPENED`** (a new status: `OPEN` stays "new, not yet picked up",
+  which `make rehearse` caught being ambiguous). The dashboard shows a red banner.
+- **`make rehearse`** (`scripts/rehearse.py`) drives the Case API over HTTP (or an
+  in-process one with an embedded mock SAP if none answers) and asserts at every step:
+  exposure 340M (max and expected), shortfall 900, P(stockout) 100%, one replan, an
+  8.1M option rejected for safety stock, a 31M air option, chosen 11.4M, saving 19.6M,
+  Tier 2 transfer 3.9M executed, Tier 3 bridge 7.5M pending with approve-by day 1 18:00,
+  ≤ 20 tool calls; then PO created, RESOLVED, coverage verified, audit chain intact.
+  Reports pass rate, time to approval card, approve→PO, signal→verified and per-stage
+  mean/max to `var/rehearse/report-*.json`. `--inject` flips the expectation to REOPENED
+  and needs VERIFY_DELAY_SECONDS ≥ 3 so the fault lands first.
+- **VERIFY on the compressed timer:** `VERIFY_DELAY_SECONDS` (60 by default) with a live
+  "Verification in N s — re-reading SAP" countdown on the VERIFY row.
+- **Pre-flight** (`make preflight`): LLM (Bedrock ping with tool call, or golden present
+  and not fake), Case API and its provider, mock SAP reachable and day 0 = today, dashboard
+  up, CBC solve time, Cedar policies validate. Red = blocker, amber = read me.
+- **Demo-day fallback:** if Bedrock misbehaves on stage, stop `make dev` and start
+  `make replay` (same UI, REPLAY badge visible); nothing else changes.
+- `web_smoke.sh` waits until its ports are free on exit, so smoke runs can go back to back;
+  `SMOKE_LLM=replay` runs the golden-path test on the recording.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
   `InvalidClientTokenId`. Still to run once they exist: `make aws-probe`, pick the model,
   `make eval-perceive` (target ≥ 18/20), `make demo` with Bedrock ×3 for stability and
-  per-stage timings.
+  per-stage timings, `make record-golden` (replace the fake placeholder), and
+  `make rehearse N=10` against Bedrock.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay rehearse destroy
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -68,6 +68,9 @@ web-check: ## Typecheck, lint and production-build the dashboard
 web-smoke: ## Playwright smoke test of the full demo (starts its own API + dashboard)
 	./scripts/web_smoke.sh
 
+web-smoke-replay: ## Same on the golden recording; checks the REPLAY badge
+	SMOKE_LLM=replay ./scripts/web_smoke.sh
+
 dev: ## Run mock SAP (:8001), Case API (:8000) and dashboard (:3000) together; Ctrl-C stops all
 	@trap 'kill 0' INT TERM EXIT; \
 	$(UV) uvicorn --factory services.sap_mock.app:create_app --host 127.0.0.1 --port 8001 & \
@@ -86,11 +89,24 @@ demo-fake: ## Same with the scripted fake LLM (no AWS needed)
 eval-perceive: ## PERCEIVE accuracy on data/demo/perceive_testset.jsonl (needs Bedrock)
 	$(UV) python scripts/eval_perceive.py
 
-replay: ## Run the full system on the recorded golden run (Phase 6)
-	$(call not_yet,6)
+replay: ## Full stack (mock SAP + API + dashboard) on the golden recording; no Bedrock calls
+	REPLAY=1 $(MAKE) dev
 
-rehearse: ## Reset, run, approve, verify; loop N times (Phase 6)
-	$(call not_yet,6)
+replay-cli: ## The golden recording through the CLI (instant)
+	REPLAY=1 REPLAY_SPEED=0 $(UV) python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
+		--pdf data/demo/forwarder_notice.pdf --auto-approve --verify-delay 1 --embedded-sap
+
+record-golden: ## Record the golden run with the LLM from .env (accepted only if it hits 11.4M)
+	$(UV) python scripts/record_golden.py
+
+rehearse: ## Reset, run, approve, verify N times via the Case API (N=10); report in var/rehearse/
+	$(UV) python scripts/rehearse.py -n $(N)
+
+rehearse-fault: ## Same, but inject a delayed transfer: passes only if VERIFY re-opens the case
+	$(UV) python scripts/rehearse.py -n $(N) --inject transfer_delayed
+
+preflight: ## Demo-day checklist: services up, LLM reachable or golden recording present
+	$(UV) python scripts/preflight.py
 
 destroy: ## Tear down all AWS resources (Phase 7)
 	$(call not_yet,7)

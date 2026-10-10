@@ -23,6 +23,7 @@ class LLMRequest(BaseModel):
     messages: list[Message]
     tools: list[dict[str, Any]] = []  # Converse toolSpec entries
     max_tokens: int = 4096
+    case_id: str | None = None  # set by the agent; never sent to the model (keys replay)
 
 
 class LLMResponse(BaseModel):

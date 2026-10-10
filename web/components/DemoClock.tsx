@@ -15,7 +15,9 @@ export default function DemoClock({ events }: { events: CaseEvent[] }) {
   }, []);
 
   const start = events[0] ? Date.parse(events[0].ts) : null;
-  const end = events.find((e) => e.stage === "CASE" && ["resolved", "escalated"].includes(e.status));
+  const end = events.find(
+    (e) => e.stage === "CASE" && ["resolved", "escalated", "reopened"].includes(e.status),
+  );
   const verified = end?.status === "resolved";
   const stop = end ? Date.parse(end.ts) : (now ?? start ?? 0);
   const seconds = start ? (stop - start) / 1000 : 0;
@@ -27,7 +29,7 @@ export default function DemoClock({ events }: { events: CaseEvent[] }) {
     >
       <div>
         <div className="text-[11px] uppercase tracking-widest text-slate-400">
-          Signal → {verified ? "verified" : end ? "escalated" : "…"}
+          Signal → {verified ? "verified" : end ? end.status : "…"}
         </div>
         <div
           className={`font-mono text-4xl font-bold tabular-nums ${verified ? "text-emerald-400" : "text-white"}`}

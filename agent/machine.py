@@ -211,7 +211,7 @@ class Agent:
 
     def _llm(self, case_id: str, stage: str, req: LLMRequest, prompt_version: str) -> LLMResponse:
         t0 = time.perf_counter()
-        resp = self.llm.converse(req)
+        resp = self.llm.converse(req.model_copy(update={"case_id": case_id}))
         case = self.store.get_case(case_id)
         self.store.update_case(case_id, llm_call_count=case.llm_call_count + 1)
         wall = round(time.perf_counter() - t0, 3)
@@ -1111,7 +1111,7 @@ class Agent:
             self._leave(
                 case_id, "VERIFY", "Verification failed: case re-opened", detail, verification
             )
-            self.store.update_case(case_id, status="OPEN")
+            self.store.update_case(case_id, status="REOPENED")
             self._event(case_id, "CASE", "reopened", "Case re-opened for a human / replan", detail)
 
     # ================================================================ helpers

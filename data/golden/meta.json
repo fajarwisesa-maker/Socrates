@@ -1,0 +1,106 @@
+{
+  "recorded_at": "2026-10-10T05:33:04+00:00",
+  "provider": "fake",
+  "model": "fake",
+  "prompts": [
+    "assess.v1",
+    "perceive.v1",
+    "plan.v1",
+    "reflect.v1"
+  ],
+  "llm_calls": [
+    {
+      "purpose": "perceive",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "assess",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "assess",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "assess",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "plan",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "plan",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "plan",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "reflect",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    }
+  ],
+  "stage_timings_s": {
+    "PERCEIVE": "0.003",
+    "ASSESS": "0.051",
+    "PLAN": "0.096",
+    "SIMULATE": "0.745",
+    "REFLECT": "0.026",
+    "PLAN#2": "0.005",
+    "SIMULATE#2": "0.091",
+    "REFLECT#2": "0.029",
+    "ACT": "0.05",
+    "VERIFY": "0.016"
+  },
+  "seconds_to_approval_card": 1.17,
+  "outcome": {
+    "chosen_option": "B2",
+    "summary": {
+      "chosen": "B2",
+      "chosen_cost": 11400000,
+      "chosen_cost_display": "Rp 11.400.000",
+      "max_exposure": 340000000,
+      "max_exposure_display": "Rp 340.000.000",
+      "expected_exposure": 340000000,
+      "baseline": "A2",
+      "baseline_cost_display": "Rp 31.000.000",
+      "saving_vs_baseline": 19600000,
+      "saving_display": "Rp 19.600.000",
+      "exposure_avoided": 340000000,
+      "exposure_avoided_display": "Rp 340.000.000"
+    },
+    "tool_calls": 11,
+    "llm_calls": 8,
+    "replans": 1,
+    "actions": [
+      [
+        "stock_transfer",
+        "EXECUTED",
+        "STO-000001"
+      ],
+      [
+        "alternate_supplier",
+        "EXECUTED",
+        "4500018232"
+      ]
+    ]
+  }
+}

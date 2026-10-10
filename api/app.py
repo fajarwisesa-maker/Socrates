@@ -18,6 +18,7 @@ Run: uvicorn --factory api.app:create_app --port 8000
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from collections import defaultdict
@@ -32,7 +33,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from agent.case_store import NotFound
-from agent.clients import HttpSapClient
+from agent.clients import HttpSapClient, SapError
 from agent.machine import Agent, CaseStateError
 from agent.providers import make_provider
 from agent.providers.base import LLMProvider
@@ -42,6 +43,14 @@ from siaga_common.settings import REPO_ROOT, Settings, get_settings
 
 log = logging.getLogger(__name__)
 DEMO = REPO_ROOT / "data" / "demo"
+
+
+def _golden_meta(s: Settings) -> dict[str, Any] | None:
+    meta = s.replay_path.parent / "meta.json"
+    if not meta.exists():
+        return None
+    m = json.loads(meta.read_text())
+    return {k: m.get(k) for k in ("provider", "model", "recorded_at")}
 
 
 class ApprovalDecision(BaseModel):
@@ -176,6 +185,7 @@ def create_app(
             "max_tool_calls": s.max_tool_calls,
             "max_replans": s.max_replans,
             "embedded_sap": s.embedded_sap,
+            "replay_source": _golden_meta(s) if (s.replay or s.llm_provider == "replay") else None,
         }
 
     @app.post("/cases", status_code=202)
@@ -258,6 +268,14 @@ def create_app(
         if reset_store:
             reset_store()
         return {"status": "reset", "sap": {"day0": sap_state.get("day0")}}
+
+    @app.post("/demo/inject", include_in_schema=False)
+    def demo_inject(body: dict[str, Any]) -> dict[str, Any]:
+        """Hidden: forward a fault to the mock SAP (makes VERIFY fail). Not in the UI."""
+        try:
+            return runtime.sap.post("/admin/inject", body)
+        except SapError as e:
+            raise HTTPException(e.status, e.message) from e
 
     @app.get("/demo/inputs/whatsapp", response_class=PlainTextResponse)
     def demo_whatsapp() -> str:

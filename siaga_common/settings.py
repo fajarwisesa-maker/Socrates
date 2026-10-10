@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # the Bedrock provider then drops it automatically. "off" never sends it.
     llm_temperature: str = Field("0", alias="LLM_TEMPERATURE")
     replay_path: Path = Field(REPO_ROOT / "data" / "golden" / "llm.jsonl", alias="REPLAY_PATH")
+    # 1.0 = replay at the recorded model latency (looks live on stage), 0 = instant.
+    replay_speed: float = Field(1.0, alias="REPLAY_SPEED")
     llm_record_path: Path | None = Field(None, alias="LLM_RECORD_PATH")
 
     # --- Backends (local now, AWS in Phase 7) ---

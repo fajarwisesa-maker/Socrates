@@ -22,7 +22,14 @@ from pydantic import BaseModel, Field
 from siaga_common.timeline import to_iso
 
 CaseStatus = Literal[
-    "OPEN", "RUNNING", "AWAITING_APPROVAL", "VERIFYING", "RESOLVED", "ESCALATED", "FAILED"
+    "OPEN",
+    "RUNNING",
+    "AWAITING_APPROVAL",
+    "VERIFYING",
+    "RESOLVED",
+    "REOPENED",
+    "ESCALATED",
+    "FAILED",
 ]
 Stage = Literal["PERCEIVE", "ASSESS", "PLAN", "SIMULATE", "REFLECT", "ACT", "VERIFY", "CASE"]
 ApprovalStatus = Literal["PENDING", "APPROVED", "REJECTED", "EXPIRED"]

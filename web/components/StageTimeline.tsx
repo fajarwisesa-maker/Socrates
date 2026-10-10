@@ -86,6 +86,12 @@ export default function StageTimeline({
         </span>
       }
     >
+      {record.status === "REOPENED" && (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-800">
+          <b>Verification failed — case re-opened.</b> SAP no longer shows the planned supply
+          arriving in time; a planner needs to look at it.
+        </div>
+      )}
       {record.status === "ESCALATED" && (
         <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-800">
           <b>Escalated to a human planner:</b> {record.escalation_reason}
@@ -118,7 +124,11 @@ export default function StageTimeline({
                 </Badge>
                 {info.rounds > 1 && <Badge tone="violet">×{info.rounds}</Badge>}
                 {info.replans > 0 && <Badge tone="red">critic rejected → replan</Badge>}
-                <span className="flex-1 truncate text-xs text-slate-600">{last?.title ?? ""}</span>
+                <span className="flex-1 truncate text-xs text-slate-600">
+                  {stage === "VERIFY" && record.status === "VERIFYING" && record.verify_due_at && now
+                    ? `Verification in ${Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000))} s — re-reading SAP`
+                    : (last?.title ?? "")}
+                </span>
                 <span className="w-14 text-right font-mono text-xs tabular-nums text-slate-500">
                   {info.state === "pending" ? "" : `${info.elapsed.toFixed(1)} s`}
                 </span>

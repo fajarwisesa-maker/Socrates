@@ -6,6 +6,9 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await request.post("/api/demo/reset");
   await page.goto("/");
   await expect(page.getByTestId("signal-inbox")).toBeVisible();
+  if (process.env.SIAGA_EXPECT_REPLAY) {
+    await expect(page.getByTestId("replay-badge")).toContainText("REPLAY");
+  }
 
   await page.getByRole("button", { name: "Load demo WhatsApp" }).click();
   await expect(page.getByTestId("whatsapp-input")).toHaveValue(/Brebes/);
@@ -37,7 +40,7 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   });
   await page.getByTestId("stage-VERIFY").getByRole("button").click();
   await page.getByRole("button", { name: /Show \d+ entries/ }).click();
-  await page.screenshot(shots("3-verified"));
+  await page.screenshot(shots(process.env.SIAGA_EXPECT_REPLAY ? "5-replay-verified" : "3-verified"));
 });
 
 test("rejecting the bridge PO replans the remaining shortfall to air", async ({ page, request }) => {

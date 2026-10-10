@@ -6,6 +6,7 @@ export type CaseStatus =
   | "AWAITING_APPROVAL"
   | "VERIFYING"
   | "RESOLVED"
+  | "REOPENED"
   | "ESCALATED"
   | "FAILED";
 
@@ -146,6 +147,7 @@ export interface CaseRecord {
   explanation: { summary: string; recommendation_rationale: string; risks: string[] } | null;
   summary: Summary | null;
   verification: Verification | null;
+  verify_due_at: string | null;
   escalation_reason: string | null;
 }
 
@@ -156,6 +158,7 @@ export interface Config {
   verify_delay_seconds: number;
   max_tool_calls: number;
   max_replans: number;
+  replay_source: { provider: string; model: string | null; recorded_at: string } | null;
 }
 
 export interface AuditEntry {

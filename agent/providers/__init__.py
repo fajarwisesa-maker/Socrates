@@ -10,7 +10,7 @@ def make_provider(settings: Settings) -> LLMProvider:
     if settings.replay or settings.llm_provider == "replay":
         from agent.providers.replay import ReplayProvider
 
-        return ReplayProvider(settings.replay_path)
+        return ReplayProvider(settings.replay_path, speed=settings.replay_speed)
     if settings.llm_provider == "fake":
         from agent.providers.fake import FakeProvider
         from agent.providers.scripts import golden_scripts

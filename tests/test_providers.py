@@ -78,5 +78,5 @@ def test_record_then_replay(tmp_path):
     assert replay.converse(REQ).text() == "answer 0"
     second = replay.converse(REQ)
     assert second.text() == "answer 1" and second.model.startswith("replay:")
-    with pytest.raises(LLMError, match="exhausted"):
+    with pytest.raises(LLMError, match="no recorded"):
         replay.converse(REQ)

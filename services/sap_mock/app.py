@@ -12,6 +12,7 @@ Actions:
 Admin:
     POST /admin/reset          restore the seed state (optional {"day0": "YYYY-MM-DD"})
     GET  /admin/state          day 0 and entity counts
+    POST /admin/inject         hidden fault injection: transfer_delayed | po_cancelled
 
 The mock does bookkeeping only (stock movements, number ranges, confirmations). It does
 not decide tiers or approvals; that is the agent's tool layer + policy engine.
@@ -24,7 +25,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -35,7 +36,7 @@ from services.sap_mock import odata
 from services.sap_mock.seed import reset_store
 from services.sap_mock.store import KEYS, SapStore, SqliteSapStore
 from siaga_common.settings import get_settings
-from siaga_common.timeline import to_iso
+from siaga_common.timeline import from_iso, to_iso
 
 PO_NUMBER_START = 4500018232  # next number after the seeded PO 4500018231
 STO_NUMBER_START = 1
@@ -104,6 +105,16 @@ class ResetIn(BaseModel):
     day0: date | None = None
 
 
+class InjectIn(BaseModel):
+    """Hidden demo fault injection (not part of the main demo)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event: Literal["transfer_delayed", "po_cancelled"]
+    ref: str | None = Field(None, description="document to hit; default = latest created")
+    delay_hours: float = Field(48, gt=0)
+
+
 # ---------- helpers ----------
 
 Row = dict[str, Any]
@@ -164,6 +175,30 @@ def create_app(
     def admin_reset(body: ResetIn | None = None) -> dict[str, Any]:
         day0 = reset_store(store, body.day0 if body else None)
         return {"status": "reset", "day0": to_iso(day0), **_state()}
+
+    @app.post("/admin/inject")
+    def admin_inject(body: InjectIn) -> dict[str, Any]:
+        """Make VERIFY fail: delay the latest transfer, or cancel the latest new PO."""
+        with store.transaction():
+            if body.event == "transfer_delayed":
+                rows = store.list("StockTransfer")
+                row = _pick(rows, "StockTransfer", body.ref)
+                eta = from_iso(row["PlannedArrivalDateTime"]) + timedelta(hours=body.delay_hours)
+                row = {**row, "Status": "DELAYED", "PlannedArrivalDateTime": to_iso(eta)}
+                store.put("StockTransfer", row)
+            else:
+                rows = [p for p in store.list("A_PurchaseOrder") if p.get("CreationDateTime")]
+                row = _pick(rows, "PurchaseOrder", body.ref)
+                row = {**row, "YY1_Status": "CANCELLED_BY_SUPPLIER"}
+                store.put("A_PurchaseOrder", row)
+        return {"injected": body.event, "row": row}
+
+    def _pick(rows: list[Row], key: str, ref: str | None) -> Row:
+        if ref:
+            rows = [r for r in rows if r[key] == ref]
+        if not rows:
+            raise SapError(404, "NothingToInject", f"no {key} to inject into")
+        return sorted(rows, key=lambda r: r[key])[-1]
 
     @app.get("/admin/state")
     def admin_state() -> dict[str, Any]:
