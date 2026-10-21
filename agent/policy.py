@@ -56,9 +56,9 @@ class LocalCedarPolicyEngine:
         files = sorted(policy_dir.glob("*.cedar"))
         if not files:
             raise FileNotFoundError(f"no .cedar files in {policy_dir}")
-        self.policies = "\n".join(f.read_text() for f in files)
+        self.policies = "\n".join(f.read_text(encoding="utf-8") for f in files)
         self.actions = sorted(set(actions))
-        self.schema = (policy_dir / "siaga.cedarschema").read_text() + "".join(
+        self.schema = (policy_dir / "siaga.cedarschema").read_text(encoding="utf-8") + "".join(
             f"\naction {_cedar_str(a)} appliesTo "
             "{ principal: Agent, resource: Case, context: ToolContext };"
             for a in self.actions

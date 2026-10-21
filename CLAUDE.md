@@ -68,6 +68,18 @@ uv run python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
     [--auto-approve] [--verify-delay N]
 ```
 
+Without make or bash (native Windows PowerShell/cmd, or anywhere):
+
+```bash
+uv sync
+cd web && npm ci && cd ..
+uv run python scripts/dev.py --fake          # = LLM_PROVIDER=fake make dev
+uv run python scripts/dev.py --replay        # = make replay
+uv run python scripts/dev.py --embedded-sap  # mock SAP inside the Case API (2 processes)
+uv run pytest -q                             # = make test
+uv run python scripts/rehearse.py -n 10      # = make rehearse N=10
+```
+
 Phase 5 (Case API + dashboard):
 
 ```bash
@@ -679,6 +691,20 @@ additive (no field removed).
   - Results: pytest 158 passed (1 live-Bedrock skipped); web smoke 8/8 (fake) and 7/7
     (replay); `make rehearse N=10` 10/10 on the fake LLM and 10/10 on replay;
     `make rehearse-fault N=3` 3/3.
+
+### Native Windows support
+
+- **All text file I/O passes `encoding="utf-8"`.** Windows Python defaults to cp1252, which
+  garbled `§ – →` in policies, prompts and the recording, and made PERCEIVE drop the
+  forwarder's "48–72 hours" quote. The suite passes with an ASCII default encoding
+  (`PYTHONCOERCECLOCALE=0 LC_ALL=C PYTHONUTF8=0 uv run pytest`); the only remaining
+  `EncodingWarning` is PuLP reading its own ASCII config.
+- **`scripts/dev.py`** replaces `make dev` / `make replay` where there is no bash: it
+  starts the three services in their own process groups and stops all of them on Ctrl-C,
+  SIGTERM or when one exits (`taskkill /T` on Windows, `killpg` elsewhere).
+- **`.gitattributes`** keeps LF in a Windows checkout.
+- Still bash-only: `make` itself and `scripts/web_smoke.sh` (Playwright smoke). On Windows,
+  run Playwright directly in `web/` against a running stack, or use Git Bash.
 
 ## Open items
 

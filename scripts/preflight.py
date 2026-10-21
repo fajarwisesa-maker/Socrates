@@ -42,7 +42,7 @@ def main() -> int:
 
     # --- LLM ---------------------------------------------------------------------------
     meta_path = s.replay_path.parent / "meta.json"
-    meta = json.loads(meta_path.read_text()) if meta_path.exists() else None
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else None
     if replay:
         if not s.replay_path.exists():
             line(RED, "golden recording", f"missing {s.replay_path}; run `make record-golden`")

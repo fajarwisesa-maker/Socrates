@@ -133,7 +133,7 @@ def one_run(
         client.post("/demo/reset").raise_for_status()
         resp = client.post(
             "/cases",
-            data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text()},
+            data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8")},
             files={
                 "pdf": (
                     "forwarder_notice.pdf",
@@ -266,7 +266,7 @@ def main() -> int:
     report = summarise(runs, target, args.inject)
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"report-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
-    path.write_text(json.dumps(report, indent=2))
+    path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nPASS RATE {report['passed']}/{report['total']}")
     if report["t_total_s"]:
         card, total = report["t_card_s"], report["t_total_s"]

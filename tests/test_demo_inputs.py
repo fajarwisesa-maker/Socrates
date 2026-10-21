@@ -17,7 +17,7 @@ LANES = {"SMG-JKT", "BDG-CKR", "SBY-JKT", "TPR-CKR", "MRK-BKS", None}
 
 
 def test_whatsapp_message():
-    text = (DEMO / "whatsapp_driver.txt").read_text()
+    text = (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8")
     for word in ("Pantura", "Brebes", "Cikarang", "2-3 hari"):
         assert word in text
 
@@ -35,13 +35,13 @@ def test_precedents():
     files = sorted((DEMO / "precedents").glob("*.md"))
     assert 18 <= len(files) <= 22
     for f in files:
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
         assert "synthetic: true" in text and "**SYNTHETIC**" in text, f.name
         body = text.split("---", 2)[2]
         words = len(re.sub(r"^>.*$", "", body, flags=re.M).split())
         assert 100 <= words <= 200, (f.name, words)
     similar = {"P-001", "P-002", "P-003"}
-    tags = {f.name[:5]: f.read_text() for f in files}
+    tags = {f.name[:5]: f.read_text(encoding="utf-8") for f in files}
     assert "pantura" in tags["P-001"] and "flood" in tags["P-001"]
     assert "toll" in tags["P-002"]
     assert "port_strike" in tags["P-003"]
@@ -49,11 +49,11 @@ def test_precedents():
 
 
 def test_perceive_testset():
-    lines = (DEMO / "perceive_testset.jsonl").read_text().splitlines()
+    lines = (DEMO / "perceive_testset.jsonl").read_text(encoding="utf-8").splitlines()
     items = [json.loads(line) for line in lines]
     assert len(items) == 20
     assert len({i["id"] for i in items}) == 20
-    demo_text = (DEMO / "whatsapp_driver.txt").read_text().strip()
+    demo_text = (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8").strip()
     assert any(s.get("text") == demo_text for i in items for s in i["signals"])
     non_disruptions = [i for i in items if not i["expected"]["is_disruption"]]
     assert 3 <= len(non_disruptions) <= 8

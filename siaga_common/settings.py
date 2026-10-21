@@ -18,7 +18,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=REPO_ROOT / ".env", extra="ignore", populate_by_name=True
+        env_file=REPO_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
     )
 
     # --- LLM ---
@@ -86,7 +89,7 @@ def export_aws_env(env_file: Path | None = None) -> list[str]:
     if not path.exists():
         return []
     exported = []
-    for key, value in dotenv_values(path).items():
+    for key, value in dotenv_values(path, encoding="utf-8").items():
         if key.startswith("AWS_") and value and key not in os.environ:
             os.environ[key] = value
             exported.append(key)

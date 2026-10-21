@@ -47,7 +47,7 @@ def wait_status(api, case_id, *statuses, timeout=10.0):
 def start_demo_case(api):
     r = api.post(
         "/cases",
-        data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text()},
+        data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8")},
         files={
             "pdf": (
                 "forwarder_notice.pdf",

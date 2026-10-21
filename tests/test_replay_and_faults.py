@@ -20,7 +20,9 @@ GOLDEN = REPO_ROOT / "data" / "golden" / "llm.jsonl"
 
 @pytest.fixture
 def signals():
-    return build_signals((DEMO / "whatsapp_driver.txt").read_text(), DEMO / "forwarder_notice.pdf")
+    return build_signals(
+        (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8"), DEMO / "forwarder_notice.pdf"
+    )
 
 
 @pytest.fixture
@@ -142,7 +144,7 @@ def test_api_inject_passthrough(runtime, sap):
         assert "/demo/inject" not in api.get("/openapi.json").json()["paths"]  # hidden
         r = api.post(
             "/cases",
-            data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text()},
+            data={"whatsapp": (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8")},
         )
         case_id = r.json()["case_id"]
         deadline = time.monotonic() + 10

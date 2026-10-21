@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{'':28}{e.detail}")
 
     agent = Agent(runtime, llm, on_event=show)
-    text = args.whatsapp.read_text() if args.whatsapp else None
+    text = args.whatsapp.read_text(encoding="utf-8") if args.whatsapp else None
     case = agent.start_case(build_signals(text, args.pdf))
     bold, reset = (BOLD, RESET) if colour else ("", "")
     print(f"{bold}SIAGA case {case.case_id}  (LLM: {llm.name}){reset}")

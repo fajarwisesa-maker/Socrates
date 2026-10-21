@@ -71,7 +71,7 @@ def main() -> int:
 
     t0 = time.perf_counter()
     signals = build_signals(
-        (DEMO / "whatsapp_driver.txt").read_text(), DEMO / "forwarder_notice.pdf"
+        (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8"), DEMO / "forwarder_notice.pdf"
     )
     case = agent.start_case(signals)
     c = agent.run(case.case_id)
@@ -102,7 +102,9 @@ def main() -> int:
             print("  -", f)
         return 1
 
-    entries = [json.loads(line) for line in (tmp / "llm.jsonl").read_text().splitlines()]
+    entries = [
+        json.loads(line) for line in (tmp / "llm.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     audit = runtime.audit.read(c.case_id)
     prompts = sorted({e.payload["prompt"] for e in audit if e.kind == "llm_call"})
     meta = {
@@ -132,7 +134,9 @@ def main() -> int:
     }
     args.out.mkdir(parents=True, exist_ok=True)
     shutil.copy(tmp / "llm.jsonl", args.out / "llm.jsonl")
-    (args.out / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n")
+    (args.out / "meta.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"recorded {len(entries)} LLM responses from {inner.name} -> {args.out}/llm.jsonl")
     print(f"prompts {prompts}; {c.tool_call_count} tool calls; card after {t_card:.1f} s")
     return 0

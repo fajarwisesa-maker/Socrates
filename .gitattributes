@@ -1,0 +1,5 @@
+# LF everywhere, also in a Windows checkout (shell scripts, demo text, recordings)
+* text=auto eol=lf
+*.png binary
+*.pdf binary
+*.db binary

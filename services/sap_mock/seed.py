@@ -38,7 +38,7 @@ def load_seed(day0: datetime, seed_dir: Path = SEED_DIR) -> dict[str, list[dict[
     data: dict[str, list[dict[str, Any]]] = {}
     for entity_set in KEYS:
         path = seed_dir / f"{entity_set}.json"
-        rows = json.loads(path.read_text()) if path.exists() else []
+        rows = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
         data[entity_set] = [_resolve(r, day0) for r in rows]
     return data
 

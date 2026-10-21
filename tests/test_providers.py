@@ -129,7 +129,8 @@ def test_aws_values_in_dotenv_reach_boto3_but_real_env_wins(tmp_path, monkeypatc
 
     env = tmp_path / ".env"
     env.write_text(
-        "LLM_PROVIDER=bedrock\nAWS_BEARER_TOKEN_BEDROCK=from-dotenv\nAWS_PROFILE=from-dotenv\n"
+        "LLM_PROVIDER=bedrock\nAWS_BEARER_TOKEN_BEDROCK=from-dotenv\nAWS_PROFILE=from-dotenv\n",
+        encoding="utf-8",
     )
     monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK", raising=False)
     monkeypatch.setenv("AWS_PROFILE", "from-shell")

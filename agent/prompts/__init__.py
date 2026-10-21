@@ -18,4 +18,4 @@ def load_prompt(stage: str, version: int | None = None) -> tuple[str, str]:
     if not files:
         raise FileNotFoundError(f"no prompt for stage {stage!r}")
     v = version or max(files)
-    return files[v].read_text().strip(), f"{stage}.v{v}"
+    return files[v].read_text(encoding="utf-8").strip(), f"{stage}.v{v}"

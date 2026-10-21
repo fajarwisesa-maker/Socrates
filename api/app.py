@@ -49,7 +49,7 @@ def _golden_meta(s: Settings) -> dict[str, Any] | None:
     meta = s.replay_path.parent / "meta.json"
     if not meta.exists():
         return None
-    m = json.loads(meta.read_text())
+    m = json.loads(meta.read_text(encoding="utf-8"))
     return {k: m.get(k) for k in ("provider", "model", "recorded_at")}
 
 
@@ -279,7 +279,7 @@ def create_app(
 
     @app.get("/demo/inputs/whatsapp", response_class=PlainTextResponse)
     def demo_whatsapp() -> str:
-        return (DEMO / "whatsapp_driver.txt").read_text()
+        return (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8")
 
     @app.get("/demo/inputs/pdf")
     def demo_pdf() -> FileResponse:

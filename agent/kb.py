@@ -46,7 +46,7 @@ def _tokens(text: str) -> list[str]:
 def load_precedents(directory: Path = PRECEDENT_DIR) -> list[Precedent]:
     out = []
     for f in sorted(directory.glob("*.md")):
-        raw = f.read_text()
+        raw = f.read_text(encoding="utf-8")
         _, front, body = raw.split("---", 2)
         meta = dict(line.split(":", 1) for line in front.strip().splitlines() if ":" in line)
         tags = [t.strip() for t in meta["tags"].strip().strip("[]").split(",")]

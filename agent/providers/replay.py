@@ -33,7 +33,7 @@ class RecordingProvider:
         self.name = f"recording({inner.name})"
         self.counts: dict[str, int] = defaultdict(int)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text("")
+        self.path.write_text("", encoding="utf-8")
 
     def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
         resp = self.inner.converse(req, on_retry)
@@ -44,7 +44,7 @@ class RecordingProvider:
             "response": resp.model_dump(),
         }
         self.counts[req.purpose] += 1
-        with self.path.open("a") as f:
+        with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return resp
 
@@ -57,7 +57,7 @@ class ReplayProvider:
         if not self.path.exists():
             raise LLMError(f"no golden recording at {self.path}; run `make record-golden`")
         self.queue: dict[str, list[dict]] = defaultdict(list)
-        for line in self.path.read_text().splitlines():
+        for line in self.path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 e = json.loads(line)
                 self.queue[e["purpose"]].append(e)

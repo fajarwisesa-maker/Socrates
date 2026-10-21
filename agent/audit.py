@@ -91,7 +91,11 @@ class LocalAuditWriter:
         path = self._path(case_id)
         if not path.exists():
             return []
-        return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
     def append(self, case_id: str, kind: str, payload: dict[str, Any]) -> AuditEntry:
         with self._lock:
@@ -108,7 +112,7 @@ class LocalAuditWriter:
                 "prev_hash": prev,
             }
             entry = AuditEntry(**body, hash=_digest(body))
-            with self._path(case_id).open("a") as f:
+            with self._path(case_id).open("a", encoding="utf-8") as f:
                 f.write(entry.model_dump_json() + "\n")
             self._tail[case_id] = (seq + 1, entry.hash)
             return entry

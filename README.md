@@ -11,6 +11,9 @@ See [CLAUDE.md](CLAUDE.md) for how to run, configuration, architecture and decis
 uv sync && make test
 ```
 
+No make or bash (e.g. Windows without WSL): `uv sync`, `cd web && npm ci`, then
+`uv run python scripts/dev.py --fake` and open http://localhost:3000.
+
 ## Screenshots
 
 Presenter mode (projector, 1280×720), one stage at a time, from the replay of the demo case:

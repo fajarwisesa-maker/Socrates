@@ -15,7 +15,9 @@ DEMO = REPO_ROOT / "data" / "demo"
 
 @pytest.fixture
 def signals():
-    return build_signals((DEMO / "whatsapp_driver.txt").read_text(), DEMO / "forwarder_notice.pdf")
+    return build_signals(
+        (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8"), DEMO / "forwarder_notice.pdf"
+    )
 
 
 @pytest.fixture

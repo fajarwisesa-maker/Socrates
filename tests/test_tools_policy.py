@@ -281,9 +281,9 @@ def test_tampering_breaks_the_chain(runtime, ctx):
     invoke(runtime, ctx, "execute_stock_transfer", TRANSFER)
     invoke(runtime, ctx, "search_precedents", {"query": "flood"})
     path = runtime.audit.dir / f"{ctx.case_id}.jsonl"
-    lines = path.read_text().splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
     lines[1] = lines[1].replace("3900000", "390000")  # edit the transfer's tool_call entry
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     v = runtime.audit.verify(ctx.case_id)
     assert not v.ok and v.broken_at == 1 and v.reason == "hash mismatch"
 
@@ -292,7 +292,7 @@ def test_tampering_breaks_the_chain(runtime, ctx):
 
 
 def test_cedar_threshold_matches_code():
-    cedar = (REPO_ROOT / "policy" / "siaga.cedar").read_text()
+    cedar = (REPO_ROOT / "policy" / "siaga.cedar").read_text(encoding="utf-8")
     amounts = {int(a) for a in re.findall(r"amount_idr\s*[<>]=?\s*(\d+)", cedar)}
     assert amounts == {TIER2_MAX_IDR}
 
