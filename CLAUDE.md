@@ -122,6 +122,7 @@ See `.env.example` for the full list.
 | `LLM_PROVIDER` | `bedrock` | `bedrock` \| `fake` \| `replay` |
 | `BEDROCK_MODEL_ID` | **none** | model or inference-profile ID; no default in code by design |
 | `AWS_REGION` | `ap-southeast-1` | |
+| `AWS_PROFILE` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`) / `AWS_BEARER_TOKEN_BEDROCK` | unset | AWS credentials: one of a profile, access keys, or a Bedrock API key. They can sit in `.env`; `export_aws_env()` passes `AWS_*` lines to boto3, and the shell environment wins. A Bedrock API key covers model calls; `make aws-check` needs a profile or access keys (STS) |
 | `REPLAY` / `REPLAY_PATH` | `0` / `data/golden/llm.jsonl` | replay recorded LLM responses (no network) |
 | `REPLAY_SPEED` | `1.0` | 1.0 = recorded model latency (looks live), 0 = instant |
 | `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |

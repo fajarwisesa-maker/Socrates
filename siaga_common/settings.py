@@ -70,6 +70,29 @@ class Settings(BaseSettings):
         return self.bedrock_model_id
 
 
+def export_aws_env(env_file: Path | None = None) -> list[str]:
+    """Copy AWS_* values from `.env` into os.environ for boto3.
+
+    pydantic-settings reads `.env` only for the fields above; boto3 reads credentials
+    (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN, AWS_PROFILE, or a
+    Bedrock API key in AWS_BEARER_TOKEN_BEDROCK) from the process environment. Variables
+    already set in the real environment win. Returns the names exported (never values).
+    """
+    import os
+
+    from dotenv import dotenv_values
+
+    path = env_file or REPO_ROOT / ".env"
+    if not path.exists():
+        return []
+    exported = []
+    for key, value in dotenv_values(path).items():
+        if key.startswith("AWS_") and value and key not in os.environ:
+            os.environ[key] = value
+            exported.append(key)
+    return exported
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

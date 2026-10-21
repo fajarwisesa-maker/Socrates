@@ -20,6 +20,9 @@ def make_provider(settings: Settings) -> LLMProvider:
         provider: LLMProvider = FakeProvider(golden_scripts())
     else:
         from agent.providers.bedrock import BedrockProvider
+        from siaga_common.settings import export_aws_env
+
+        export_aws_env()  # credentials / Bedrock API key from .env reach boto3
 
         temp = (
             None if settings.llm_temperature.lower() == "off" else float(settings.llm_temperature)

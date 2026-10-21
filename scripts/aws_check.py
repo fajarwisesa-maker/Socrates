@@ -118,8 +118,11 @@ def main() -> int:
     ap.add_argument("--model-id", help="make one tiny Converse + tool call with this ID")
     args = ap.parse_args()
 
-    from siaga_common.settings import get_settings
+    from siaga_common.settings import export_aws_env, get_settings
 
+    exported = export_aws_env()
+    if exported:
+        print(f"Using from .env: {', '.join(exported)}")
     region = args.region or get_settings().aws_region
     print(f"Region: {region}")
     try:

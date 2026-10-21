@@ -122,3 +122,20 @@ def test_simulated_throttle_exhaust_raises_llm_error():
     )
     with pytest.raises(LLMError, match="after 6 attempts"):
         p.converse(REQ.model_copy(update={"case_id": "c1"}))
+
+
+def test_aws_values_in_dotenv_reach_boto3_but_real_env_wins(tmp_path, monkeypatch):
+    from siaga_common.settings import export_aws_env
+
+    env = tmp_path / ".env"
+    env.write_text(
+        "LLM_PROVIDER=bedrock\nAWS_BEARER_TOKEN_BEDROCK=from-dotenv\nAWS_PROFILE=from-dotenv\n"
+    )
+    monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK", raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "from-shell")
+    assert export_aws_env(env) == ["AWS_BEARER_TOKEN_BEDROCK"]
+    import os
+
+    assert os.environ["AWS_BEARER_TOKEN_BEDROCK"] == "from-dotenv"
+    assert os.environ["AWS_PROFILE"] == "from-shell"  # the real environment wins
+    monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK")
