@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 /*
- * SIAGA visual system (redesign step 2).
+ * SIAGA visual system (redesign step 2; darkened in step 6 for the projector check: every
+ * text pair keeps >= 4.5:1 and white icons on fills >= 3:1 after a 30% contrast washout,
+ * see web/e2e/projector.spec.ts).
  * Colour means something: brand teal = SIAGA; red = money at risk / rejected;
  * amber = waiting for a human; green = resolved / executed. Status colours are never
- * decorative. Text never lighter than ink-2 (#475569). Text-on-tint uses the *-ink shades
+ * decorative. Text never lighter than ink-2 (#334155). Text-on-tint uses the *-ink shades
  * (>= 4.5:1 on white and on their soft tint); the base hues are for fills, icons and
  * large numbers.
  */
@@ -14,22 +16,22 @@
   --surface-2: #eceeeb; /* filled areas instead of hairline borders */
   --line: #cbd2d9; /* 2px borders only */
   --ink: #0f172a;
-  --ink-2: #475569;
+  --ink-2: #334155;
 
   --brand: #0f766e;
-  --brand-ink: #0b5d57;
+  --brand-ink: #0a4f4a;
   --brand-soft: #e3f1ef;
 
   --risk: #dc2626;
-  --risk-ink: #b91c1c;
+  --risk-ink: #991b1b;
   --risk-soft: #fdecec;
 
-  --human: #d97706;
-  --human-ink: #92400e;
+  --human: #b45309;
+  --human-ink: #78350f;
   --human-soft: #fdf3e2;
 
-  --ok: #16a34a;
-  --ok-ink: #166534;
+  --ok: #15803d;
+  --ok-ink: #14532d;
   --ok-soft: #e8f6ec;
 }
 

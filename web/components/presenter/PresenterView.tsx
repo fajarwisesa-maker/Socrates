@@ -56,7 +56,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
       data-steps={pacing.steps.length}
       data-held={pacing.held ? "1" : undefined}
     >
-      <header className="flex h-[5.5rem] shrink-0 items-center gap-6 px-6">
+      <header className="flex h-[5.5rem] shrink-0 items-center gap-4 px-6 whitespace-nowrap">
         <Wordmark />
         {record && (
           <div className="text-xl text-ink-2" data-testid="case-line">
@@ -84,10 +84,10 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         {record && pacing.progress !== null && next && (
           <span className="inline-flex items-center gap-2 text-base font-medium text-ink-2" data-testid="next-step">
             Next: {STAGE_LABEL[next.stage]}
-            {next.round > 1 ? ` (round ${next.round})` : ""} <Kbd>Space</Kbd>
+            {next.round > 1 ? ` (${next.round})` : ""} <Kbd>Space</Kbd>
           </span>
         )}
-        <div className="ml-auto flex items-center gap-6">
+        <div className="ml-auto flex items-center gap-4">
           {config?.replay && (
             <span
               data-testid="replay-badge"
@@ -100,9 +100,12 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           <button
             onClick={() => setDrawer(true)}
             data-testid="open-details"
+            title="Details (D)"
             className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
           >
-            <PanelRight className="size-4" aria-hidden /> Details <Kbd>D</Kbd>
+            <PanelRight className="size-4" aria-hidden />
+            <span className="sr-only">Details</span>
+            <Kbd>D</Kbd>
           </button>
           {modeSwitch}
           <PresenterClock events={events} />

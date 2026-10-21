@@ -37,23 +37,36 @@ export function LaneMap({
 
   return (
     <svg viewBox={`0 0 ${W} ${h}`} className="w-full" role="img" aria-label={`${origin} to ${dest}`}>
-      <g opacity={dimBlocked ? 0.45 : 1}>
-        <line x1={20} y1={TOP} x2={bx - 20} y2={TOP} stroke="var(--ink-2)" strokeWidth={4} strokeLinecap="round" />
-        <line x1={bx + 20} y1={TOP} x2={dx - 26} y2={TOP} stroke="var(--risk)" strokeWidth={4} strokeDasharray="10 9" />
-        <circle cx={14} cy={TOP} r={10} fill="var(--ink-2)" />
-        <text x={0} y={TOP + 40} fontSize={20} fontWeight={600} fill="var(--ink)">
+      {/* the old route steps back: lines and markers fade, labels turn solid secondary
+          (opacity on text would not survive a washed-out projector) */}
+      <g>
+        <g opacity={dimBlocked ? 0.45 : 1}>
+          <line x1={20} y1={TOP} x2={bx - 20} y2={TOP} stroke="var(--ink-2)" strokeWidth={4} strokeLinecap="round" />
+          <line x1={bx + 20} y1={TOP} x2={dx - 26} y2={TOP} stroke="var(--risk)" strokeWidth={4} strokeDasharray="10 9" />
+          <circle cx={14} cy={TOP} r={10} fill="var(--ink-2)" />
+        </g>
+        <text x={0} y={TOP + 40} fontSize={20} fontWeight={600} fill={dimBlocked ? "var(--ink-2)" : "var(--ink)"}>
           {origin}
         </text>
         {blockedAt && (
           <>
-            <circle cx={bx} cy={TOP} r={19} fill="var(--risk)" />
-            <path
-              d={`M${bx - 7} ${TOP - 7} L${bx + 7} ${TOP + 7} M${bx + 7} ${TOP - 7} L${bx - 7} ${TOP + 7}`}
-              stroke="white"
-              strokeWidth={4}
-              strokeLinecap="round"
-            />
-            <text x={bx} y={TOP + 44} fontSize={20} fontWeight={600} fill="var(--risk-ink)" textAnchor="middle">
+            <g opacity={dimBlocked ? 0.45 : 1}>
+              <circle cx={bx} cy={TOP} r={19} fill="var(--risk)" />
+              <path
+                d={`M${bx - 7} ${TOP - 7} L${bx + 7} ${TOP + 7} M${bx + 7} ${TOP - 7} L${bx - 7} ${TOP + 7}`}
+                stroke="white"
+                strokeWidth={4}
+                strokeLinecap="round"
+              />
+            </g>
+            <text
+              x={bx}
+              y={TOP + 44}
+              fontSize={20}
+              fontWeight={600}
+              fill={dimBlocked ? "var(--ink-2)" : "var(--risk-ink)"}
+              textAnchor="middle"
+            >
               {blockedAt}
             </text>
           </>

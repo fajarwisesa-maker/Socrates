@@ -10,14 +10,14 @@ const TOKENS: [string, string, string][] = [
   ["surface-2", "#eceeeb", "filled areas instead of hairlines"],
   ["line", "#cbd2d9", "2px borders only"],
   ["ink", "#0f172a", "text"],
-  ["ink-2", "#475569", "secondary text (never lighter)"],
+  ["ink-2", "#334155", "secondary text (never lighter)"],
   ["brand", "#0f766e", "SIAGA: progress, current stage, primary action"],
   ["risk", "#dc2626", "money at risk, rejected (fills / big numbers)"],
-  ["risk-ink", "#b91c1c", "risk text"],
-  ["human", "#d97706", "waiting for a human (fills)"],
-  ["human-ink", "#92400e", "human text"],
-  ["ok", "#16a34a", "resolved / executed (fills)"],
-  ["ok-ink", "#166534", "resolved text"],
+  ["risk-ink", "#991b1b", "risk text"],
+  ["human", "#b45309", "waiting for a human (fills)"],
+  ["human-ink", "#78350f", "human text"],
+  ["ok", "#15803d", "resolved / executed (fills)"],
+  ["ok-ink", "#14532d", "resolved text"],
 ];
 
 function lum(hex: string) {

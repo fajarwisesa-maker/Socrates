@@ -5,6 +5,9 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 120_000,
+  // every test resets the one demo Case API it shares, so tests must not run in parallel
+  workers: 1,
+  fullyParallel: false,
   use: {
     baseURL: process.env.SIAGA_WEB_URL ?? "http://127.0.0.1:3000",
     viewport: { width: 1600, height: 1000 },

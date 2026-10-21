@@ -48,20 +48,18 @@ export function OptionCard({
       )}
     >
       <div className="text-xl font-semibold text-ink">
-        <motion.span
-          initial={play === "reject" && !reduce ? { opacity: 1 } : false}
-          animate={{ opacity: state === "rejected" ? 0.55 : 1 }}
-          transition={t(stampAt)}
-        >
+        {/* de-emphasised with a solid secondary colour, not opacity: it must survive a
+            washed-out projector (e2e/projector.spec.ts) */}
+        <span className={cn("transition-colors duration-300", state === "rejected" && "text-ink-2")}>
           {option.label}
-        </motion.span>{" "}
+        </span>{" "}
         <span className="font-normal text-ink-2">· {option.option_id}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <span className="relative text-[2.75rem] leading-none font-semibold tracking-tight whitespace-nowrap text-ink">
           <motion.span
-            initial={play === "reject" && !reduce ? { opacity: 1 } : false}
-            animate={{ opacity: state === "rejected" ? 0.5 : 1 }}
+            initial={play === "reject" && !reduce ? { color: "#0f172a" } : false}
+            animate={{ color: state === "rejected" ? "#334155" : "#0f172a" }}
             transition={t(stampAt)}
           >
             {feasible ? juta(r.total_cost) : "Not feasible"}
@@ -88,7 +86,7 @@ export function OptionCard({
           </motion.span>
         )}
         {state === "chosen" && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1 text-lg font-semibold text-white">
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-ink px-3 py-1 text-lg font-semibold text-white">
             <Check className="size-5" aria-hidden /> Chosen
           </span>
         )}

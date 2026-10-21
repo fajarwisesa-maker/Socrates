@@ -108,7 +108,7 @@ function ApprovalCard({ approval, record }: { approval: Approval; record: CaseRe
               data-testid="approve"
               disabled={busy}
               onClick={() => decide("approve")}
-              className="flex-1 rounded-[var(--radius-control)] bg-ok-ink px-3 py-2 text-sm font-semibold text-white hover:bg-[#14532d] disabled:opacity-50"
+              className="flex-1 rounded-[var(--radius-control)] bg-ok-ink px-3 py-2 text-sm font-semibold text-white hover:bg-[#0d3b20] disabled:opacity-50"
             >
               {busy ? "Sending…" : "Approve"}
             </button>

@@ -18,7 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
-| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, step 5 Planner + drawer + error states done; **step 5 checkpoint** |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
 
@@ -81,7 +81,7 @@ make web-smoke               # Playwright: full demo + reject path on a producti
                              # with its own API/ports; screenshots in web/e2e/screenshots/
 ```
 
-Screenshots of a full local run (fake LLM): `docs/screenshots/`.
+Screenshots of the redesigned dashboard (replay of the fake-LLM golden run): `docs/screenshots/`, shown in README.md.
 
 Dashboard modes (UI redesign): **Presenter** (default, projector) and **Planner** (dense view).
 Toggle with `P` or the header switch; `?mode=planner|presenter` overrides (the choice is
@@ -645,6 +645,39 @@ additive (no field removed).
     case's first PERCEIVE call goes through N reported retries (1.5 s each), or runs out
     after 6 attempts and raises `LLMError`. Tested; off by default.
   - e2e: drawer test, gallery test; both also in the replay smoke.
+
+- **Step 6 (projector check).**
+  - `web/e2e/projector.spec.ts` simulates a washed-out projector by reducing contrast 30%
+    (each sRGB channel c → 0.5 + 0.7·(c − 0.5)). It walks every Presenter step of a real
+    run at 1280×720, plus the start screen, the approved Act card and the verified end.
+    - For each visible text, including SVG lane labels, it measures the colours the
+      browser actually paints: stacked backgrounds and opacity are accounted for.
+    - It fails if any text falls below 4.5:1, or below 3:1 for large text (≥ 24px, or
+      ≥ 18.66px bold).
+    - It runs in both smoke suites.
+  - **Colour tokens darkened to pass after washout:**
+    - `ink-2` #475569 → #334155;
+    - `brand-ink` #0B5D57 → #0A4F4A;
+    - `risk-ink` #B91C1C → #991B1B;
+    - `human-ink` #92400E → #78350F;
+    - `ok-ink` #166534 → #14532D;
+    - the fills, so white icons on them keep ≥ 3:1: `ok` #16A34A → #15803D,
+      `human` #D97706 → #B45309.
+    - Brand teal #0F766E and risk red #DC2626 are unchanged.
+  - The check found intentional dims that were made with opacity: the rejected card's
+    label and price (0.5–0.55) and the old route on Verify (0.45). They now use the solid
+    `ink-2` colour; only lines and markers keep opacity. The "Chosen" pill uses
+    `brand-ink`.
+  - The Presenter header stays on one line at 1280: smaller gaps, the next-step hint
+    reads "Next: Plan (2)", and the details button is an icon plus `D`.
+  - Playwright runs with `workers: 1`: every test resets the one shared demo API, so a
+    second spec file running in parallel collided with the first.
+  - **Dev note:** Turbopack keeps a persistent dev cache in `web/.next/dev` that can
+    serve stale CSS even after a restart. If tokens or new Tailwind classes don't show
+    up, stop `next dev`, `rm -rf web/.next/dev` and start it again.
+  - Results: pytest 158 passed (1 live-Bedrock skipped); web smoke 8/8 (fake) and 7/7
+    (replay); `make rehearse N=10` 10/10 on the fake LLM and 10/10 on replay;
+    `make rehearse-fault N=3` 3/3.
 
 ## Open items
 

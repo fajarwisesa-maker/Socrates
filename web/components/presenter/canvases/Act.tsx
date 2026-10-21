@@ -105,8 +105,8 @@ function ActionCard({ action: a, record, onDecided }: { action: CaseAction; reco
       initial={false}
       animate={
         pending
-          ? { backgroundColor: "#fdf3e2", borderColor: "#d97706" }
-          : { backgroundColor: "#e8f6ec", borderColor: "#16a34a" }
+          ? { backgroundColor: "#fdf3e2", borderColor: "#b45309" }
+          : { backgroundColor: "#e8f6ec", borderColor: "#15803d" }
       }
       transition={{ duration: reduce ? 0 : 0.5 }}
     >

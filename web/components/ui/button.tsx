@@ -11,7 +11,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         brand: "bg-brand text-white hover:bg-brand-ink",
-        approve: "bg-ok-ink text-white hover:bg-[#14532d]",
+        approve: "bg-ok-ink text-white hover:bg-[#0d3b20]",
         outline: "border-2 border-line bg-surface text-ink hover:bg-surface-2",
         ghost: "text-ink-2 hover:bg-surface-2 hover:text-ink",
         danger: "border-2 border-risk-ink bg-surface text-risk-ink hover:bg-risk-soft",

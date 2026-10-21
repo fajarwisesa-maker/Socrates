@@ -22,7 +22,7 @@ export function Highlighted({ text, spans, stagger = 0.25 }: { text: string; spa
         data-evidence={`${s.signal}:${s.start}`}
         className="rounded-md px-0.5 font-semibold not-italic [box-decoration-break:clone]"
         initial={reduce ? false : { backgroundColor: "rgba(227,241,239,0)", color: "#0f172a" }}
-        animate={{ backgroundColor: "#e3f1ef", color: "#0b5d57" }}
+        animate={{ backgroundColor: "#e3f1ef", color: "#0a4f4a" }}
         transition={{ delay: reduce ? 0 : 0.2 + i * stagger, duration: 0.35 }}
       >
         {text.slice(s.start, s.end)}
