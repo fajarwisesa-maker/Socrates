@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     replay_path: Path = Field(REPO_ROOT / "data" / "golden" / "llm.jsonl", alias="REPLAY_PATH")
     # 1.0 = replay at the recorded model latency (looks live on stage), 0 = instant.
     replay_speed: float = Field(1.0, alias="REPLAY_SPEED")
+    # demo/test aid: "N" visible retries on each case's first model call, or "exhaust"
+    llm_simulate_throttle: str = Field("", alias="LLM_SIMULATE_THROTTLE")
     llm_record_path: Path | None = Field(None, alias="LLM_RECORD_PATH")
 
     # --- Backends (local now, AWS in Phase 7) ---

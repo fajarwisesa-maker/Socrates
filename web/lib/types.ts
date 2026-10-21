@@ -299,4 +299,8 @@ export interface AuditPayload {
   latency_s?: number;
   event?: string;
   by?: string;
+  attempt?: number;
+  max_attempts?: number;
+  reason?: string;
+  dropped?: unknown[];
 }

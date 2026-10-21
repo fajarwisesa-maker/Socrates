@@ -294,3 +294,15 @@ def test_llm_retry_is_an_event_not_an_error(runtime, signals):
     assert len(retry) == 1 and retry[0].stage == "PERCEIVE"
     assert retry[0].data == {"reason": "throttled", "attempt": 2, "max_attempts": 6, "wait_s": 2.0}
     assert "llm_retry" in {e.kind for e in runtime.audit.read(c.case_id)}
+
+
+def test_throttle_exhausted_escalates_as_model_unavailable(runtime, signals):
+    from agent.providers.throttle import SimulatedThrottleProvider
+
+    llm = SimulatedThrottleProvider(FakeProvider(golden_scripts()), "exhaust", sleep=lambda s: None)
+    agent = Agent(runtime, llm)
+    c = agent.run(agent.start_case(signals).case_id)
+    assert c.status == "ESCALATED"
+    assert c.escalation_reason.startswith("LLM unavailable: Bedrock ThrottlingException")
+    retries = [e for e in runtime.store.list_events(c.case_id) if e.status == "retry"]
+    assert [e.data["attempt"] for e in retries] == [2, 3, 4, 5, 6]

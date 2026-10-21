@@ -99,3 +99,26 @@ def test_record_then_replay(tmp_path):
     assert second.text() == "answer 1" and second.model.startswith("replay:")
     with pytest.raises(LLMError, match="no recorded"):
         replay.converse(REQ)
+
+
+def test_simulated_throttle_reports_retries_then_succeeds():
+    from agent.providers.throttle import SimulatedThrottleProvider
+
+    waits, seen = [], []
+    inner = FakeProvider({"perceive": lambda r, n: say("ok")})
+    p = SimulatedThrottleProvider(inner, "2", sleep=waits.append)
+    req = REQ.model_copy(update={"case_id": "c1"})
+    assert p.converse(req, on_retry=lambda *a: seen.append(a)).text() == "ok"
+    assert seen == [(2, 6, 1.5, "throttled"), (3, 6, 1.5, "throttled")] and waits == [1.5, 1.5]
+    p.converse(req, on_retry=lambda *a: seen.append(a))  # once per case only
+    assert len(seen) == 2
+
+
+def test_simulated_throttle_exhaust_raises_llm_error():
+    from agent.providers.throttle import SimulatedThrottleProvider
+
+    p = SimulatedThrottleProvider(
+        FakeProvider({"perceive": lambda r, n: say("ok")}), "exhaust", sleep=lambda s: None
+    )
+    with pytest.raises(LLMError, match="after 6 attempts"):
+        p.converse(REQ.model_copy(update={"case_id": "c1"}))

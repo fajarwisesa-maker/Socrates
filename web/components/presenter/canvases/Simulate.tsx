@@ -27,10 +27,12 @@ export function SimulateCanvas({ record, round }: { record: CaseRecord; round: n
             <OptionCard key={o.option_id} option={o} record={record} />
           ))}
         </div>
-        <p className="mt-auto flex items-center gap-2 text-xl font-medium text-ink-2" data-testid="solver-label">
-          <Calculator className="size-6 text-brand" aria-hidden />
-          Calculated by the solver, not AI
-        </p>
+        {options.length > 0 && (
+          <p className="mt-auto flex items-center gap-2 text-xl font-medium text-ink-2" data-testid="solver-label">
+            <Calculator className="size-6 text-brand" aria-hidden />
+            Calculated by the solver, not AI
+          </p>
+        )}
       </div>
     </Frame>
   );

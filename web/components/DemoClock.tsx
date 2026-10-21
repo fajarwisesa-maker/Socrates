@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { clock } from "@/lib/format";
 import type { CaseEvent } from "@/lib/types";
 
-export default function DemoClock({ events }: { events: CaseEvent[] }) {
+export default function DemoClock({ events, compact = false }: { events: CaseEvent[]; compact?: boolean }) {
   // Read the clock only in the browser (Cache Components prerenders the page shell).
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -25,24 +25,22 @@ export default function DemoClock({ events }: { events: CaseEvent[] }) {
   return (
     <div
       data-testid="demo-clock"
-      className="flex items-center gap-4 rounded-xl bg-slate-900 px-5 py-3 text-white shadow-sm"
+      className="flex items-center gap-4 rounded-[var(--radius-card)] bg-surface px-4 py-2 shadow-[var(--shadow-card)]"
     >
       <div>
-        <div className="text-[11px] uppercase tracking-widest text-slate-400">
-          Signal → {verified ? "verified" : end ? end.status : "…"}
+        <div className="text-xs tracking-wide text-ink-2 uppercase">
+          Signal → {verified ? "verified" : end ? end.status : "now"}
         </div>
-        <div
-          className={`font-mono text-4xl font-bold tabular-nums ${verified ? "text-emerald-400" : "text-white"}`}
-        >
+        <div className={`font-mono text-3xl font-semibold tabular-nums ${verified ? "text-ok-ink" : "text-ink"}`}>
           {clock(seconds)}
         </div>
       </div>
-      <div className="border-l border-slate-700 pl-4 text-xs leading-5 text-slate-300">
+      <div className={`border-l-2 border-surface-2 pl-4 text-xs leading-5 text-ink-2 ${compact ? "hidden 2xl:block" : ""}`}>
         <div>
-          Manual today: <span className="font-semibold text-white">~3 days</span>
+          Manual today: <span className="font-semibold text-ink">~3 days</span>
         </div>
         <div>
-          SIAGA: <span className="font-semibold text-white">minutes</span>, with a human approving
+          SIAGA: <span className="font-semibold text-ink">minutes</span>, with a human approving
         </div>
       </div>
     </div>

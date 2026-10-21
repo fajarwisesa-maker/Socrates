@@ -155,3 +155,36 @@ test.describe("reduced motion", () => {
   await expect(page.getByTestId("time-line")).toContainText("3 days");
   });
 });
+
+test("details drawer (D): step events, options + Critic, audit chain, case facts", async ({ page }) => {
+  await page.request.post("/api/demo/reset");
+  await page.goto("/?mode=presenter&auto=1");
+  await page.getByTestId("load-whatsapp").click();
+  await page.getByTestId("load-pdf").click();
+  await page.getByTestId("presenter-start").click();
+  await expect(page.getByTestId("presenter-approve")).toBeVisible({ timeout: 60_000 });
+
+  await page.keyboard.press("d");
+  const drawer = page.getByTestId("details-drawer");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByTestId("drawer-step-events")).toContainText("Stock transfer");
+  await drawer.getByTestId("drawer-tab-options").click();
+  await expect(drawer.getByTestId("option-B1")).toContainText("rejected: safety_stock");
+  await expect(drawer.getByTestId("drawer-critic")).toContainText("Bandung DC would drop to 50 cartons");
+  await drawer.getByTestId("drawer-tab-audit").click();
+  await expect(drawer.getByTestId("audit-status")).toContainText("hash chain verified");
+  await drawer.getByTestId("drawer-tab-case").click();
+  await expect(drawer.getByTestId("drawer-case")).toContainText("synthetic precedent");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+});
+
+test("error and guard-rail states read as intentional (gallery)", async ({ page }) => {
+  await page.goto("/design/states");
+  const g = page.getByTestId("states-gallery");
+  await expect(g.getByTestId("notice-retrying").first()).toContainText("Retrying the model call");
+  await expect(g.getByTestId("notice-retried").first()).toContainText("retried once");
+  await expect(g.getByTestId("notice-denied").first()).toContainText("Blocked by policy: Purchase order");
+  await expect(g.getByTestId("notice-escalated")).toHaveCount(6); // 3 cases x presenter + planner size
+  await expect(g.getByText("Tool-call budget used up: handed to a human planner").first()).toBeVisible();
+});

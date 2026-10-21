@@ -10,7 +10,9 @@ def make_provider(settings: Settings) -> LLMProvider:
     if settings.replay or settings.llm_provider == "replay":
         from agent.providers.replay import ReplayProvider
 
-        return ReplayProvider(settings.replay_path, speed=settings.replay_speed)
+        return _throttled(
+            ReplayProvider(settings.replay_path, speed=settings.replay_speed), settings
+        )
     if settings.llm_provider == "fake":
         from agent.providers.fake import FakeProvider
         from agent.providers.scripts import golden_scripts
@@ -27,4 +29,12 @@ def make_provider(settings: Settings) -> LLMProvider:
         from agent.providers.replay import RecordingProvider
 
         provider = RecordingProvider(provider, settings.llm_record_path)
-    return provider
+    return _throttled(provider, settings)
+
+
+def _throttled(provider: LLMProvider, settings: Settings) -> LLMProvider:
+    if not settings.llm_simulate_throttle:
+        return provider
+    from agent.providers.throttle import SimulatedThrottleProvider
+
+    return SimulatedThrottleProvider(provider, settings.llm_simulate_throttle)

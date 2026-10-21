@@ -1,12 +1,13 @@
 "use client";
 
-import { Pause, Radio } from "lucide-react";
-import { useEffect } from "react";
+import { PanelRight, Pause, Radio } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { dayShort } from "@/lib/format";
 import { useDwell, usePacing } from "@/lib/pacing";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { CaseState } from "@/lib/useCase";
+import { DetailsDrawer } from "./DetailsDrawer";
 import { ImpactMeter } from "./ImpactMeter";
 import { PresenterClock } from "./PresenterClock";
 import { StageCanvas } from "./StageCanvas";
@@ -20,7 +21,8 @@ import { Wordmark } from "./Wordmark";
  * minimum dwell per step (Space advances, H holds, R restarts the view, ← → step).
  */
 export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwitch: React.ReactNode }) {
-  const { config, record, events, apiDown, follow, refresh } = state;
+  const { config, record, events, apiDown, follow, refresh, reset } = state;
+  const [drawer, setDrawer] = useState(false);
   const dwell = useDwell();
   const pacing = usePacing(record?.case_id ?? null, events, dwell);
   const { step, viewEvents } = pacing;
@@ -37,6 +39,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
       else if (e.key === "h" || e.key === "H") pacing.toggleHold();
       else if (e.key === "r" || e.key === "R") pacing.restart();
       else if (e.key === "l" || e.key === "L") pacing.toLatest();
+      else if (e.key === "d" || e.key === "D") setDrawer((o) => !o);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -94,6 +97,13 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
               REPLAY
             </span>
           )}
+          <button
+            onClick={() => setDrawer(true)}
+            data-testid="open-details"
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+          >
+            <PanelRight className="size-4" aria-hidden /> Details <Kbd>D</Kbd>
+          </button>
           {modeSwitch}
           <PresenterClock events={events} />
         </div>
@@ -117,6 +127,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
               round={step.round}
               events={events}
               record={record}
+              live={pacing.isLatest}
               onDecided={() => {
                 refresh();
                 pacing.touch();
@@ -140,6 +151,18 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         </section>
         <ImpactMeter record={record} viewEvents={viewEvents} isLatest={pacing.isLatest} />
       </main>
+      <DetailsDrawer
+        open={drawer}
+        onOpenChange={setDrawer}
+        record={record}
+        events={events}
+        step={step}
+        config={config}
+        onReset={async () => {
+          await reset();
+          setDrawer(false);
+        }}
+      />
     </div>
   );
 }

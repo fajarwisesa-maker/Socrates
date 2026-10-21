@@ -108,3 +108,17 @@ export function stageRounds(events: CaseEvent[], stage: Stage): CaseEvent[][] {
 export function completed(evs: CaseEvent[]): CaseEvent | undefined {
   return evs.find((e) => e.status === "completed");
 }
+
+export const TOOL: Record<string, string> = {
+  find_inbound_purchase_orders: "Find inbound POs",
+  assess_impact: "Assess impact",
+  search_precedents: "Search precedents",
+  simulate_option: "Simulate option",
+  get_action_status: "Read SAP status",
+  request_human_approval: "Request approval",
+  draft_rfq: "Draft RFQ",
+  execute_stock_transfer: "Stock transfer",
+  create_purchase_order: "Purchase order",
+  book_spot_air: "Air charter booking",
+  reschedule_customer_order: "Customer reschedule",
+};

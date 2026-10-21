@@ -9,6 +9,7 @@ import ImpactPanel from "./ImpactPanel";
 import OptionsTable from "./OptionsTable";
 import SignalInbox from "./SignalInbox";
 import StageTimeline from "./StageTimeline";
+import { Wordmark } from "./presenter/Wordmark";
 import { Badge } from "./ui";
 
 /** Planner mode: the dense view for Q&A on a laptop (cleaned up in redesign step 5). */
@@ -21,11 +22,11 @@ export default function PlannerView({
 }) {
   const { config, caseId, record, approvals, events, apiDown, running, follow, reset } = state;
   return (
-    <main className="mx-auto max-w-[1600px] p-5">
+    <main className="mx-auto max-w-[1600px] p-5" data-testid="planner">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">SIAGA</h1>
+            <Wordmark />
             {config?.replay && (
               <span
                 data-testid="replay-badge"
@@ -44,20 +45,20 @@ export default function PlannerView({
             {config && <Badge tone="slate">LLM: {config.llm_provider}</Badge>}
             {record && <StatusBadge status={record.status} />}
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-2">
             Supply Intelligence Agent for Guarding Availability · supervised agent, deterministic numbers
           </p>
           {record?.day0 && (
-            <p className="text-xs text-slate-400">Day 0 = {dayLabel(null, record.day0).replace(" 00:00", "")} (midnight WIB)</p>
+            <p className="text-xs text-ink-2">Day 0 = {dayLabel(null, record.day0).replace(" 00:00", "")} (midnight WIB)</p>
           )}
         </div>
         <div className="flex items-center gap-3">
           {modeSwitch}
-          <DemoClock events={events} />
+          <DemoClock events={events} compact />
           <button
             data-testid="reset"
             onClick={reset}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-[var(--radius-control)] border-2 border-line bg-surface px-3 py-2 text-sm font-medium text-ink-2 hover:bg-surface-2"
           >
             Reset demo
           </button>
@@ -65,35 +66,36 @@ export default function PlannerView({
       </header>
 
       {apiDown && (
-        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900">
+        <div className="mb-4 rounded-md border border-human bg-human-soft p-2.5 text-sm text-human-ink">
           Cannot reach the Case API. Is <code>make api</code> running? Retrying every second…
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)_440px]">
-        <div className="space-y-4">
-          <SignalInbox onStarted={follow} disabled={running} />
-          <ImpactPanel record={record} />
-        </div>
-        <div className="space-y-4">
-          <StageTimeline events={events} record={record} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="min-w-0 space-y-4">
+          <StageTimeline
+            events={events}
+            record={record}
+            limits={config ? { tools: config.max_tool_calls, replans: config.max_replans } : undefined}
+          />
           <OptionsTable record={record} />
+          <AuditView caseId={caseId} version={events.length} />
         </div>
         <div className="space-y-4">
-          <ApprovalCards record={record} approvals={approvals} />
+          {record?.status === "AWAITING_APPROVAL" && <ApprovalCards record={record} approvals={approvals} />}
+          {!record && <SignalInbox onStarted={follow} disabled={running} />}
+          <ImpactPanel record={record} />
+          {record?.status !== "AWAITING_APPROVAL" && <ApprovalCards record={record} approvals={approvals} />}
           {record?.explanation && (
-            <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-              <h2 className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-slate-500">
-                Agent explanation
-              </h2>
-              <p className="text-slate-800">{record.explanation.summary}</p>
-              <p className="mt-2 text-slate-600">{record.explanation.recommendation_rationale}</p>
+            <section className="rounded-[var(--radius-card)] bg-surface p-4 text-sm shadow-[var(--shadow-card)]">
+              <h2 className="mb-1 text-sm font-semibold tracking-wide text-ink-2 uppercase">Agent explanation</h2>
+              <p className="mb-1 text-xs text-ink-2">Written by the model; every number comes from the solver.</p>
+              <p className="text-ink">{record.explanation.summary}</p>
+              <p className="mt-2 text-ink-2">{record.explanation.recommendation_rationale}</p>
             </section>
           )}
+          {record && <SignalInbox onStarted={follow} disabled={running} />}
         </div>
-      </div>
-      <div className="mt-4">
-        <AuditView caseId={caseId} version={events.length} />
       </div>
     </main>
   );

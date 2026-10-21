@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { notices } from "@/lib/notices";
 import { stageRounds } from "@/lib/present";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { ActCanvas } from "./canvases/Act";
@@ -10,6 +10,7 @@ import { PerceiveCanvas } from "./canvases/Perceive";
 import { PlanCanvas } from "./canvases/Plan";
 import { ReflectCanvas } from "./canvases/Reflect";
 import { SimulateCanvas } from "./canvases/Simulate";
+import { StateNotices } from "../StateNotices";
 import { VerifyCanvas } from "./canvases/Verify";
 
 /** One stage (and round) on the canvas, plus the intentional states around it. */
@@ -19,18 +20,20 @@ export function StageCanvas({
   events,
   record,
   onDecided,
+  live = true,
 }: {
   stage: Stage;
   round: number;
   events: CaseEvent[];
   record: CaseRecord;
   onDecided: () => void;
+  /** the shown step is the agent's current one (a retry note only makes sense live) */
+  live?: boolean;
 }) {
   const reduce = useReducedMotion();
   const evs = stageRounds(events, stage)[round - 1] ?? [];
-  const last = evs.at(-1);
-  const retrying = last?.status === "retry";
-  const escalated = record.status === "ESCALATED" && events.some((e) => e.stage === stage && e.status === "escalated");
+  // Presenter shows a retry only while it happens, and never the "retried" footnote
+  const items = notices(evs, record, live).filter((n) => n.kind !== "retried");
 
   const body = (() => {
     switch (stage) {
@@ -60,21 +63,9 @@ export function StageCanvas({
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
       <div className="min-h-0 flex-1">{body}</div>
-      {retrying && (
-        <p className="mt-3 flex items-center gap-2 text-xl text-ink-2" data-testid="retry-note">
-          <RefreshCw className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
-          Retrying the model call… ({String(last?.data.reason ?? "busy")}, attempt {String(last?.data.attempt ?? "")})
-        </p>
-      )}
-      {escalated && (
-        <div
-          className="mt-3 flex items-start gap-3 rounded-[var(--radius-card)] bg-risk-soft p-4 text-xl text-risk-ink"
-          data-testid="escalated-panel"
-        >
-          <AlertTriangle className="mt-0.5 size-6 shrink-0" aria-hidden />
-          <span>
-            <b>Handed to a human planner.</b> {record.escalation_reason}
-          </span>
+      {items.length > 0 && (
+        <div className="mt-3">
+          <StateNotices items={items} />
         </div>
       )}
     </motion.div>

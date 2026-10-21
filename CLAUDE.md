@@ -18,7 +18,7 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
-| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing done; **step 4 checkpoint** |
+| UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, step 5 Planner + drawer + error states done; **step 5 checkpoint** |
 
 ## How to run
 
@@ -89,6 +89,10 @@ remembered per browser). The style tile of the visual system is at `/design`.
 Presenter pacing: each stage stays on screen ≥ 5 s (`?dwell=N` seconds, `?auto=1` = no
 dwell for tests and rehearse); `Space`/`→` next, `←` back, `H` hold, `R` restart the view
 (the agent is not re-run), `L` jump to live; clicking a rail step shows it (and holds).
+`D` opens the details drawer (tool calls, options + Critic, audit trail, case facts, reset).
+Error-state gallery: `/design/states`. Demo/test knobs: `LLM_SIMULATE_THROTTLE=N|exhaust`
+(visible throttling retries on each case's first model call), `MAX_TOOL_CALLS=6` (budget
+escalation).
 
 Phase 6 (replay + hardening):
 
@@ -130,6 +134,7 @@ See `.env.example` for the full list.
 | `SQLITE_PATH` / `SAP_DB_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
 | `MAX_TOOL_CALLS` / `MAX_REPLANS` | `20` / `2` | enforced by the state machine |
 | `VERIFY_DELAY_SECONDS` | `60` | VERIFY timer |
+| `LLM_SIMULATE_THROTTLE` | unset | demo/test aid: `N` visible throttling retries on each case's first model call, or `exhaust` |
 
 ## Architecture in brief
 
@@ -599,6 +604,47 @@ additive (no field removed).
       - clicking the rail steps back through rounds;
       - R restarts the view; L jumps to live;
     - both new Presenter tests also run in the replay smoke.
+
+- **Step 5 (Planner mode, details drawer, error states).**
+  - **Details drawer** (`D`, `components/presenter/DetailsDrawer.tsx`; a Radix Dialog
+    used as a right-side sheet, with Radix Tabs). Tabs:
+    - This step: events, tool calls with tier, arguments, and raw JSON on demand.
+    - Options & Critic: the solver table and every check with its template sentence and
+      rule id.
+    - Audit trail: hash-chain status and entries.
+    - Case: tool / model call counters against the configured limits, the model provider
+      or replay source, precedents labelled "synthetic precedent", the model-written
+      explanation (labelled), Tier 0 notes, keys, Reset demo.
+    - Raw JSON appears only here, never on the canvas.
+  - **Planner mode** uses the visual system: design-token colours, Geist, a light clock
+    card, and a 2-column layout (main column: timeline, options, audit; sidebar:
+    approvals, impact, explanation).
+    - All stages are expanded.
+    - Perceive lists each located evidence quote with its source and field, plus any
+      dropped quotes, and confidence Medium → High.
+    - Plan lists the cited precedents labelled "synthetic precedent".
+    - Reflect shows the Critic's template sentences with the rule id.
+    - The options table uses fixed column widths, plain plan lines and the Critic reason.
+    - Impact adds Plan cost (case cost) and Protected (net).
+    - Approval cards hide an empty approve-by or alternatives, show the rejection
+      reason, and use the dark green Approve button (white on `#16A34A` fails contrast).
+    - The timeline counter uses the configured limits.
+    - The signal inbox moves below the case panels once a case exists.
+  - **Error states** (`lib/notices.ts` + `components/StateNotices.tsx`, shared by
+    Presenter, Planner and the drawer):
+    - neutral grey "Retrying the model call…" while a retry is in progress;
+    - a "retried N times" footnote (Planner only);
+    - red "Blocked by policy: <tool>" with the backend's denial message;
+    - escalations with a plain title (model stayed busy / budget used up / replan limit /
+      no feasible plan), the reason, and "everything done so far is kept and in the
+      audit trail". One red notice per hand-over.
+    - The gallery at `/design/states` renders every state from fixture events through
+      the same `notices()`. Tool denial cannot happen on the demo path (ACT routes Tier 3
+      to approval), so it is shown there.
+  - **`LLM_SIMULATE_THROTTLE`** (`agent/providers/throttle.py`): wraps any provider. Each
+    case's first PERCEIVE call goes through N reported retries (1.5 s each), or runs out
+    after 6 attempts and raises `LLMError`. Tested; off by default.
+  - e2e: drawer test, gallery test; both also in the replay smoke.
 
 ## Open items
 

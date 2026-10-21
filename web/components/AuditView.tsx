@@ -16,6 +16,10 @@ function summary(e: AuditEntry): string {
       return `${p.from ?? "start"} → ${p.to}`;
     case "llm_call":
       return `${p.purpose} · ${p.prompt} · ${p.model} · ${p.latency_s}s`;
+    case "llm_retry":
+      return `${p.purpose} retry ${p.attempt}/${p.max_attempts} (${p.reason})`;
+    case "evidence_dropped":
+      return `${(p.dropped ?? []).length} quote(s) not found in the signals`;
     case "approval":
       return `${p.event} ${p.approval_id}${p.status ? ` ${p.status}` : ""}${p.by ? ` by ${p.by}` : ""}`;
     default:
@@ -23,8 +27,16 @@ function summary(e: AuditEntry): string {
   }
 }
 
-export default function AuditView({ caseId, version }: { caseId: string | null; version: number }) {
-  const [open, setOpen] = useState(false);
+export default function AuditView({
+  caseId,
+  version,
+  defaultOpen = false,
+}: {
+  caseId: string | null;
+  version: number;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.audit>> | null>(null);
 
   useEffect(() => {
@@ -59,20 +71,20 @@ export default function AuditView({ caseId, version }: { caseId: string | null; 
         <Empty>Every stage transition, tool call, policy decision and approval is recorded here.</Empty>
       ) : (
         <>
-          <button onClick={() => setOpen(!open)} className="text-xs font-medium text-sky-700 hover:underline">
+          <button onClick={() => setOpen(!open)} className="text-xs font-medium text-brand-ink hover:underline">
             {open ? "Hide entries" : `Show ${data.entries.length} entries`}
           </button>
           {open && (
             <div className="mt-2 max-h-80 overflow-auto">
-              <table className="w-full font-mono text-[11px]">
+              <table className="w-full font-mono text-xs">
                 <tbody>
                   {data.entries.map((e) => (
-                    <tr key={e.seq} className="border-t border-slate-100">
-                      <td className="py-0.5 pr-2 text-slate-400">{e.seq}</td>
-                      <td className="pr-2 text-slate-500">{e.ts.slice(11, 19)}</td>
+                    <tr key={e.seq} className="border-t border-line">
+                      <td className="py-0.5 pr-2 text-ink-2">{e.seq}</td>
+                      <td className="pr-2 text-ink-2">{e.ts.slice(11, 19)}</td>
                       <td className="pr-2 font-semibold">{e.kind}</td>
                       <td className="pr-2">{summary(e)}</td>
-                      <td className="text-slate-400" title={`prev ${e.prev_hash}`}>
+                      <td className="text-ink-2" title={`prev ${e.prev_hash}`}>
                         {e.hash.slice(0, 10)}…
                       </td>
                     </tr>
