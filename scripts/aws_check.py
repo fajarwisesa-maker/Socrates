@@ -4,6 +4,7 @@ Usage:
     uv run python scripts/aws_check.py                 # identity + model list
     uv run python scripts/aws_check.py --probe         # also probe tool use on each Sonnet
     uv run python scripts/aws_check.py --model-id X    # one tiny Converse + tool-use call on X
+    uv run python scripts/aws_check.py --agentcore     # which AgentCore features answer here
 
 `list-foundation-models` does not report tool-use support, so "supports tool use" is
 proven empirically: a Converse call offering one tool (toolChoice auto - current Claude
@@ -110,12 +111,44 @@ def converse_ping(region: str, model_id: str) -> dict:
     }
 
 
+# One read-only list call per AgentCore feature. A feature that is not offered in the
+# region fails at the endpoint (no DNS / UnknownOperation), which is what we report;
+# AccessDenied means the feature exists but this identity lacks the permission.
+AGENTCORE_PROBES = [
+    ("Runtime", "bedrock-agentcore-control", "list_agent_runtimes"),
+    ("Gateway", "bedrock-agentcore-control", "list_gateways"),
+    ("Policy (Cedar / temporal)", "bedrock-agentcore-control", "list_policy_engines"),
+    ("Evaluations (evaluators)", "bedrock-agentcore-control", "list_evaluators"),
+    ("Evaluations (batch)", "bedrock-agentcore", "list_batch_evaluations"),
+    ("Memory", "bedrock-agentcore-control", "list_memories"),
+]
+
+
+def agentcore_probe(region: str) -> None:
+    print(f"\nAgentCore features in {region} (read-only list calls):")
+    for label, service, method in AGENTCORE_PROBES:
+        try:
+            getattr(boto3.client(service, region_name=region), method)(maxResults=1)
+            status = "available"
+        except ClientError as e:
+            err = e.response["Error"]
+            status = (
+                "available (no permission for this identity)"
+                if err["Code"] in ("AccessDeniedException", "UnauthorizedOperation")
+                else f"{err['Code']}: {err['Message'][:80]}"
+            )
+        except BotoCoreError as e:
+            status = f"not reachable: {e}"[:100]
+        print(f"  {label:<28} {status}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--region", default=None)
     ap.add_argument("--probe", action="store_true", help="probe tool use on every Sonnet model")
     ap.add_argument("--all", action="store_true", help="with --probe: every Claude model")
     ap.add_argument("--model-id", help="make one tiny Converse + tool call with this ID")
+    ap.add_argument("--agentcore", action="store_true", help="probe AgentCore features")
     args = ap.parse_args()
 
     from siaga_common.settings import export_aws_env, get_settings
@@ -127,6 +160,9 @@ def main() -> int:
     print(f"Region: {region}")
     try:
         identity(region)
+        if args.agentcore:
+            agentcore_probe(region)
+            return 0
         if args.model_id:
             print(json.dumps(converse_ping(region, args.model_id), indent=2, default=str))
             return 0
