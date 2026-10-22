@@ -540,7 +540,8 @@ class RescheduleCustomerOrder(Tool):
         return RescheduleOut(**ctx.sap.post("/SalesOrderReschedule", body))
 
 
-def build_registry() -> ToolRegistry:
+def build_registry(multi: bool = False) -> ToolRegistry:
+    """The v1 tools; with `multi` (ORCHESTRATION=multi) also the specialists' v2 tools."""
     registry = ToolRegistry([])
     tools: list[Tool] = [
         FindInboundPurchaseOrders(),
@@ -555,5 +556,9 @@ def build_registry() -> ToolRegistry:
         BookSpotAir(),
         RescheduleCustomerOrder(),
     ]
+    if multi:
+        from agent.tools.v2 import v2_tools
+
+        tools += v2_tools(registry)
     registry.tools = {t.name: t for t in tools}
     return registry

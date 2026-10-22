@@ -130,6 +130,7 @@ function StepEvents({ events }: { events: CaseEvent[] }) {
                   {e.status === "tool" ? `tool · ${d.status}` : e.status}
                 </Badge>
                 {typeof d.tier === "number" && e.status === "tool" && <TierBadge tier={d.tier} />}
+                {e.agent && <span className="text-xs font-medium text-ink-2">{e.agent}</span>}
                 <span className="font-semibold text-ink">
                   {e.status === "tool" && d.tool ? (TOOL[d.tool] ?? d.tool) : e.title}
                 </span>
@@ -238,6 +239,23 @@ function CaseFacts({
                 : config.llm_provider}
           </b>
         </p>
+      )}
+      {config?.orchestration === "multi" && (config.specialists ?? []).length > 0 && (
+        <section data-testid="drawer-specialists">
+          <h3 className="mb-1 text-sm font-semibold tracking-wide text-ink-2 uppercase">
+            SIAGA Orchestrator · specialist agents
+          </h3>
+          <ul className="space-y-1">
+            {config.specialists!.map((sp) => (
+              <li key={sp.name}>
+                <b>{sp.name}</b> <span className="text-ink-2">({sp.stages.map((s) => STAGE_LABEL[s]).join(" + ")})</span>
+                <div className="text-xs text-ink-2">
+                  may call: {sp.allowlist.map((t) => TOOL[t] ?? t).join(", ")} · model used for {sp.uses_llm_for}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {precedents.length > 0 && (
         <section>

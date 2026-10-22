@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { dayLabel, rupiah, thousands } from "@/lib/format";
 import { escalation, notices } from "@/lib/notices";
-import { FIELD, period, STRATEGY } from "@/lib/present";
+import { FIELD, glossFor, period, STRATEGY } from "@/lib/present";
 import { stageInfo, type StageState } from "@/lib/stages";
 import { STAGES, type CaseEvent, type CaseRecord, type Precedent, type Stage } from "@/lib/types";
 import { StateNotices } from "./StateNotices";
@@ -96,6 +96,11 @@ export default function StageTimeline({
               >
                 <span className="w-5 text-center text-xs font-bold text-ink-2">{i + 1}</span>
                 <span className="w-24 text-sm font-semibold text-ink">{stage}</span>
+                {info.events.find((e) => e.agent && e.status === "started")?.agent && (
+                  <span className="w-28 truncate text-xs font-medium text-ink-2" data-testid={`agent-${stage}`}>
+                    {info.events.find((e) => e.agent && e.status === "started")?.agent}
+                  </span>
+                )}
                 <Badge tone={STATE_TONE[info.state]}>
                   {info.state === "running" && <Spinner />}
                   {info.state}
@@ -195,6 +200,7 @@ function StageDetails({ stage, record, events }: { stage: Stage; record: CaseRec
             {(d.evidence ?? []).map((e) => (
               <li key={`${e.signal}:${e.start}`} className="text-sm text-ink">
                 <span lang="id" className="italic">“{e.text}”</span>{" "}
+                {glossFor(e) && <span lang="en">({glossFor(e)})</span>}{" "}
                 <span className="text-ink-2">
                   · {e.source === "pdf" ? "PDF" : "WhatsApp"} → {FIELD[e.field] ?? e.field}
                 </span>
@@ -212,8 +218,15 @@ function StageDetails({ stage, record, events }: { stage: Stage; record: CaseRec
     case "ASSESS": {
       const a = record.affected;
       if (!a) return <Empty>Finding affected orders…</Empty>;
+      const note = events.find((e) => e.status === "completed")?.data.impact_note as string | undefined;
       return (
         <div className="space-y-2 text-sm">
+          {note && (
+            <div className="rounded-md bg-surface p-2 text-ink ring-1 ring-line" data-testid="impact-note">
+              <div className="text-xs text-ink-2">Impact Agent (written by the model; numbers from the risk function)</div>
+              {note}
+            </div>
+          )}
           <div>
             <b>Inbound POs on the lane:</b>{" "}
             {(a.purchase_orders ?? [])
@@ -332,6 +345,12 @@ function StageDetails({ stage, record, events }: { stage: Stage; record: CaseRec
                   </li>
                 ))}
               </ul>
+              {f.explanation && (
+                <p className="mt-0.5 text-xs text-ink" data-testid={`critic-note-${f.option_id}`}>
+                  <span className="text-ink-2">Critic Agent (model-written): </span>
+                  {f.explanation}
+                </p>
+              )}
             </div>
           ))}
           {record.explanation && (

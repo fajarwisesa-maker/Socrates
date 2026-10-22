@@ -59,6 +59,22 @@ class Disruption(_DisruptionFields):
     )
 
 
+class GlossedEvidenceItem(EvidenceItem):
+    """v2 Signal Agent: the same quote plus a short English meaning (translation only)."""
+
+    gloss_en: str = Field(
+        description="short English meaning of the quote, e.g. 'macet total' -> 'total gridlock'"
+    )
+
+
+class GlossedDisruption(Disruption):
+    """v2 Signal Agent output: Disruption whose evidence items carry an English gloss."""
+
+    evidence: list[GlossedEvidenceItem] = Field(  # type: ignore[assignment]
+        description="quotes supporting the fields, each with its signal, field and English gloss"
+    )
+
+
 class LocatedEvidence(BaseModel):
     """An evidence quote that code found in its signal (offsets computed in code)."""
 
@@ -69,6 +85,7 @@ class LocatedEvidence(BaseModel):
     start: int
     end: int
     text: str  # the signal text between start and end, as written
+    gloss_en: str | None = None  # v2 Signal Agent only
 
 
 class PerceivedDisruption(_DisruptionFields):
@@ -134,4 +151,39 @@ PROPOSE_CANDIDATES = tool_spec(
 )
 WRITE_EXPLANATION = tool_spec(
     "write_explanation", "Write the planner-facing explanation of the options.", Explanation
+)
+
+
+# ---------------------------------------------------------------- v2 specialists
+
+
+class OptionNote(_Strict):
+    option_id: str
+    explanation: str = Field(description="why the option fails its rule(s), in plain language")
+
+
+class CriticNotes(_Strict):
+    """Critic Agent: plain-language notes on the options that failed a rule."""
+
+    explanations: list[OptionNote] = []
+
+
+class ApprovalSummary(_Strict):
+    """Executor Agent: the short summary at the top of an approval card."""
+
+    summary: str = Field(description="2 sentences: what is asked, why, and by when")
+
+
+REPORT_DISRUPTION_GLOSSED = tool_spec(
+    "report_disruption",
+    "Report the structured disruption fused from all signals, with an English gloss per quote.",
+    GlossedDisruption,
+)
+REPORT_REVIEW = tool_spec(
+    "report_review",
+    "Explain, in plain language, why each failing option fails (after check_business_rules).",
+    CriticNotes,
+)
+WRITE_APPROVAL_SUMMARY = tool_spec(
+    "write_approval_summary", "Write the summary shown on the approval card.", ApprovalSummary
 )

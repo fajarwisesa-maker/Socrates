@@ -1,0 +1,174 @@
+{
+  "recorded_at": "2026-10-22T13:53:51+00:00",
+  "provider": "fake",
+  "orchestration": "multi",
+  "model": "fake",
+  "prompts": [
+    "critic_agent.v1",
+    "executor_agent.v1",
+    "impact_agent.v1",
+    "planner_agent.v1",
+    "signal_agent.v1"
+  ],
+  "llm_calls": [
+    {
+      "purpose": "signal",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "signal",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 3,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 3,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.explain",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "executor.summary",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    }
+  ],
+  "stage_timings_s": {
+    "PERCEIVE": "0.028",
+    "ASSESS": "0.066",
+    "PLAN": "0.02",
+    "SIMULATE": "0.077",
+    "REFLECT": "0.047",
+    "PLAN#2": "0.018",
+    "SIMULATE#2": "0.073",
+    "REFLECT#2": "0.049",
+    "ACT": "0.064",
+    "VERIFY": "0.018"
+  },
+  "seconds_to_approval_card": 0.49,
+  "outcome": {
+    "chosen_option": "B2",
+    "summary": {
+      "chosen": "B2",
+      "chosen_cost": 11400000,
+      "chosen_cost_display": "Rp 11.400.000",
+      "max_exposure": 340000000,
+      "max_exposure_display": "Rp 340.000.000",
+      "expected_exposure": 340000000,
+      "already_spent": 0,
+      "already_spent_display": "Rp 0",
+      "case_cost": 11400000,
+      "case_cost_display": "Rp 11.400.000",
+      "exposure_avoided": 340000000,
+      "exposure_avoided_display": "Rp 340.000.000",
+      "net_protected": 328600000,
+      "net_protected_display": "Rp 328.600.000",
+      "baseline": "A2",
+      "baseline_cost_display": "Rp 31.000.000",
+      "saving_vs_baseline": 19600000,
+      "saving_display": "Rp 19.600.000"
+    },
+    "tool_calls": 15,
+    "llm_calls": 18,
+    "replans": 1,
+    "actions": [
+      [
+        "stock_transfer",
+        "EXECUTED",
+        "STO-000001"
+      ],
+      [
+        "alternate_supplier",
+        "EXECUTED",
+        "4500018232"
+      ]
+    ]
+  }
+}

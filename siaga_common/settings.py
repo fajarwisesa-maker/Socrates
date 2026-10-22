@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -59,10 +59,23 @@ class Settings(BaseSettings):
     sap_db_path: Path = Field(REPO_ROOT / "var" / "sap_mock.db", alias="SAP_DB_PATH")
     audit_dir: Path = Field(REPO_ROOT / "var" / "audit", alias="AUDIT_DIR")
 
+    # --- v2 flags (docs/v2-flags.md); every default = v1 behaviour ---
+    # single: the v1 state machine; multi: specialist Strands agents under the same
+    # deterministic orchestrator
+    orchestration: Literal["single", "multi"] = Field("single", alias="ORCHESTRATION")
+
     # --- Agent loop limits (enforced in code, not by the model) ---
     max_tool_calls: int = Field(20, alias="MAX_TOOL_CALLS")
     max_replans: int = Field(2, alias="MAX_REPLANS")
     verify_delay_seconds: int = Field(60, alias="VERIFY_DELAY_SECONDS")
+
+    @model_validator(mode="after")
+    def _multi_golden(self) -> Settings:
+        # The multi-agent run has its own recording (other LLM purposes); the v1 one stays
+        # the v1 fallback. An explicit REPLAY_PATH always wins.
+        if self.orchestration == "multi" and "replay_path" not in self.model_fields_set:
+            self.replay_path = REPO_ROOT / "data" / "golden" / "multi" / "llm.jsonl"
+        return self
 
     def require_model_id(self) -> str:
         if not self.bedrock_model_id:

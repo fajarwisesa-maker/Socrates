@@ -4,6 +4,7 @@
     uv run python scripts/dev.py --fake       # scripted LLM, no AWS
     uv run python scripts/dev.py --replay     # the golden recording, no AWS
     uv run python scripts/dev.py --embedded-sap   # mock SAP inside the Case API (2 processes)
+    uv run python scripts/dev.py --multi      # v2: specialist agents (ORCHESTRATION=multi)
 
 Starts the mock S/4HANA (:8001), the Case API (:8000) and the dashboard (:3000), like
 `make dev`. Ctrl-C stops all of them; so does any one of them exiting.
@@ -75,6 +76,7 @@ def main() -> int:
     ap.add_argument(
         "--embedded-sap", action="store_true", help="run the mock SAP inside the Case API"
     )
+    ap.add_argument("--multi", action="store_true", help="specialist agents (ORCHESTRATION=multi)")
     args = ap.parse_args()
 
     npm = shutil.which("npm")
@@ -94,6 +96,8 @@ def main() -> int:
         env["REPLAY"] = "1"
     if args.embedded_sap:
         env["EMBEDDED_SAP"] = "1"
+    if args.multi:
+        env["ORCHESTRATION"] = "multi"
 
     def on_term(*_: object) -> None:
         raise KeyboardInterrupt

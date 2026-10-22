@@ -18,6 +18,10 @@ and the decisions made. **Update it every phase.**
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
 | 8 | not started |
+| v2 step 0 (safety net, access check) | done except the SAP checks (SAP access pending); tag `v1-demo` on `7bccb9a` is local only (this session cannot push tags) |
+| v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
+| v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
+| v2 steps 3–7 | step 3 waiting for SAP access; 4–7 not started |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
@@ -78,6 +82,16 @@ uv run python scripts/dev.py --replay        # = make replay
 uv run python scripts/dev.py --embedded-sap  # mock SAP inside the Case API (2 processes)
 uv run pytest -q                             # = make test
 uv run python scripts/rehearse.py -n 10      # = make rehearse N=10
+```
+
+SIAGA v2 (`SIAGA_v2_upgrade_prompt.md`; flags in `docs/v2-flags.md`, all off = v1):
+
+```bash
+ORCHESTRATION=multi make dev          # specialist Strands agents (Signal, Impact, Planner, Critic, Executor)
+ORCHESTRATION=multi make replay       # on data/golden/multi/ (fake placeholder recording)
+ORCHESTRATION=multi make rehearse N=10   # report includes per-agent timings
+ORCHESTRATION=multi make web-smoke    # e2e incl. e2e/multi.spec.ts (skips on a v1 API)
+make agentcore-check                  # which AgentCore features answer in AWS_REGION (needs AWS creds)
 ```
 
 Phase 5 (Case API + dashboard):
@@ -706,6 +720,81 @@ additive (no field removed).
 - Still bash-only: `make` itself and `scripts/web_smoke.sh` (Playwright smoke). On Windows,
   run Playwright directly in `web/` against a running stack, or use Git Bash.
 
+### SIAGA v2 step 0 decisions
+
+- `v1-demo` = commit `7bccb9a` (rehearse N=3: 3/3 fake, 3/3 replay). The tag exists in the
+  build container only: the session's git proxy refuses tag pushes. Push it from a clone
+  (`git tag v1-demo 7bccb9a && git push origin v1-demo`) if a remote tag is wanted.
+- `docs/v2-flags.md` lists every flag; `.env.example` has the SAP variable names, no values.
+- AgentCore availability in ap-southeast-1 could not be read from AWS docs (the docs host is
+  blocked by this environment's network policy). From AWS announcements found by search:
+  Policy is GA in Singapore; temporal policies (Dogwood) list Singapore as available;
+  Gateway is likely; Runtime is listed by trackers; Evaluations is unclear (sources
+  conflict). The installed botocore has the Policy (incl. Dogwood/temporal statements),
+  Gateway rate-limit and Evaluations APIs. `make agentcore-check` confirms per account.
+
+### SIAGA v2 step 2 decisions (multi-agent orchestration, `ORCHESTRATION=multi`)
+
+- **Strands Agents `strands-agents==1.58.1`** (6 Oct; pinned two weeks back like the UI
+  deps). Read from the installed package, not from memory: `Model.stream`,
+  `PythonAgentTool`, `request_state["stop_event_loop"]`, `limits={"turns": N}`,
+  `SequentialToolExecutor`, `retry_strategy=None`.
+- **`agent/multi/orchestrator.py`**: `MultiAgentOrchestrator` subclasses the v1 `Agent`
+  and overrides only the model-facing hooks (`_perceive_model`, `_assess_model`,
+  `_plan_model`, `_solve`, `_review_options`, `_explain_model`, `_card`). Stage order,
+  budget, replan cap, evidence location, confidence, selection, approvals, ACT, VERIFY
+  and escalations are the v1 code. `agent/factory.make_agent` picks the class.
+- **Every model call still goes through `Agent._llm`.** `agent/multi/model.py`
+  (`OrchestratedModel`) is a Strands model provider that calls it, so fake / replay /
+  recording / Bedrock, retry events, audit and the LLM counter are unchanged. Strands runs
+  each specialist's loop (tool choice, tool execution, conversation).
+- **Specialists** (`agent/multi/specialists.py`) with prompts `agent/prompts/<key>_agent.v1.md`:
+  - Signal (PERCEIVE): `extract_pdf_text`. The PDF is shown as an attachment it opens itself.
+    Evidence items carry `gloss_en` (translation only); code still locates every quote.
+  - Impact (ASSESS): `find_open_pos`, `get_sales_orders`, `get_stock`, `compute_risk`. The
+    v1 delay guard applies; its final sentence is stored as `impact_note`.
+  - Planner (PLAN + SIMULATE): `search_precedents`, `run_solver`. Two invocations sharing one
+    conversation; `run_solver` takes strategies only and applies the case's constraints in
+    code; a candidate it did not simulate is run by code (an Orchestrator event).
+  - Critic (REFLECT): `check_business_rules` (deterministic) then `report_review` (notes per
+    failing option, refused until the check ran); selection stays in code; then
+    `write_explanation`.
+  - Executor (ACT + VERIFY): `create_stock_transfer`, `request_approval`,
+    `create_purchase_order`, `check_status` **plus `book_spot_air` and
+    `reschedule_customer_order`** (missing from the brief's table; the replan to air needs
+    them). Its actions are calls of the chosen plan made in code, as in v1; the model writes
+    only the approval card `summary`.
+- **v2 tools** (`agent/tools/v2.py`) are registered only in multi mode, so the v1 registry
+  and Cedar action list are unchanged. Most are the v1 tools under the brief's names.
+- **Allowlist = hard error**: checked in the model adapter (before Strands runs a tool) and
+  in `_tool` for code paths. A violation is audited (`allowlist_violation`), shown as a
+  `denied` event and escalates the case. Errors raised inside a Strands tool (budget,
+  allowlist) are held, the loop is stopped, and they are re-raised after the agent returns
+  (Strands turns tool exceptions into error results).
+- **Bounded output**: 5 turns, then one nudge of 2 turns, then escalation (v1: 5 in total).
+- **Events** carry `agent` (the stage's specialist; CASE events and escalations:
+  "SIAGA Orchestrator"); audit `tool_call` entries carry `agent` in multi mode only.
+- **Replay**: purposes `signal`, `impact`, `planner.plan`, `planner.simulate`,
+  `critic.review`, `critic.explain`, `executor.summary`. The multi recording lives in
+  `data/golden/multi/` (REPLAY_PATH default in multi mode); the v1 one is untouched.
+  **The committed multi recording is a fake-LLM placeholder.**
+- **Budget**: golden path 15 tool calls (13 to the approval card); reject → air → verify
+  19 on the fake LLM. A real model that runs more lookups can bring the reject path close
+  to 20 (then it escalates on budget, by design).
+- **UI** (step 6 items that come with step 2):
+  - The rail names each stage's agent: from events, else the team in `/config`
+    (`orchestration`, `specialists`). Rows are 4.75rem only when agents exist.
+  - Perceive puts the gloss under each Bahasa phrase (text-lg, `ink-2`). When glosses
+    show, the PDF phrases flow on shared lines so the canvas still fits 1280×720
+    (e2e-checked; the projector check passes in multi mode).
+  - The drawer shows the agent per event and the specialists with their allowlists.
+  - Planner mode shows the agent per stage, the Impact note, the Critic notes and the
+    approval summary, each labelled "model-written".
+- `make rehearse` reports `agent_s` (per-agent time, from `/config`).
+- `scripts/dev.py --multi` for the no-make path.
+- Results (fake LLM): pytest 171 passed; rehearse multi 10/10 fake and 10/10 replay;
+  v1 3/3; web smoke multi 9/9 (fake) and 8/8 (replay), v1 8/8 + 1 skipped and 7/7.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -713,5 +802,10 @@ additive (no field removed).
   `make eval-perceive` (target ≥ 18/20), `make demo` with Bedrock ×3 for stability and
   per-stage timings, `make record-golden` (replace the fake placeholder), and
   `make rehearse N=10` against Bedrock.
+- Bedrock on the owner's account returns `ValidationException: Operation not allowed` for
+  every model call: Anthropic's first-time use form (Bedrock console > Model catalog) was
+  not submitted; check Nova to rule out an account-level block. v2 step 2 still needs
+  3 Bedrock runs with per-agent timings (< 4 min total) and a Bedrock multi recording.
+- SAP access (AI Core service key, Cloud Foundry, Joule) for v2 steps 0 (checks), 1 and 3.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

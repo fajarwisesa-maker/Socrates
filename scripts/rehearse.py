@@ -200,15 +200,27 @@ def one_run(
     return r
 
 
-def summarise(runs: list[dict[str, Any]], target: str, inject: str | None) -> dict[str, Any]:
+def summarise(
+    runs: list[dict[str, Any]],
+    target: str,
+    inject: str | None,
+    stage_agent: dict[str, str] | None = None,
+) -> dict[str, Any]:
     ok = [r for r in runs if r["ok"]]
     stage_totals: dict[str, list[float]] = defaultdict(list)
+    agent_totals: dict[str, list[float]] = defaultdict(list)  # v2: per specialist agent
     for r in ok:
         per: dict[str, float] = defaultdict(float)
         for key, s in r["stages"].items():
             per[key.split("#")[0]] += s
         for k, v in per.items():
             stage_totals[k].append(v)
+        by_agent: dict[str, float] = defaultdict(float)
+        for k, v in per.items():
+            if stage_agent and k in stage_agent:
+                by_agent[stage_agent[k]] += v
+        for k, v in by_agent.items():
+            agent_totals[k].append(v)
 
     def stat(xs: list[float]) -> dict[str, float] | None:
         return {"mean": round(statistics.mean(xs), 2), "max": round(max(xs), 2)} if xs else None
@@ -223,6 +235,7 @@ def summarise(runs: list[dict[str, Any]], target: str, inject: str | None) -> di
         "t_approve_to_po_s": stat([r["t_approve_to_po_s"] for r in ok]),
         "t_total_s": stat([r["t_total_s"] for r in ok]),
         "stage_s": {k: stat(v) for k, v in stage_totals.items()},
+        "agent_s": {k: stat(v) for k, v in agent_totals.items()},
         "runs": runs,
     }
 
@@ -242,13 +255,15 @@ def main() -> int:
 
     with api_client(url, args.local, args.verify_delay) as (client, target):
         cfg = client.get("/config").json()
+        stage_agent = {st: sp["name"] for sp in cfg.get("specialists") or [] for st in sp["stages"]}
         verify_wait = cfg["verify_delay_seconds"] + 5
         if args.inject and cfg["verify_delay_seconds"] < 3:
             print("WARNING: VERIFY_DELAY_SECONDS < 3 on the API; VERIFY may run before the fault")
         extra = f", inject {args.inject}" if args.inject else ""
         print(
             f"Rehearsing {args.n}x against {target}; LLM {cfg['llm_provider']}, "
-            f"VERIFY delay {cfg['verify_delay_seconds']} s{extra}"
+            f"VERIFY delay {cfg['verify_delay_seconds']} s, "
+            f"orchestration {cfg.get('orchestration', 'single')}{extra}"
         )
         runs = []
         for i in range(1, args.n + 1):
@@ -263,7 +278,7 @@ def main() -> int:
             )
             print(f"  run {i:>2}  {mark}  {times}")
 
-    report = summarise(runs, target, args.inject)
+    report = summarise(runs, target, args.inject, stage_agent)
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"report-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -274,6 +289,9 @@ def main() -> int:
         print(f"signal -> end          mean {total['mean']} s, max {total['max']} s")
         stages = ", ".join(f"{k} {v['mean']}/{v['max']}" for k, v in report["stage_s"].items() if v)
         print(f"per stage (mean / max s): {stages}")
+        if report["agent_s"]:
+            agents = ", ".join(f"{k} {v['mean']}/{v['max']}" for k, v in report["agent_s"].items())
+            print(f"per agent (mean / max s): {agents}")
     print(f"report: {path.relative_to(REPO_ROOT)}")
     return 0 if report["passed"] == report["total"] else 1
 

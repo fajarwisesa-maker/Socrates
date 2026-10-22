@@ -3,7 +3,8 @@
 import { FileText, MessageCircle } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useRef } from "react";
-import { CAUSE, delay, FIELD } from "@/lib/present";
+import { CAUSE, delay, FIELD, glossFor } from "@/lib/present";
+import { cn } from "@/lib/utils";
 import type { CaseRecord, Evidence } from "@/lib/types";
 import { EvidenceLinks } from "../EvidenceLinks";
 import { Highlighted } from "../Highlighted";
@@ -29,6 +30,8 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
     references: d.references.length ? d.references.map((r) => `PO ${r}`).join(", ") : "—",
   };
   const progression = d.confidence_basis?.progression ?? [];
+  // v2 glosses make the WhatsApp bubble taller; the PDF phrases then flow on shared lines
+  const glossed = ev.some((e) => glossFor(e));
 
   return (
     <Frame stage="PERCEIVE" round={round} headline={headline}>
@@ -42,7 +45,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                 <div className="mb-2 flex items-center gap-2 text-lg font-semibold text-ink-2">
                   <FileText className="size-5" aria-hidden /> Forwarder notice · PDF
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className={glossed ? "text-xl leading-[1.5]" : "flex flex-wrap gap-1.5"}>
                   {[...spans].sort((x, y) => x.start - y.start).map((e, j) => (
                     <motion.mark
                       key={e.start}
@@ -51,7 +54,11 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                       transition={{ delay: reduce ? 0 : 1.5 + j * 0.08, duration: 0.3 }}
                       data-field={e.field}
                       data-evidence={`${e.signal}:${e.start}`}
-                      className="rounded-md bg-brand-soft px-1.5 text-xl font-semibold text-brand-ink"
+                      className={
+                        glossed
+                          ? "mr-1.5 inline-block rounded-md bg-brand-soft px-1.5 font-semibold whitespace-nowrap text-brand-ink"
+                          : "rounded-md bg-brand-soft px-1.5 text-xl font-semibold text-brand-ink"
+                      }
                     >
                       {e.text.replace(/\s+/g, " ")}
                     </motion.mark>
@@ -63,7 +70,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                 <div className="mb-1 flex items-center gap-2 text-lg font-semibold text-ink-2">
                   <MessageCircle className="size-5" aria-hidden /> Driver · WhatsApp
                 </div>
-                <p lang="id" className="text-xl leading-[1.45] text-ink italic">
+                <p lang="id" className={cn("text-xl text-ink italic", glossed ? "leading-[1.35]" : "leading-[1.45]")}>
                   <Highlighted text={s.text} spans={spans} />
                 </p>
               </div>

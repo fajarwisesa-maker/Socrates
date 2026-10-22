@@ -1,7 +1,7 @@
 // Plain words for Presenter mode. Names come from SAP labels (assess_impact), numbers from
 // the backend; this file only chooses words and formats.
 import { dayShort, thousands } from "./format";
-import type { CaseAction, CaseEvent, CaseRecord, Labels, PlannedAction, Stage } from "./types";
+import type { CaseAction, CaseEvent, CaseRecord, Config, Labels, PlannedAction, Stage } from "./types";
 
 export const CAUSE: Record<string, string> = {
   flood: "Flood",
@@ -121,4 +121,31 @@ export const TOOL: Record<string, string> = {
   create_purchase_order: "Purchase order",
   book_spot_air: "Air charter booking",
   reschedule_customer_order: "Customer reschedule",
+  // v2 specialists' tools (ORCHESTRATION=multi)
+  extract_pdf_text: "Read PDF",
+  find_open_pos: "Find open POs",
+  get_stock: "Read stock",
+  get_sales_orders: "Read customer orders",
+  compute_risk: "Compute risk",
+  run_solver: "Run solver",
+  check_business_rules: "Check business rules",
+  create_stock_transfer: "Stock transfer",
+  request_approval: "Request approval",
+  check_status: "Read SAP status",
 };
+
+/** The agent working each stage: from the events (what happened), else the configured team. */
+export function agentsByStage(events: CaseEvent[], config: Config | null): Partial<Record<Stage, string>> {
+  const out: Partial<Record<Stage, string>> = {};
+  for (const sp of config?.specialists ?? []) for (const st of sp.stages) out[st] = sp.name;
+  for (const e of events) if (e.agent && e.stage !== "CASE" && e.status === "started") out[e.stage] = e.agent;
+  return out;
+}
+
+/** Show a gloss only when it adds something (an English quote's gloss repeats it). */
+export function glossFor(e: { quote: string; gloss_en?: string | null }): string | null {
+  const g = e.gloss_en?.trim();
+  if (!g) return null;
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return norm(g) === norm(e.quote) ? null : g;
+}

@@ -22,6 +22,8 @@ export interface CaseEvent {
   detail: string;
   data: Record<string, unknown>;
   ts: string;
+  /** v2 (ORCHESTRATION=multi): the specialist working the stage, or the orchestrator */
+  agent?: string | null;
 }
 
 export interface PlannedAction {
@@ -57,6 +59,8 @@ export interface CriticFinding {
   option_id: string;
   round: number;
   clean: boolean;
+  /** v2 Critic Agent: why the option fails, in plain language (model-written) */
+  explanation?: string;
   checks: {
     rule: string;
     passed: boolean;
@@ -100,6 +104,9 @@ export interface ApprovalCard {
   approve_by: string | null;
   approve_by_display: string;
   eta_display: string | null;
+  /** v2: two sentences written by the Executor Agent (model-written; numbers copied) */
+  summary?: string;
+  summary_by?: string;
 }
 
 export interface Approval {
@@ -168,6 +175,16 @@ export interface Config {
   max_tool_calls: number;
   max_replans: number;
   replay_source: { provider: string; model: string | null; recorded_at: string } | null;
+  /** v2: "single" (v1 state machine) or "multi" (specialist agents) */
+  orchestration?: "single" | "multi";
+  specialists?: Specialist[];
+}
+
+export interface Specialist {
+  name: string;
+  stages: Stage[];
+  allowlist: string[];
+  uses_llm_for: string;
 }
 
 export interface AuditEntry {
@@ -206,6 +223,8 @@ export interface Evidence {
   start: number;
   end: number;
   text: string;
+  /** v2 Signal Agent: short English meaning of the quote (translation only) */
+  gloss_en?: string | null;
 }
 
 export interface Labels {

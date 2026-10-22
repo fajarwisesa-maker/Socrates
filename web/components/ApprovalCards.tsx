@@ -63,6 +63,12 @@ function ApprovalCard({ approval, record }: { approval: Approval; record: CaseRe
       <div className="text-xs text-ink-2">
         part of a plan totalling {c.plan_total_display} · {c.tier_reasons.join("; ")}
       </div>
+      {c.summary && (
+        <p className="mt-2 text-sm text-ink" data-testid="approval-summary">
+          {c.summary}
+          <span className="block text-xs text-ink-2">{c.summary_by ?? "Executor Agent"} (model-written; amounts copied)</span>
+        </p>
+      )}
       <dl className="mt-2 space-y-1 text-xs">
         <div>
           <dt className="inline font-semibold">Why: </dt>

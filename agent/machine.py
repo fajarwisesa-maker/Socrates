@@ -78,6 +78,16 @@ class CaseStateError(ValueError):
 
 
 class Agent:
+    # Tool names per role. The multi-agent orchestrator (v2) uses the specialists' names.
+    TOOLS: dict[str, str] = {
+        "find_pos": "find_inbound_purchase_orders",
+        "impact": "assess_impact",
+        "precedents": "search_precedents",
+        "simulate": "simulate_option",
+        "approval": "request_human_approval",
+        "status": "get_action_status",
+    }
+
     def __init__(
         self,
         runtime: Runtime,
@@ -168,10 +178,23 @@ class Agent:
         title: str,
         detail: str = "",
         data: dict[str, Any] | None = None,
+        agent: str | None = None,
     ) -> CaseEvent:
-        e = self.store.append_event(case_id, stage, status, title, detail, data)  # type: ignore[arg-type]
+        e = self.store.append_event(
+            case_id,
+            stage,  # type: ignore[arg-type]
+            status,
+            title,
+            detail,
+            data,
+            agent=agent or self._agent_for(stage),
+        )
         self.on_event(e)
         return e
+
+    def _agent_for(self, stage: str) -> str | None:
+        """Who works a stage. v1 has no specialists; the multi-agent orchestrator does."""
+        return None
 
     def _enter(self, case_id: str, stage: str) -> None:
         case = self.store.get_case(case_id)
@@ -196,7 +219,7 @@ class Agent:
         )
 
     def _tool(self, case_id: str, stage: str, name: str, args: dict[str, Any]) -> ToolCallResult:
-        r = self.registry.invoke(self._ctx(case_id), name, args)
+        r = self.registry.invoke(self._ctx(case_id), name, args, agent=self._agent_for(stage))
         title = f"{name} -> {r.status}" + (f" (Tier {r.tier})" if r.tier is not None else "")
         detail = r.denial.message if r.denial else (r.error or "")
         self._event(
@@ -329,6 +352,11 @@ class Agent:
     def _perceive(self, case_id: str) -> bool:
         self._enter(case_id, "PERCEIVE")
         case = self.store.get_case(case_id)
+        raw = self._perceive_model(case_id, case)
+        d = self._ground_evidence(case_id, raw, case.signals)
+        return self._perceive_rest(case_id, d)
+
+    def _perceive_model(self, case_id: str, case: CaseRecord) -> Disruption:
         blocks = []
         for i, s in enumerate(case.signals, start=1):
             label = s["type"] + (f": {s['filename']}" if s.get("filename") else "")
@@ -341,10 +369,9 @@ class Agent:
             tools=[REPORT_DISRUPTION],
             max_tokens=2048,
         )
-        raw: Disruption = self._structured(
-            case_id, "PERCEIVE", req, version, "report_disruption", Disruption
-        )
-        d = self._ground_evidence(case_id, raw, case.signals)
+        return self._structured(case_id, "PERCEIVE", req, version, "report_disruption", Disruption)
+
+    def _perceive_rest(self, case_id: str, d: PerceivedDisruption) -> bool:
         self.store.update_case(case_id, disruption=d.model_dump(mode="json"))
         if not d.is_disruption:
             self._leave(
@@ -404,56 +431,8 @@ class Agent:
     def _assess(self, case_id: str) -> bool:
         self._enter(case_id, "ASSESS")
         d = PerceivedDisruption.model_validate(self.store.get_case(case_id).disruption)
-        prompt, version = load_prompt("assess")
-        allowed = {"find_inbound_purchase_orders", "assess_impact"}
-        tools = [s for s in self.registry.specs() if s["toolSpec"]["name"] in allowed]
         found: dict[str, Any] = {"purchase_orders": []}
-        impact: dict[str, Any] = {}
-
-        def run_tool(u: dict[str, Any]) -> dict[str, Any]:
-            name, args = u["name"], u["input"]
-            if name == "assess_impact" and (
-                args.get("delay_hours_min") != d.delay_hours_min
-                or args.get("delay_hours_max") != d.delay_hours_max
-            ):
-                return {
-                    "error": "delay must equal the reported disruption delay "
-                    f"({d.delay_hours_min}-{d.delay_hours_max} h)"
-                }
-            r = self._tool(case_id, "ASSESS", name, args)
-            if r.status != "ok":
-                return {
-                    "status": r.status,
-                    "error": r.error,
-                    "denial": r.denial and r.denial.model_dump(),
-                }
-            if name == "find_inbound_purchase_orders":
-                found["purchase_orders"] = r.output["purchase_orders"]
-            else:
-                impact.update(args=args, output=r.output)
-            return r.output
-
-        messages = [user_text(f"Disruption:\n{json.dumps(d.for_llm(), indent=2)}")]
-        for _ in range(MAX_LLM_TURNS):
-            resp = self._llm(
-                case_id,
-                "ASSESS",
-                LLMRequest(purpose="assess", system=prompt, messages=messages, tools=tools),
-                version,
-            )
-            messages.append(resp.message)
-            uses = resp.tool_uses()
-            if not uses:
-                break
-            results = [
-                tool_result(u["toolUseId"], run_tool(u))
-                if u["name"] in allowed
-                else tool_result(u["toolUseId"], {"error": "tool not available"}, ok=False)
-                for u in uses
-            ]
-            messages.append(
-                {"role": "user", "content": json.loads(json.dumps(results, default=str))}
-            )
+        impact = self._assess_model(case_id, d, found)
 
         if not impact:
             self._event(
@@ -487,13 +466,87 @@ class Agent:
             "ASSESS",
             "Impact assessed",
             detail,
-            {"risk": risk.model_dump(mode="json"), "affected": affected},
+            {
+                "risk": risk.model_dump(mode="json"),
+                "affected": affected,
+                **self._stage_notes(case_id, "ASSESS"),
+            },
         )
         if risk.shortfall == 0:
             self.store.update_case(case_id, status="RESOLVED")
             self._event(case_id, "CASE", "resolved", "No shortfall: monitoring only")
             return False
         return True
+
+    def _assess_tool(
+        self,
+        case_id: str,
+        d: PerceivedDisruption,
+        found: dict[str, Any],
+        impact: dict[str, Any],
+        name: str,
+        args: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run one ASSESS tool for the model; keep what later stages need."""
+        if name == self.TOOLS["impact"] and (
+            args.get("delay_hours_min") != d.delay_hours_min
+            or args.get("delay_hours_max") != d.delay_hours_max
+        ):
+            return {
+                "error": "delay must equal the reported disruption delay "
+                f"({d.delay_hours_min}-{d.delay_hours_max} h)"
+            }
+        r = self._tool(case_id, "ASSESS", name, args)
+        if r.status != "ok":
+            return {
+                "status": r.status,
+                "error": r.error,
+                "denial": r.denial and r.denial.model_dump(),
+            }
+        if name == self.TOOLS["find_pos"]:
+            found["purchase_orders"] = r.output["purchase_orders"]
+        elif name == self.TOOLS["impact"]:
+            impact.update(args=args, output=r.output)
+        return r.output
+
+    def _assess_model(
+        self, case_id: str, d: PerceivedDisruption, found: dict[str, Any]
+    ) -> dict[str, Any]:
+        """The model picks the read tools; returns the impact call (args + output) or {}."""
+        prompt, version = load_prompt("assess")
+        allowed = {self.TOOLS["find_pos"], self.TOOLS["impact"]}
+        tools = [s for s in self.registry.specs() if s["toolSpec"]["name"] in allowed]
+        impact: dict[str, Any] = {}
+
+        messages = [user_text(f"Disruption:\n{json.dumps(d.for_llm(), indent=2)}")]
+        for _ in range(MAX_LLM_TURNS):
+            resp = self._llm(
+                case_id,
+                "ASSESS",
+                LLMRequest(purpose="assess", system=prompt, messages=messages, tools=tools),
+                version,
+            )
+            messages.append(resp.message)
+            uses = resp.tool_uses()
+            if not uses:
+                break
+            results = [
+                tool_result(
+                    u["toolUseId"],
+                    self._assess_tool(case_id, d, found, impact, u["name"], u["input"]),
+                )
+                if u["name"] in allowed
+                else tool_result(u["toolUseId"], {"error": "tool not available"}, ok=False)
+                for u in uses
+            ]
+            messages.append(
+                {"role": "user", "content": json.loads(json.dumps(results, default=str))}
+            )
+        return impact
+
+    def _stage_notes(self, case_id: str, stage: str) -> dict[str, Any]:
+        """Extra fields for a stage's `completed` event (v2: the specialist's own words)."""
+        return {}
 
     def _assess_fallback(
         self, case_id: str, d: PerceivedDisruption, found: dict[str, Any]
@@ -502,7 +555,7 @@ class Agent:
             r = self._tool(
                 case_id,
                 "ASSESS",
-                "find_inbound_purchase_orders",
+                self.TOOLS["find_pos"],
                 {"lane": d.lane, "references": d.references},
             )
             if r.status != "ok":
@@ -524,7 +577,7 @@ class Agent:
             "delay_hours_min": d.delay_hours_min,
             "delay_hours_max": d.delay_hours_max,
         }
-        r = self._tool(case_id, "ASSESS", "assess_impact", args)
+        r = self._tool(case_id, "ASSESS", self.TOOLS["impact"], args)
         if r.status != "ok":
             raise Escalate(f"impact assessment failed: {r.error}")
         return {"args": args, "output": r.output}
@@ -558,24 +611,7 @@ class Agent:
                 "planner_rejections": case.rejection_reasons,
                 "already_executed": [a for a in case.actions if a["status"] == "EXECUTED"],
             }
-        prompt, version = load_prompt("plan")
-        tools = [s for s in self.registry.specs() if s["toolSpec"]["name"] == "search_precedents"]
-        req = LLMRequest(
-            purpose="plan",
-            system=prompt,
-            messages=[user_text(json.dumps(context, indent=2, default=str))],
-            tools=[*tools, PROPOSE_CANDIDATES],
-        )
-
-        def search(u: dict[str, Any]) -> dict[str, Any]:
-            if u["name"] != "search_precedents":
-                return {"error": "tool not available"}
-            r = self._tool(case_id, "PLAN", "search_precedents", u["input"])
-            return r.output if r.status == "ok" else {"error": r.error}
-
-        plan: CandidatePlan = self._structured(
-            case_id, "PLAN", req, version, "propose_candidates", CandidatePlan, search
-        )
+        plan = self._plan_model(case_id, context)
         candidates = []
         for c in plan.candidates:
             strategies = [s for s in c.strategies if s not in case.ruled_out_strategies]
@@ -600,6 +636,26 @@ class Agent:
             },
         )
 
+    def _plan_model(self, case_id: str, context: dict[str, Any]) -> CandidatePlan:
+        prompt, version = load_prompt("plan")
+        tools = [s for s in self.registry.specs() if s["toolSpec"]["name"] == "search_precedents"]
+        req = LLMRequest(
+            purpose="plan",
+            system=prompt,
+            messages=[user_text(json.dumps(context, indent=2, default=str))],
+            tools=[*tools, PROPOSE_CANDIDATES],
+        )
+
+        def search(u: dict[str, Any]) -> dict[str, Any]:
+            if u["name"] != "search_precedents":
+                return {"error": "tool not available"}
+            r = self._tool(case_id, "PLAN", "search_precedents", u["input"])
+            return r.output if r.status == "ok" else {"error": r.error}
+
+        return self._structured(
+            case_id, "PLAN", req, version, "propose_candidates", CandidatePlan, search
+        )
+
     def _cited_precedents(self, case_id: str, ids: list[str]) -> list[dict[str, Any]]:
         """Precedents the model cited that a search in this case actually returned."""
         hits: dict[str, dict[str, Any]] = {}
@@ -617,16 +673,8 @@ class Agent:
         case = self.store.get_case(case_id)
         rnd = case.plan_round
         results = []
-        for c in [c for c in case.candidates if c["round"] == rnd]:
-            r = self._tool(
-                case_id,
-                "SIMULATE",
-                "simulate_option",
-                {"strategies": c["strategies"], "constraints": case.constraints},
-            )
-            if r.status != "ok":
-                raise Escalate(f"solver failed for option {c['option_id']}: {r.error}")
-            res = SolveResult.model_validate(r.output)
+        candidates = [c for c in case.candidates if c["round"] == rnd]
+        for c, res in zip(candidates, self._solve(case_id, candidates), strict=True):
             results.append(
                 {
                     "option_id": c["option_id"],
@@ -650,6 +698,22 @@ class Agent:
             {"options": results},
         )
 
+    def _solve(self, case_id: str, candidates: list[dict[str, Any]]) -> list[SolveResult]:
+        """One solver call per candidate, in order, with the case's active constraints."""
+        constraints = self.store.get_case(case_id).constraints
+        out = []
+        for c in candidates:
+            r = self._tool(
+                case_id,
+                "SIMULATE",
+                self.TOOLS["simulate"],
+                {"strategies": c["strategies"], "constraints": constraints},
+            )
+            if r.status != "ok":
+                raise Escalate(f"solver failed for option {c['option_id']}: {r.error}")
+            out.append(SolveResult.model_validate(r.output))
+        return out
+
     # ---------------------------------------------------------------- REFLECT
 
     def _reflect(self, case_id: str) -> str:
@@ -657,26 +721,11 @@ class Agent:
         case = self.store.get_case(case_id)
         rnd = case.plan_round
         risk = RiskResult.model_validate(case.risk)
-        material, plant = case.affected["material"], case.affected["plant"]
-        suppliers = {s["Supplier"]: s for s in self.rt.sap.query("A_Supplier")}
-        ctx = self._ctx(case_id)
-
         options = [o for o in case.solver_results if o["round"] == rnd]
-        reviews: dict[str, critic.OptionReview] = {}
+        reviews, notes = self._review_options(case_id, rnd, options)
         findings = []
         for o in options:
-            rv = critic.review(
-                o["option_id"],
-                SolveResult.model_validate(o["result"]),
-                risk,
-                material=material,
-                plant=plant,
-                suppliers=suppliers,
-                registry=self.registry,
-                ctx=ctx,
-                plant_names=(case.affected.get("labels") or {}).get("plants"),
-            )
-            reviews[o["option_id"]] = rv
+            rv = reviews[o["option_id"]]
             findings.append(
                 {
                     "option_id": o["option_id"],
@@ -684,6 +733,7 @@ class Agent:
                     "clean": rv.clean,
                     "checks": [c.model_dump() for c in rv.checks],
                     "tiers": [t.model_dump() for t in rv.tiers],
+                    **({"explanation": notes[o["option_id"]]} if o["option_id"] in notes else {}),
                 }
             )
             self._event(
@@ -756,6 +806,29 @@ class Agent:
         )
         return "act"
 
+    def _review_options(
+        self, case_id: str, rnd: int, options: list[dict[str, Any]]
+    ) -> tuple[dict[str, critic.OptionReview], dict[str, str]]:
+        """The Critic's rule checks per option (code), plus any plain-language notes."""
+        case = self.store.get_case(case_id)
+        risk = RiskResult.model_validate(case.risk)
+        suppliers = {s["Supplier"]: s for s in self.rt.sap.query("A_Supplier")}
+        reviews = {
+            o["option_id"]: critic.review(
+                o["option_id"],
+                SolveResult.model_validate(o["result"]),
+                risk,
+                material=case.affected["material"],
+                plant=case.affected["plant"],
+                suppliers=suppliers,
+                registry=self.registry,
+                ctx=self._ctx(case_id),
+                plant_names=(case.affected.get("labels") or {}).get("plants"),
+            )
+            for o in options
+        }
+        return reviews, {}
+
     def _compare(self, case: CaseRecord, chosen, options, risk: RiskResult) -> dict[str, Any]:
         clean = {
             f["option_id"] for f in self.store.get_case(case.case_id).critic_findings if f["clean"]
@@ -809,7 +882,6 @@ class Agent:
         return out
 
     def _explain(self, case_id, chosen, options, findings, risk, compare) -> Explanation:
-        prompt, version = load_prompt("reflect")
         data = {
             "selected_option": chosen["option_id"],
             "comparison": compare,
@@ -832,6 +904,10 @@ class Agent:
                 f for f in self.store.get_case(case_id).critic_findings if not f["clean"]
             ],
         }
+        return self._explain_model(case_id, data)
+
+    def _explain_model(self, case_id: str, data: dict[str, Any]) -> Explanation:
+        prompt, version = load_prompt("reflect")
         req = LLMRequest(
             purpose="reflect",
             system=prompt,
@@ -853,6 +929,7 @@ class Agent:
         actions = list(case.actions)
         for i, a in enumerate(result.actions):
             tool, args = tool_call_for(a, material, plant)
+            tool = self.TOOLS.get(tool, tool)
             t = self.registry.get(tool)
             tier = t.tier(t.Input.model_validate(args), self._ctx(case_id))
             record = {
@@ -885,7 +962,7 @@ class Agent:
                 r = self._tool(
                     case_id,
                     "ACT",
-                    "request_human_approval",
+                    self.TOOLS["approval"],
                     {"tool": tool, "args": args, "card": card},
                 )
                 if r.status != "ok":
@@ -1129,7 +1206,7 @@ class Agent:
         for a in executed:
             if a["kind"] in key:
                 refs[key[a["kind"]]].append(a["sap_ref"])
-        r = self._tool(case_id, "VERIFY", "get_action_status", refs)
+        r = self._tool(case_id, "VERIFY", self.TOOLS["status"], refs)
         if r.status != "ok":
             raise Escalate(f"verification read failed: {r.error}")
         risk = RiskResult.model_validate(case.risk)

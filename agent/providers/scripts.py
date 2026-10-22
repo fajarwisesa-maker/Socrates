@@ -177,5 +177,150 @@ def reflect(req: LLMRequest, n: int) -> dict[str, Any]:
     )
 
 
+# ---------------------------------------------------------------- v2 specialists
+# (ORCHESTRATION=multi). Same decisions as above, made through each agent's own tools.
+
+_GLOSS = {
+    "lalin Pantura": "Pantura traffic",
+    "macet total": "total gridlock",
+    "banjir di Brebes": "flooding in Brebes",
+    "ga gerak sm sekali": "not moving at all",
+    "bs 2-3 hari": "could take 2-3 days",
+}
+
+
+def _calls(*uses: tuple[str, dict[str, Any]], text: str | None = None) -> dict[str, Any]:
+    """An assistant message with several tool calls in one turn."""
+    content: list[dict[str, Any]] = [{"text": text}] if text else []
+    for name, args in uses:
+        content += tool_call(name, args)["content"]
+    return {"role": "assistant", "content": content}
+
+
+def signal_agent(req: LLMRequest, n: int) -> dict[str, Any]:
+    blocks = _signal_blocks(req)
+    pdfs = {r["signal"]: r["text"] for r in _tool_results(req) if "text" in r and "signal" in r}
+    unread = [num for num, kind, _ in blocks if kind == "pdf" and num not in pdfs]
+    if unread:
+        return _calls(*[("extract_pdf_text", {"signal": num}) for num in unread])
+    texts = [(num, kind, pdfs.get(num, body)) for num, kind, body in blocks]
+    everything = "\n".join(t for _, _, t in texts)
+    evidence = [
+        {"quote": q, "signal": num, "field": f, "gloss_en": _GLOSS.get(q, q)}
+        for num, kind, body in texts
+        for q, f in _EVIDENCE.get(kind, [])
+        if q in body
+    ]
+    return tool_call(
+        "report_disruption",
+        {
+            "is_disruption": True,
+            "cause": "flood",
+            "lane": "SMG-JKT",
+            "location": "Jalur Pantura, Brebes-Tegal",
+            "delay_hours_min": 48,
+            "delay_hours_max": 72,
+            "references": sorted(set(re.findall(r"\b45\d{8}\b", everything))),
+            "evidence": evidence,
+            "model_confidence": 0.92 if "force majeure" in everything.lower() else 0.6,
+        },
+    )
+
+
+def impact_agent(req: LLMRequest, n: int) -> dict[str, Any]:
+    d = _first_json(req)
+    results = _tool_results(req)
+    if not results:
+        return tool_call("find_open_pos", {"lane": d["lane"], "references": d["references"]})
+    last = results[-1]
+    if "purchase_orders" in last:
+        pos = last["purchase_orders"]
+        item = pos[0]["items"][0]
+        return _calls(
+            ("get_sales_orders", {"material": item["Material"], "plant": item["Plant"]}),
+            (
+                "compute_risk",
+                {
+                    "material": item["Material"],
+                    "plant": item["Plant"],
+                    "affected_references": [p["PurchaseOrder"] for p in pos],
+                    "delay_hours_min": d["delay_hours_min"],
+                    "delay_hours_max": d["delay_hours_max"],
+                },
+            ),
+        )
+    plant_id = next(
+        b["toolUse"]["input"]["plant"]
+        for m in req.messages
+        for b in m["content"]
+        if b.get("toolUse", {}).get("name") == "compute_risk"
+    )
+    plant = ((last.get("labels") or {}).get("plants") or {}).get(plant_id, plant_id)
+    refs = ", ".join(i["ref"] for i in last["risk"]["inbound"])
+    return say(
+        f"The flood delays PO {refs or 'the inbound PO'} past the loading cutoff at {plant}, "
+        "so the customer orders loading there before it are at risk of a stockout."
+    )
+
+
+def planner_simulate(req: LLMRequest, n: int) -> dict[str, Any]:
+    ask = max(
+        i
+        for i, m in enumerate(req.messages)
+        if m["role"] == "user"
+        and any(b.get("text", "").startswith("Simulate each candidate") for b in m["content"])
+    )
+    if any("toolResult" in b for m in req.messages[ask + 1 :] for b in m["content"]):
+        return say("Every candidate has a solver result.")
+    text = req.messages[ask]["content"][0]["text"]
+    lines = re.findall(r"^- \w+: (.+)$", text, flags=re.M)
+    return _calls(*[("run_solver", {"strategies": ln.split(", ")}) for ln in lines])
+
+
+def critic_review(req: LLMRequest, n: int) -> dict[str, Any]:
+    ctx = _first_json(req)
+    results = _tool_results(req)
+    if not results:
+        return tool_call("check_business_rules", {"round": ctx["round"]})
+    notes = [
+        {
+            "option_id": rv["option_id"],
+            "explanation": ". ".join(
+                c["plain"] or c["detail"] for c in rv["checks"] if not c["passed"]
+            )
+            + ". The plan looks cheapest on paper but would move the stockout to the donor DC's "
+            "own customers.",
+        }
+        for rv in results[-1]["reviews"]
+        if not all(c["passed"] for c in rv["checks"])
+    ]
+    return tool_call("report_review", {"explanations": notes})
+
+
+def executor_summary(req: LLMRequest, n: int) -> dict[str, Any]:
+    f = _first_json(req)
+    return tool_call(
+        "write_approval_summary",
+        {
+            "summary": f"SIAGA asks you to approve: {f['what']} ({f['cost_display']}). It closes "
+            f"the remaining shortfall before the loading cutoff; approve by "
+            f"{f['approve_by_display']}."
+        },
+    )
+
+
 def golden_scripts() -> dict[str, Script]:
-    return {"perceive": perceive, "assess": assess, "plan": plan, "reflect": reflect}
+    return {
+        "perceive": perceive,
+        "assess": assess,
+        "plan": plan,
+        "reflect": reflect,
+        # v2 specialists (ORCHESTRATION=multi)
+        "signal": signal_agent,
+        "impact": impact_agent,
+        "planner.plan": plan,
+        "planner.simulate": planner_simulate,
+        "critic.review": critic_review,
+        "critic.explain": reflect,
+        "executor.summary": executor_summary,
+    }

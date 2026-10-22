@@ -79,6 +79,7 @@ class CaseEvent(BaseModel):
     detail: str = ""
     data: dict[str, Any] = {}
     ts: str
+    agent: str | None = None  # v2 (ORCHESTRATION=multi): the specialist working the stage
 
 
 class ApprovalRequest(BaseModel):
@@ -118,6 +119,7 @@ class CaseStore(Protocol):
         title: str,
         detail: str = "",
         data: dict[str, Any] | None = None,
+        agent: str | None = None,
     ) -> CaseEvent: ...
     def list_events(self, case_id: str, after: int = -1) -> list[CaseEvent]: ...
     def create_approval(
@@ -220,6 +222,7 @@ class SqliteCaseStore:
         title: str,
         detail: str = "",
         data: dict[str, Any] | None = None,
+        agent: str | None = None,
     ) -> CaseEvent:
         with self._lock:
             (n,) = self._conn.execute(
@@ -234,6 +237,7 @@ class SqliteCaseStore:
                 detail=detail,
                 data=json.loads(json.dumps(data or {}, default=str)),
                 ts=self._now(),
+                agent=agent,
             )
             self._conn.execute(
                 "INSERT INTO events VALUES (?, ?, ?)", (case_id, n, event.model_dump_json())

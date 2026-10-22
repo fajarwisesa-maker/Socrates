@@ -8,6 +8,7 @@ computed from the located evidence alone, so it is the same on every run.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from agent.schemas import EvidenceItem, LocatedEvidence
@@ -51,7 +52,7 @@ def locate(quote: str, text: str) -> tuple[int, int] | None:
 
 
 def locate_evidence(
-    evidence: list[EvidenceItem], signals: list[dict[str, Any]]
+    evidence: Sequence[EvidenceItem], signals: list[dict[str, Any]]
 ) -> tuple[list[LocatedEvidence], list[dict[str, Any]]]:
     """Split the model's evidence into located items and dropped ones (with a reason)."""
     located: list[LocatedEvidence] = []
@@ -75,6 +76,7 @@ def locate_evidence(
                 start=start,
                 end=end,
                 text=sig["text"][start:end],
+                gloss_en=getattr(e, "gloss_en", None),
             )
         )
     return located, dropped

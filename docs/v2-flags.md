@@ -9,7 +9,7 @@ the shell (the shell wins).
 
 | Flag | Values (default first) | Step | What it switches | Status |
 | --- | --- | --- | --- | --- |
-| `ORCHESTRATION` | `single` \| `multi` | 2 | `single`: the v1 state machine calls the LLM per stage. `multi`: the same deterministic orchestrator delegates each stage to a specialist Strands agent (Signal, Impact, Planner, Critic, Executor), each with its own system prompt and tool allowlist. | in progress |
+| `ORCHESTRATION` | `single` \| `multi` | 2 | `single`: the v1 state machine calls the LLM per stage. `multi`: the same deterministic orchestrator delegates each stage to a specialist Strands agent (Signal, Impact, Planner, Critic, Executor), each with its own system prompt and tool allowlist. | done with the fake LLM; Bedrock runs pending |
 | `SAP_MOCK_ON_BTP` | `0` \| `1` | 1 | `0`: the mock S/4HANA at `SAP_MOCK_URL` (localhost). `1`: the copy on SAP BTP Cloud Foundry at `SAP_MOCK_BTP_URL`, with the `X-API-Key` header from `SAP_MOCK_API_KEY`. Nothing else changes. | waiting for SAP access |
 | `DELAY_MODEL` | `signal` \| `rpt` | 3 | `signal`: the delay range read by Perceive. `rpt`: SAP RPT-1.6 on AI Core predicts `delay_hours` from the disruption history; code combines it with the signal range (rule to be confirmed). Falls back to `signal` after a 5 s timeout. | waiting for SAP access |
 | `JOULE_APPROVALS` | `0` \| `1` | 4 | Tier 3 approvals can also come from the "SIAGA" Joule capability, through the same endpoint, policy check and audit record (`channel: "joule"`). | not started |

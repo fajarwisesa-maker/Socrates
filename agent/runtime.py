@@ -59,7 +59,7 @@ def build_runtime(
 ) -> Runtime:
     s = settings or get_settings()
     clock = clock or (lambda: datetime.now(UTC))
-    registry = build_registry()
+    registry = build_registry(multi=s.orchestration == "multi")
 
     if solver is None:
         if s.solver_backend == "inprocess":

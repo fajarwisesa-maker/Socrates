@@ -19,7 +19,7 @@ import httpx
 
 from agent.case_store import CaseEvent, CaseRecord
 from agent.clients import HttpSapClient
-from agent.machine import Agent
+from agent.factory import make_agent
 from agent.providers import make_provider
 from agent.runtime import build_runtime
 from agent.signals import build_signals
@@ -87,12 +87,13 @@ def main(argv: list[str] | None = None) -> int:
     def show(e: CaseEvent) -> None:
         c = COLOUR.get(e.status, DIM if e.status in ("llm", "tool", "started") else "")
         c, reset = (c, RESET) if colour else ("", "")
-        line = f"{time.perf_counter() - t0:6.1f}s  {e.stage:<9} {e.status:<10} {e.title}"
+        who = f"{e.agent:<18} " if e.agent else ""
+        line = f"{time.perf_counter() - t0:6.1f}s  {e.stage:<9} {who}{e.status:<10} {e.title}"
         print(f"{c}{line}{reset}")
         if e.detail and e.status not in ("llm", "started"):
             print(f"{'':28}{e.detail}")
 
-    agent = Agent(runtime, llm, on_event=show)
+    agent = make_agent(runtime, llm, on_event=show)
     text = args.whatsapp.read_text(encoding="utf-8") if args.whatsapp else None
     case = agent.start_case(build_signals(text, args.pdf))
     bold, reset = (BOLD, RESET) if colour else ("", "")

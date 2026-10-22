@@ -164,15 +164,18 @@ class ToolRegistry:
     def specs(self, llm_only: bool = True) -> list[dict[str, Any]]:
         return [t.spec() for t in self.tools.values() if t.llm_visible or not llm_only]
 
-    def invoke(self, ctx: ToolContext, name: str, raw_args: dict[str, Any]) -> ToolCallResult:
+    def invoke(
+        self, ctx: ToolContext, name: str, raw_args: dict[str, Any], agent: str | None = None
+    ) -> ToolCallResult:
         t0 = time.perf_counter()
+        by = {"agent": agent} if agent else {}  # v2: which specialist made the call
 
         def done(result: ToolCallResult) -> ToolCallResult:
             result.duration_ms = round((time.perf_counter() - t0) * 1000, 1)
             ctx.audit.append(
                 ctx.case_id,
                 "tool_call",
-                {"tool": name, "args": raw_args, **result.model_dump(exclude={"tool"})},
+                {"tool": name, "args": raw_args, **by, **result.model_dump(exclude={"tool"})},
             )
             return result
 

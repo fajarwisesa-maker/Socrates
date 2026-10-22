@@ -34,7 +34,8 @@ from pydantic import BaseModel
 
 from agent.case_store import NotFound
 from agent.clients import HttpSapClient, SapError
-from agent.machine import Agent, CaseStateError
+from agent.factory import make_agent
+from agent.machine import CaseStateError
 from agent.providers import make_provider
 from agent.providers.base import LLMProvider
 from agent.runtime import Runtime, build_runtime
@@ -51,6 +52,20 @@ def _golden_meta(s: Settings) -> dict[str, Any] | None:
         return None
     m = json.loads(meta.read_text(encoding="utf-8"))
     return {k: m.get(k) for k in ("provider", "model", "recorded_at")}
+
+
+def _specialists() -> list[dict[str, Any]]:
+    from agent.multi.specialists import SPECIALISTS
+
+    return [
+        {
+            "name": sp.name,
+            "stages": list(sp.stages),
+            "allowlist": sorted(sp.allowlist),
+            "uses_llm_for": sp.uses_llm_for,
+        }
+        for sp in SPECIALISTS
+    ]
 
 
 class ApprovalDecision(BaseModel):
@@ -70,7 +85,7 @@ class CaseService:
         workers: int = 4,
     ):
         self.rt, self.llm, self.reset_sap = runtime, llm, reset_sap
-        self.agent = Agent(runtime, llm)
+        self.agent = make_agent(runtime, llm)
         self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="case")
         self.locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._stop = threading.Event()
@@ -179,6 +194,8 @@ def create_app(
     def config() -> dict[str, Any]:
         return {
             "llm_provider": service.llm.name,
+            "orchestration": s.orchestration,
+            "specialists": _specialists() if s.orchestration == "multi" else [],
             "replay": s.replay or s.llm_provider == "replay",
             "model": s.bedrock_model_id if s.llm_provider == "bedrock" else None,
             "verify_delay_seconds": s.verify_delay_seconds,

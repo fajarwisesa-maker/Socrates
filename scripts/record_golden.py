@@ -26,7 +26,7 @@ from pathlib import Path
 
 from agent.audit import LocalAuditWriter
 from agent.case_store import SqliteCaseStore
-from agent.machine import Agent
+from agent.factory import make_agent
 from agent.providers import make_provider
 from agent.providers.replay import RecordingProvider
 from agent.runtime import build_runtime
@@ -34,7 +34,6 @@ from agent.signals import build_signals
 from services.sap_mock.embedded import embedded_sap
 from siaga_common.settings import REPO_ROOT, get_settings
 
-GOLDEN = REPO_ROOT / "data" / "golden"
 DEMO = REPO_ROOT / "data" / "demo"
 
 
@@ -46,7 +45,9 @@ def check(cond: bool, what: str, failures: list[str]) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--provider", choices=["bedrock", "fake"])
-    ap.add_argument("--out", type=Path, default=GOLDEN)
+    ap.add_argument(
+        "--out", type=Path, default=None, help="default: the folder of REPLAY_PATH for this mode"
+    )
     args = ap.parse_args()
 
     overrides = {"replay": False, "llm_record_path": None, "verify_delay_seconds": 0}
@@ -56,6 +57,7 @@ def main() -> int:
     if settings.llm_provider == "replay":
         print("refusing to record a replay of a replay; set LLM_PROVIDER=bedrock (or fake)")
         return 2
+    args.out = args.out or settings.replay_path.parent
 
     tmp = Path(tempfile.mkdtemp())
     sap, _ = embedded_sap()
@@ -67,7 +69,7 @@ def main() -> int:
     )
     inner = make_provider(settings)
     recorder = RecordingProvider(inner, tmp / "llm.jsonl")
-    agent = Agent(runtime, recorder)
+    agent = make_agent(runtime, recorder)
 
     t0 = time.perf_counter()
     signals = build_signals(
@@ -110,6 +112,7 @@ def main() -> int:
     meta = {
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "provider": inner.name,
+        "orchestration": settings.orchestration,
         "model": entries[0]["response"]["model"] if entries else None,
         "prompts": prompts,
         "llm_calls": [

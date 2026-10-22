@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { dayShort } from "@/lib/format";
 import { useDwell, usePacing } from "@/lib/pacing";
+import { agentsByStage } from "@/lib/present";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { CaseState } from "@/lib/useCase";
 import { DetailsDrawer } from "./DetailsDrawer";
@@ -120,7 +121,13 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
 
       <main className="grid min-h-0 flex-1 grid-cols-[15.5rem_minmax(0,1fr)_20rem] gap-5 px-6 pb-6">
         <div className="pt-2">
-          <StageRail events={viewEvents} record={record} focus={step?.stage ?? null} onSelect={pacing.show} />
+          <StageRail
+            events={viewEvents}
+            record={record}
+            focus={step?.stage ?? null}
+            onSelect={pacing.show}
+            agents={agentsByStage(viewEvents, config)}
+          />
         </div>
         <section className="relative min-h-0 overflow-hidden rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-card)]">
           {record && step ? (
