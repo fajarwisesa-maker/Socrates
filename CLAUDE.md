@@ -446,7 +446,7 @@ tests/          pytest
   the approval is not pending). `POST /demo/reset` resets SAP and clears cases.
 - **SAP for the API:** HTTP to `SAP_MOCK_URL` by default (`make dev` runs the mock on
   :8001); `EMBEDDED_SAP=1` runs it in-process (`services/sap_mock/embedded.py`).
-- **Dashboard** (`web/`, Next.js 16.4 App Router + TS + Tailwind 4): one page, a server
+- **Dashboard** (`web/`, Next.js 16.4 App Router + TS + Tailwind 4; 16.4.3 since 25 Oct): one page, a server
   `page.tsx` rendering a client `Dashboard` that polls `/cases/{id}` and
   `/events?after=` every second and stops once the case is finished. Browser traffic goes
   to `/api/*`, rewritten to the Case API (`SIAGA_API_URL`), so no CORS is needed.
@@ -891,11 +891,14 @@ additive (no field removed).
   masked example is in `tests/test_pii.py`. Vehicle plates are not masked.
 - e2e `web/e2e/v2.spec.ts` checks the chip, the PII chip and the Architecture tab
   according to `/config` (skips what is off).
-- **Next.js 16.4.0 security advisories**: `npm audit` lists three critical advisories
-  (two remote code execution, one DoS) for next 16.0.0–16.4.0, fixed in 16.4.3 (released
-  23 Oct, younger than the two-week rule). The Next CLI also stops `next build` / `next
-  dev` once with an upgrade notice ("retry the same command"); a retry continues.
-  Upgrade decision is the owner's.
+- **Next.js 16.4.0 → 16.4.3** (owner's decision, 25 Oct; an exception to the two-week
+  rule): 16.4.0 had three critical advisories (two remote code execution, one DoS),
+  fixed in 16.4.3. `next` and `eslint-config-next` are pinned exactly to 16.4.3.
+  `npm audit --omit=dev`: 0 vulnerabilities; the only remaining advisory is `zod` (high)
+  in the dev-only lint tooling, not shipped. The CLI's "upgrade" stop of `next dev` /
+  `next build` no longer appears. After the upgrade: web-check passes; web smoke v1 9/9
+  (+1 skipped), v1 replay 8/8 (+1 skipped), multi + DELAY_MODEL=fake + PII 10/10, multi
+  replay 9/9.
 - Results: pytest 208 passed; web smoke with ORCHESTRATION=multi DELAY_MODEL=fake
   PII_MASKING=local 10/10; v1 9/9 (+1 skipped) and replay 8/8 (+1 skipped); rehearse v1
   3/3 fake and replay.
