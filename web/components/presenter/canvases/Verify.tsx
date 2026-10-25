@@ -90,8 +90,11 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
           <p className="mt-auto flex gap-2 text-xl text-ink-2" data-testid="tier0-note">
             <Info className="mt-1 size-5 shrink-0" aria-hidden />
             <span>
-              PO {inbound.ref} still arrives {dayShort(record.day0, inbound.arrival_earliest).replace(" WIB", "")}–
-              {dayShort(record.day0, inbound.arrival_latest)}: extra stock at {dest} later. No action taken.
+              PO {inbound.ref} still arrives{" "}
+              {inbound.arrival_earliest === inbound.arrival_latest
+                ? dayShort(record.day0, inbound.arrival_latest)
+                : `${dayShort(record.day0, inbound.arrival_earliest).replace(" WIB", "")}–${dayShort(record.day0, inbound.arrival_latest)}`}
+              : extra stock at {dest} later. No action taken.
             </span>
           </p>
         )}

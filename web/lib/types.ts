@@ -165,6 +165,10 @@ export interface CaseRecord {
   verification: Verification | null;
   verify_due_at: string | null;
   escalation_reason: string | null;
+  /** v2 step 3 (DELAY_MODEL): the learned delay and how code combined it with the signal */
+  delay_prediction?: DelayPrediction | null;
+  /** v2 step 5 (PII_MASKING): what was masked before any model call */
+  pii?: PiiReport | null;
 }
 
 export interface Config {
@@ -178,6 +182,33 @@ export interface Config {
   /** v2: "single" (v1 state machine) or "multi" (specialist agents) */
   orchestration?: "single" | "multi";
   specialists?: Specialist[];
+  /** v2: what each box of the architecture runs on (Architecture view) */
+  delay_model?: "signal" | "rpt" | "fake";
+  pii_masking?: "off" | "local";
+  joule_approvals?: boolean;
+  sap?: { mode: "local" | "embedded" | "btp"; host: string | null };
+  backends?: { case_store: string; audit: string; kb: string; policy: string; solver: string };
+}
+
+export interface DelayPrediction {
+  status: "ok" | "unavailable";
+  provider?: string;
+  model?: string;
+  predicted_hours?: number;
+  interval_hours?: [number, number] | null;
+  history_rows?: number;
+  used: "prediction" | "clamped" | "signal";
+  delay_for_risk_hours: [number, number];
+  signal_range_hours: [number, number];
+  disagree: boolean;
+  flag: string | null;
+  reason?: string | null;
+}
+
+export interface PiiReport {
+  mode: string;
+  masked: number;
+  kinds: Record<string, number>;
 }
 
 export interface Specialist {
@@ -322,4 +353,11 @@ export interface AuditPayload {
   max_attempts?: number;
   reason?: string;
   dropped?: unknown[];
+  // v2: pii_masked, delay_prediction, allowlist_violation
+  masked?: number;
+  mode?: string;
+  predicted_hours?: number;
+  delay_for_risk_hours?: [number, number];
+  used?: string;
+  agent?: string;
 }

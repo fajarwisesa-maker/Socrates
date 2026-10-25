@@ -23,7 +23,8 @@ and the decisions made. **Update it every phase.**
 | v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
 | v2 step 3 (RPT-1.6, `DELAY_MODEL`) | built and tested against a simulated AI Core (SDK response shape) and the offline stand-in; **real RPT call pending**: the SAP variables do not reach this session (`make sap-check`) |
 | v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; tested against the package run locally (rehearse 3/3); **waiting for the owner's `cf push`** (docs/btp-deploy.md) |
-| v2 steps 4–7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
+| v2 steps 6 + 5 (UI additions, PII masking) | done: delay chip, Planner prediction details, Architecture tab (Planner + drawer), PII masking (`PII_MASKING=local`) with Planner chip; cumulative cap and Evaluations dropped (owner, 25 Oct); "Approved in SAP Joule" waits for step 4 |
+| v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
@@ -95,6 +96,8 @@ ORCHESTRATION=multi make rehearse N=10   # report includes per-agent timings
 ORCHESTRATION=multi make web-smoke    # e2e incl. e2e/multi.spec.ts (skips on a v1 API)
 make agentcore-check                  # which AgentCore features answer in AWS_REGION (needs AWS creds)
 make sap-check                        # AI Core token, deployments, one RPT-1.6 call; cf target; joule status
+make btp-package / make sap-latency   # step 1: build/btp for cf push (docs/btp-deploy.md); round trips
+PII_MASKING=local make dev            # step 5: mask phones, e-mails, names before any model call
 DELAY_MODEL=rpt make dev              # SAP RPT-1.6 delay prediction in Assess (fake = offline stand-in)
 DELAY_MODEL=rpt make record-golden    # also records the RPT answers (rpt.jsonl) for replay
 ```
@@ -863,6 +866,39 @@ additive (no field removed).
   401 without / with a wrong key, 200 with it, reset works; `make demo-reset`,
   `make sap-latency` (localhost: ~2 ms median) and `make rehearse N=3` (multi, fake LLM,
   fake delay model) 3/3, all 248 SAP calls served by the packaged app.
+
+### SIAGA v2 steps 6 + 5 decisions (UI additions, PII masking)
+
+- **Assess chip** (`delayChip` in `lib/present.ts`): "<h> h · Delay predicted by SAP
+  RPT-1.6 · from 80 past disruptions" (brief wording), one line; the offline stand-in reads
+  "Delay estimated offline (not RPT)"; disagreement adds "model and signal disagree" in
+  the human (amber) tone; unavailable is a muted "Prediction unavailable — using signal
+  range". Planner mode shows prediction, interval, signal range and the delay used.
+  A point delay prints one arrival time (Impact panel, Verify note, Tier 0 note).
+- **Architecture** (`components/ArchitectureView.tsx`): the brief's section 3 diagram,
+  built only from `/config` (`orchestration`, `specialists`, `delay_model`,
+  `pii_masking`, `joule_approvals`, `sap` {mode, host}, `backends`). Every box says what
+  runs here now and the AWS / SAP target, live boxes teal, off boxes dashed. A tab in
+  Planner mode (Case | Architecture) and in the details drawer.
+- **PII masking** (`agent/pii.py`, `PII_MASKING=local`): at intake (`Agent.start_case`),
+  before any model call: phone numbers (Indonesian formats, 9–14 digits), e-mails, and
+  names marked by an honorific (Pak / Bu / Mas / Mbak / Mr …) or a label (Sopir: / a.n. /
+  PIC:). Document numbers, quantities, dates and places are untouched, so evidence still
+  locates. The case, events and every model see the masked text; the original is in the
+  audit trail only (`pii_masked`; the audit view prints counts only). Case field `pii`
+  (counts) drives the Planner chip ("PII masked · N" / "PII check · nothing to mask").
+  The demo signals contain no personal data, so the demo shows "nothing to mask"; the
+  masked example is in `tests/test_pii.py`. Vehicle plates are not masked.
+- e2e `web/e2e/v2.spec.ts` checks the chip, the PII chip and the Architecture tab
+  according to `/config` (skips what is off).
+- **Next.js 16.4.0 security advisories**: `npm audit` lists three critical advisories
+  (two remote code execution, one DoS) for next 16.0.0–16.4.0, fixed in 16.4.3 (released
+  23 Oct, younger than the two-week rule). The Next CLI also stops `next build` / `next
+  dev` once with an upgrade notice ("retry the same command"); a retry continues.
+  Upgrade decision is the owner's.
+- Results: pytest 208 passed; web smoke with ORCHESTRATION=multi DELAY_MODEL=fake
+  PII_MASKING=local 10/10; v1 9/9 (+1 skipped) and replay 8/8 (+1 skipped); rehearse v1
+  3/3 fake and replay.
 
 ## Open items
 

@@ -2,7 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { dayShort, juta, pct, thousands } from "@/lib/format";
-import { plantName } from "@/lib/present";
+import { delayChip, plantName } from "@/lib/present";
+import { cn } from "@/lib/utils";
 import type { CaseRecord } from "@/lib/types";
 import { CountUp } from "../CountUp";
 import { LaneMap } from "../LaneMap";
@@ -19,6 +20,7 @@ export function AssessCanvas({ record, round }: { record: CaseRecord; round: num
   const lane = labels?.lanes?.[po?.YY1_TransportLane ?? record.disruption?.lane ?? ""];
   const blockedAt = record.disruption?.location?.split(",").at(-1)?.trim().replace("-", "–") ?? null;
   const customer = (so: string) => a.sales_orders.find((s) => s.SalesOrder === so)?.YY1_SoldToPartyName ?? so;
+  const chip = delayChip(record.delay_prediction);
 
   return (
     <Frame
@@ -73,6 +75,21 @@ export function AssessCanvas({ record, round }: { record: CaseRecord; round: num
             </>
           )}
         </p>
+        {chip && (
+          <span
+            data-testid="delay-chip"
+            className={cn(
+              "self-start rounded-full px-3 py-1 text-base font-semibold whitespace-nowrap",
+              chip.tone === "brand" && "bg-brand-soft text-brand-ink",
+              chip.tone === "human" && "bg-human-soft text-human-ink",
+              chip.tone === "muted" && "bg-surface-2 text-ink-2",
+            )}
+          >
+            {chip.hours && <b className="text-lg">{chip.hours}</b>}
+            {chip.hours && " · "}
+            {chip.text}
+          </span>
+        )}
       </div>
     </Frame>
   );

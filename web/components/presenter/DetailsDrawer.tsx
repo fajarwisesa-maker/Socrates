@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs } from "radix-ui";
+import ArchitectureView from "@/components/ArchitectureView";
 import AuditView from "@/components/AuditView";
 import OptionsTable from "@/components/OptionsTable";
 import { StateNotices } from "@/components/StateNotices";
@@ -52,6 +53,7 @@ export function DetailsDrawer({
               ["options", "Options & Critic"],
               ["audit", "Audit trail"],
               ["case", "Case"],
+              ["architecture", "Architecture"],
             ].map(([v, label]) => (
               <Tabs.Trigger
                 key={v}
@@ -74,6 +76,9 @@ export function DetailsDrawer({
             </Tabs.Content>
             <Tabs.Content value="audit">
               <AuditView caseId={record?.case_id ?? null} version={events.length} defaultOpen />
+            </Tabs.Content>
+            <Tabs.Content value="architecture">
+              <ArchitectureView config={config} record={record} />
             </Tabs.Content>
             <Tabs.Content value="case">
               <CaseFacts record={record} events={events} config={config} onReset={onReset} />

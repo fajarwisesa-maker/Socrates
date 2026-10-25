@@ -74,7 +74,9 @@ export default function ImpactPanel({ record }: { record: CaseRecord | null }) {
       {risk.inbound.map((i) => (
         <div key={i.ref} className="mt-1 text-sm">
           PO <b>{i.ref}</b> · {thousands(i.quantity)} ctn · now arrives{" "}
-          {dayLabel(record.day0, i.arrival_earliest)} – {dayLabel(record.day0, i.arrival_latest)}
+          {i.arrival_earliest === i.arrival_latest
+            ? dayLabel(record.day0, i.arrival_latest)
+            : `${dayLabel(record.day0, i.arrival_earliest)} – ${dayLabel(record.day0, i.arrival_latest)}`}
         </div>
       ))}
     </Panel>

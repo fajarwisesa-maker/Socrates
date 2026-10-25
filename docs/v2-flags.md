@@ -13,8 +13,8 @@ the shell (the shell wins).
 | `SAP_MOCK_ON_BTP` | `0` \| `1` | 1 | `0`: the mock S/4HANA at `SAP_MOCK_URL` (localhost). `1`: the copy on SAP BTP Cloud Foundry at `SAP_MOCK_BTP_URL`, with the `X-API-Key` header from `SAP_MOCK_API_KEY`. Nothing else changes. | package + key check built and tested locally (`make btp-package`, docs/btp-deploy.md); waiting for the owner's `cf push` |
 | `DELAY_MODEL` | `signal` \| `rpt` \| `fake` | 3 | `signal`: the delay range read by Perceive. `rpt`: SAP RPT-1.6 on AI Core predicts `delay_hours` from the synthetic disruption history; code uses it inside the signal range, clamps and flags it outside (rule confirmed 25 Oct). Falls back to the signal range after 5 s (`RPT_TIMEOUT_SECONDS`). `fake`: offline stand-in, labelled "not RPT". | built; real RPT call pending (SAP variables not in this session) |
 | `JOULE_APPROVALS` | `0` \| `1` | 4 | Tier 3 approvals can also come from the "SIAGA" Joule capability, through the same endpoint, policy check and audit record (`channel: "joule"`). | not started |
-| `AUTO_EXEC_CAP` | `0` \| `1` | 5 | Cap a case's total Tier 2 auto-executions at Rp 50.000.000 (AgentCore temporal policy if available, else Cedar context + in-code check). | not started |
-| `PII_MASKING` | `off` \| `local` \| `guardrails` | 5 | Mask phone numbers and personal names in incoming signals before any LLM call; the original stays in the audit trail only. | not started |
+| `AUTO_EXEC_CAP` | `0` \| `1` | 5 | Cap a case's total Tier 2 auto-executions at Rp 50.000.000. | dropped (owner, 25 Oct) |
+| `PII_MASKING` | `off` \| `local` | 5 | Mask phone numbers, e-mails and personal names in incoming signals at intake, before any model call; the original stays in the audit trail only (`pii_masked`). `guardrails` (Bedrock Guardrails) is not built: it needs AWS access. | done (local) |
 
 ## Related settings (not flags)
 

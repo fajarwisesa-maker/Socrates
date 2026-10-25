@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     # signal range); fake: an offline, labelled stand-in for tests and runs without SAP
     delay_model: Literal["signal", "rpt", "fake"] = Field("signal", alias="DELAY_MODEL")
     rpt_timeout_seconds: float = Field(5.0, alias="RPT_TIMEOUT_SECONDS")
+    # step 5: mask phone numbers, e-mails and personal names in signals before any model
+    # call (local = deterministic masker; Bedrock Guardrails needs AWS access)
+    pii_masking: Literal["off", "local"] = Field("off", alias="PII_MASKING")
     history_path: Path = Field(
         REPO_ROOT / "data" / "history" / "disruptions.csv", alias="DELAY_HISTORY_PATH"
     )

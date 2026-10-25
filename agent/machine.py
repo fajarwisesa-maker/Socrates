@@ -107,9 +107,28 @@ class Agent:
     # ================================================================ public API
 
     def start_case(self, signals: list[dict[str, Any]], day0: str | None = None) -> CaseRecord:
-        case = self.store.create_case(signals=signals, day0=day0 or self._sap_day0())
+        pii = originals = None
+        if self.rt.settings.pii_masking == "local":  # v2 step 5: before any model call
+            from agent.pii import mask_signals
+
+            signals, pii, originals = mask_signals(signals)
+        case = self.store.create_case(signals=signals, day0=day0 or self._sap_day0(), pii=pii)
         self.rt.audit.append(case.case_id, "case", {"event": "created", "signals": signals})
         self._event(case.case_id, "CASE", "info", "Case opened", f"{len(signals)} signal(s)")
+        if pii is not None:
+            # the original text lives in the audit trail only
+            self.rt.audit.append(case.case_id, "pii_masked", {**pii, "original_signals": originals})
+            kinds = ", ".join(f"{k} {n}" for k, n in pii["kinds"].items())
+            self._event(
+                case.case_id,
+                "CASE",
+                "info",
+                f"PII masked before any model call: {pii['masked']} item(s)"
+                if pii["masked"]
+                else "PII check: nothing to mask",
+                kinds,
+                {"pii": pii},
+            )
         return case
 
     def run(self, case_id: str) -> CaseRecord:
@@ -1076,8 +1095,13 @@ class Agent:
                         "tier": 0,
                         "ref": po,
                         "text": f"PO {po}: no action taken. It will still arrive late "
-                        f"({display(day0, inbound.arrival_earliest)} to "
-                        f"{display(day0, inbound.arrival_latest)}) and leave extra stock at "
+                        + (
+                            f"({display(day0, inbound.arrival_earliest)})"
+                            if inbound.arrival_earliest == inbound.arrival_latest  # a point delay
+                            else f"({display(day0, inbound.arrival_earliest)} to "
+                            f"{display(day0, inbound.arrival_latest)})"
+                        )
+                        + " and leave extra stock at "
                         f"{plant}; "
                         "a planner may want to reverse part of the transfer"
                         + (f" {', '.join(transfers)}" if transfers else "")

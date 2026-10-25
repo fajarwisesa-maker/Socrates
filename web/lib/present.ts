@@ -1,7 +1,16 @@
 // Plain words for Presenter mode. Names come from SAP labels (assess_impact), numbers from
 // the backend; this file only chooses words and formats.
 import { dayShort, thousands } from "./format";
-import type { CaseAction, CaseEvent, CaseRecord, Config, Labels, PlannedAction, Stage } from "./types";
+import type {
+  CaseAction,
+  CaseEvent,
+  CaseRecord,
+  Config,
+  DelayPrediction,
+  Labels,
+  PlannedAction,
+  Stage,
+} from "./types";
 
 export const CAUSE: Record<string, string> = {
   flood: "Flood",
@@ -132,7 +141,26 @@ export const TOOL: Record<string, string> = {
   create_stock_transfer: "Stock transfer",
   request_approval: "Request approval",
   check_status: "Read SAP status",
+  predict_delay: "Predict delay (SAP RPT-1.6)",
 };
+
+/** Assess chip for the learned delay (v2 step 3). Wording per the v2 brief for RPT; the
+ * offline stand-in and an unavailable model say so plainly. */
+export function delayChip(
+  p: DelayPrediction | null | undefined,
+): { hours: string | null; text: string; tone: "brand" | "human" | "muted" } | null {
+  if (!p) return null;
+  if (p.status !== "ok") return { hours: null, text: "Prediction unavailable — using signal range", tone: "muted" };
+  const rows = p.history_rows ?? 0;
+  const source =
+    p.provider === "fake"
+      ? `Delay estimated offline (not RPT) · from ${rows} past disruptions`
+      : `Delay predicted by SAP RPT-1.6 · from ${rows} past disruptions`;
+  const hours = `${p.delay_for_risk_hours[0]} h`;
+  return p.disagree
+    ? { hours, text: `${source} · model and signal disagree`, tone: "human" }
+    : { hours, text: source, tone: "brand" };
+}
 
 /** The agent working each stage: from the events (what happened), else the configured team. */
 export function agentsByStage(events: CaseEvent[], config: Config | null): Partial<Record<Stage, string>> {

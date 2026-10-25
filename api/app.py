@@ -54,14 +54,24 @@ def _golden_meta(s: Settings) -> dict[str, Any] | None:
     return {k: m.get(k) for k in ("provider", "model", "recorded_at")}
 
 
-def _specialists() -> list[dict[str, Any]]:
+def _sap_info(s: Settings) -> dict[str, Any]:
+    from urllib.parse import urlparse
+
+    if s.sap_mock_on_btp:
+        return {"mode": "btp", "host": urlparse(s.sap_mock_btp_url or "").hostname}
+    if s.embedded_sap:
+        return {"mode": "embedded", "host": None}
+    return {"mode": "local", "host": urlparse(s.sap_mock_url).hostname}
+
+
+def _specialists(registered: list[str]) -> list[dict[str, Any]]:
     from agent.multi.specialists import SPECIALISTS
 
     return [
         {
             "name": sp.name,
             "stages": list(sp.stages),
-            "allowlist": sorted(sp.allowlist),
+            "allowlist": sorted(t for t in sp.allowlist if t in registered),
             "uses_llm_for": sp.uses_llm_for,
         }
         for sp in SPECIALISTS
@@ -196,7 +206,9 @@ def create_app(
             "llm_provider": service.llm.name,
             "orchestration": s.orchestration,
             "delay_model": s.delay_model,
-            "specialists": _specialists() if s.orchestration == "multi" else [],
+            "specialists": _specialists(service.rt.registry.names())
+            if s.orchestration == "multi"
+            else [],
             "replay": s.replay or s.llm_provider == "replay",
             "model": s.bedrock_model_id if s.llm_provider == "bedrock" else None,
             "verify_delay_seconds": s.verify_delay_seconds,
@@ -204,6 +216,17 @@ def create_app(
             "max_replans": s.max_replans,
             "embedded_sap": s.embedded_sap,
             "replay_source": _golden_meta(s) if (s.replay or s.llm_provider == "replay") else None,
+            # v2: what each box of the architecture runs on in this process (Architecture view)
+            "pii_masking": s.pii_masking,
+            "joule_approvals": False,  # v2 step 4 not built
+            "sap": _sap_info(s),
+            "backends": {
+                "case_store": s.case_store,
+                "audit": s.audit_backend,
+                "kb": s.kb_backend,
+                "policy": s.policy_backend,
+                "solver": s.solver_backend,
+            },
         }
 
     @app.post("/cases", status_code=202)

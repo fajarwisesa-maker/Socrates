@@ -18,6 +18,14 @@ function summary(e: AuditEntry): string {
       return `${p.purpose} · ${p.prompt} · ${p.model} · ${p.latency_s}s`;
     case "llm_retry":
       return `${p.purpose} retry ${p.attempt}/${p.max_attempts} (${p.reason})`;
+    case "pii_masked": // counts only: the original text is never rendered here
+      return `${p.masked} item(s) masked before any model call (${p.mode})`;
+    case "delay_prediction":
+      return p.status === "ok"
+        ? `${p.model}: ${p.predicted_hours} h → risk uses ${p.delay_for_risk_hours?.[0]} h (${p.used})`
+        : `prediction unavailable: ${p.reason ?? "no answer"}`;
+    case "allowlist_violation":
+      return `${p.agent} may not call ${p.tool}`;
     case "evidence_dropped":
       return `${(p.dropped ?? []).length} quote(s) not found in the signals`;
     case "approval":

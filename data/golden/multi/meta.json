@@ -1,12 +1,14 @@
 {
-  "recorded_at": "2026-10-22T13:53:51+00:00",
+  "recorded_at": "2026-10-25T06:47:04+00:00",
   "provider": "fake",
   "orchestration": "multi",
+  "delay_model": "signal",
+  "delay_prediction": null,
   "model": "fake",
   "prompts": [
     "critic_agent.v1",
     "executor_agent.v1",
-    "impact_agent.v1",
+    "impact_agent.v2",
     "planner_agent.v1",
     "signal_agent.v1"
   ],
@@ -121,18 +123,18 @@
     }
   ],
   "stage_timings_s": {
-    "PERCEIVE": "0.028",
-    "ASSESS": "0.066",
-    "PLAN": "0.02",
-    "SIMULATE": "0.077",
-    "REFLECT": "0.047",
-    "PLAN#2": "0.018",
-    "SIMULATE#2": "0.073",
-    "REFLECT#2": "0.049",
-    "ACT": "0.064",
-    "VERIFY": "0.018"
+    "PERCEIVE": "0.021",
+    "ASSESS": "0.069",
+    "PLAN": "0.017",
+    "SIMULATE": "0.067",
+    "REFLECT": "0.035",
+    "PLAN#2": "0.008",
+    "SIMULATE#2": "0.061",
+    "REFLECT#2": "0.048",
+    "ACT": "0.055",
+    "VERIFY": "0.024"
   },
-  "seconds_to_approval_card": 0.49,
+  "seconds_to_approval_card": 0.42,
   "outcome": {
     "chosen_option": "B2",
     "summary": {

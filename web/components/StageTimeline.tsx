@@ -5,7 +5,14 @@ import { dayLabel, rupiah, thousands } from "@/lib/format";
 import { escalation, notices } from "@/lib/notices";
 import { FIELD, glossFor, period, STRATEGY } from "@/lib/present";
 import { stageInfo, type StageState } from "@/lib/stages";
-import { STAGES, type CaseEvent, type CaseRecord, type Precedent, type Stage } from "@/lib/types";
+import {
+  STAGES,
+  type CaseEvent,
+  type CaseRecord,
+  type DelayPrediction,
+  type Precedent,
+  type Stage,
+} from "@/lib/types";
 import { StateNotices } from "./StateNotices";
 import { Badge, Empty, Panel, TierBadge, type Tone } from "./ui";
 
@@ -227,6 +234,7 @@ function StageDetails({ stage, record, events }: { stage: Stage; record: CaseRec
               {note}
             </div>
           )}
+          {record.delay_prediction && <DelayDetails p={record.delay_prediction} />}
           <div>
             <b>Inbound POs on the lane:</b>{" "}
             {(a.purchase_orders ?? [])
@@ -409,4 +417,38 @@ function StageDetails({ stage, record, events }: { stage: Stage; record: CaseRec
       );
     }
   }
+}
+
+/** Planner: the learned delay, its interval, the signal range and what the risk function used. */
+function DelayDetails({ p }: { p: DelayPrediction }) {
+  const [lo, hi] = p.signal_range_hours;
+  const used = p.delay_for_risk_hours;
+  return (
+    <div className="rounded-md bg-surface p-2 ring-1 ring-line" data-testid="delay-details">
+      <div className="text-xs text-ink-2">
+        {p.provider === "fake"
+          ? "Offline stand-in, not SAP RPT-1.6 (median of similar rows)"
+          : "SAP RPT-1.6 (tabular model on SAP AI Core)"}{" "}
+        · {p.history_rows ?? 0} past disruptions (synthetic history) · combined with the signal in code
+      </div>
+      {p.status === "ok" ? (
+        <div className="text-ink">
+          Predicted <b>{p.predicted_hours} h</b>
+          {p.interval_hours && (
+            <>
+              {" "}(interval {p.interval_hours[0]}–{p.interval_hours[1]} h)
+            </>
+          )}
+          ; signal {lo}–{hi} h →{" "}
+          <b>
+            risk uses {used[0]} h{p.disagree ? ` (clamped: ${p.flag})` : ""}
+          </b>
+        </div>
+      ) : (
+        <div className="text-ink-2">
+          Prediction unavailable ({p.reason ?? "no answer"}) — risk uses the signal range {lo}–{hi} h
+        </div>
+      )}
+    </div>
+  );
 }
