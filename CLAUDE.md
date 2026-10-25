@@ -894,8 +894,11 @@ additive (no field removed).
 - **Next.js 16.4.0 → 16.4.3** (owner's decision, 25 Oct; an exception to the two-week
   rule): 16.4.0 had three critical advisories (two remote code execution, one DoS),
   fixed in 16.4.3. `next` and `eslint-config-next` are pinned exactly to 16.4.3.
-  `npm audit --omit=dev`: 0 vulnerabilities; the only remaining advisory is `zod` (high)
-  in the dev-only lint tooling, not shipped. The CLI's "upgrade" stop of `next dev` /
+  `npm audit`: 0 vulnerabilities. The last advisory was `zod` < 4.6.6 (high,
+  GHSA-mrhx-c7xc-m3w5), reached only through the lint tooling
+  (`eslint-config-next` → `eslint-plugin-react-hooks`), not shipped. It is fixed by
+  `"overrides": {"zod": "4.6.6"}` in `web/package.json` (4.6.6 is two weeks old; 4.6.7 is
+  not); drop the override once eslint-plugin-react-hooks requires ≥ 4.6.6. The CLI's "upgrade" stop of `next dev` /
   `next build` no longer appears. After the upgrade: web-check passes; web smoke v1 9/9
   (+1 skipped), v1 replay 8/8 (+1 skipped), multi + DELAY_MODEL=fake + PII 10/10, multi
   replay 9/9.
