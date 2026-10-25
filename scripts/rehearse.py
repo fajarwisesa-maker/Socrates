@@ -44,7 +44,8 @@ def api_client(url: str | None, local: bool, verify_delay: int) -> Iterator[tupl
     if not local:
         try:
             httpx.get(f"{url}/health", timeout=3).raise_for_status()
-            with httpx.Client(base_url=url, timeout=30) as client:
+            headers = get_settings().case_api_headers()  # X-API-Key for the deployed API
+            with httpx.Client(base_url=url, timeout=30, headers=headers) as client:
                 yield client, f"Case API at {url}"
             return
         except httpx.HTTPError:
@@ -60,6 +61,7 @@ def api_client(url: str | None, local: bool, verify_delay: int) -> Iterator[tupl
     settings = get_settings().model_copy(
         update={
             "embedded_sap": True,
+            "case_api_key": None,  # in-process: nothing to protect
             "verify_delay_seconds": verify_delay,
             "sqlite_path": tmp / "siaga.db",
             "audit_dir": tmp / "audit",

@@ -1,7 +1,9 @@
 """Restore the demo to seed state.
 
-Calls POST {SAP_MOCK_URL}/admin/reset when the mock SAP is running (works the same
-against the AWS deployment later); otherwise re-seeds the local SQLite file directly.
+Calls POST {SAP_MOCK_URL}/admin/reset when the mock SAP is running; otherwise re-seeds the
+local SQLite file directly. With SAP_MOCK_ON_BTP=1 it resets the copy on BTP. In laptop mode
+aws (SIAGA_MODE=aws) it asks the deployed Case API (POST /demo/reset with CASE_API_KEY),
+which resets the mock its current flags point to: the BTP copy under `make flags-v2`.
 Also clears the local case store (cases, events, approvals). Audit files are kept: the
 trail is append-only and every case has a unique ID.
 """
@@ -24,8 +26,24 @@ def reset_case_store() -> None:
         print(f"case store cleared: {s.sqlite_path}")
 
 
+def reset_via_case_api() -> int:
+    s = get_settings()
+    url = s.case_api_url.rstrip("/")
+    try:
+        r = httpx.post(f"{url}/demo/reset", headers=s.case_api_headers(), timeout=30)
+        r.raise_for_status()
+    except httpx.HTTPError as e:
+        print(f"reset via the Case API at {url} failed: {e}", file=sys.stderr)
+        return 1
+    day0 = r.json()["sap"]["day0"]
+    print(f"demo reset via the Case API at {url}: SAP day0={day0}, cases cleared")
+    return 0
+
+
 def main() -> int:
     s = get_settings()
+    if s.siaga_mode == "aws":
+        return reset_via_case_api()
     reset_case_store()
     url, headers = s.sap_endpoint()  # SAP_MOCK_ON_BTP=1: the copy on BTP (its SQLite is ephemeral)
     try:

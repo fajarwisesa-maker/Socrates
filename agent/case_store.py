@@ -70,6 +70,8 @@ class CaseRecord(BaseModel):
     escalation_reason: str | None = None
     pii: dict[str, Any] | None = None  # v2 step 5 (PII_MASKING): counts only, never the text
     delay_prediction: dict[str, Any] | None = None  # v2 step 3 (DELAY_MODEL): agent/delay_model.py
+    # the flag values the case runs with (siaga_common/sources.py); also in its audit trail
+    flags: dict[str, str] | None = None
 
 
 class CaseEvent(BaseModel):

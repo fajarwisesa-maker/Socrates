@@ -51,6 +51,7 @@ from services.solver.models import (
     TimingCheckRequest,
 )
 from siaga_common.money import format_idr
+from siaga_common.sources import snapshot
 from siaga_common.timeline import display, from_iso, to_iso
 
 log = logging.getLogger(__name__)
@@ -112,8 +113,20 @@ class Agent:
             from agent.pii import mask_signals
 
             signals, pii, originals = mask_signals(signals)
-        case = self.store.create_case(signals=signals, day0=day0 or self._sap_day0(), pii=pii)
-        self.rt.audit.append(case.case_id, "case", {"event": "created", "signals": signals})
+        flags = snapshot(self.rt.settings)
+        case = self.store.create_case(
+            signals=signals, day0=day0 or self._sap_day0(), pii=pii, flags=flags
+        )
+        self.rt.audit.append(
+            case.case_id,
+            "case",
+            {
+                "event": "created",
+                "signals": signals,
+                "flags": flags,
+                "flags_source": self.rt.settings.flags_source,
+            },
+        )
         self._event(case.case_id, "CASE", "info", "Case opened", f"{len(signals)} signal(s)")
         if pii is not None:
             # the original text lives in the audit trail only

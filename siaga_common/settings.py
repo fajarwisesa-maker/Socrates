@@ -87,6 +87,22 @@ class Settings(BaseSettings):
     aicore_resource_group: str = Field("default", alias="AICORE_RESOURCE_GROUP")
     aicore_rpt_deployment_id: str | None = Field(None, alias="AICORE_RPT_DEPLOYMENT_ID")
 
+    # step 4 (not built): Tier 3 approvals from the SAP Joule capability
+    joule_approvals: bool = Field(False, alias="JOULE_APPROVALS")
+
+    # --- Where configuration comes from (docs/connections.md, siaga_common/sources.py) ---
+    # Informational: which laptop env file is active (make use-aws|use-replay|use-v1).
+    siaga_mode: Literal["aws", "replay", "v1"] | None = Field(None, alias="SIAGA_MODE")
+    # env: flags from the environment / .env. ssm: SSM Parameter Store under
+    # /siaga/flags/, read again at the start of every case (no redeploy to switch).
+    flags_source: Literal["env", "ssm"] = Field("env", alias="FLAGS_SOURCE")
+    # env: SAP secrets from the environment. aws: the Secrets Manager secret
+    # SAP_SECRET_ID, read once at startup with the process's IAM role.
+    secrets_source: Literal["env", "aws"] = Field("env", alias="SECRETS_SOURCE")
+    sap_secret_id: str = Field("siaga/sap", alias="SAP_SECRET_ID")
+    # The Case API requires X-API-Key when this is set (the deployed API always has it).
+    case_api_key: SecretStr | None = Field(None, alias="CASE_API_KEY")
+
     # --- Agent loop limits (enforced in code, not by the model) ---
     max_tool_calls: int = Field(20, alias="MAX_TOOL_CALLS")
     max_replans: int = Field(2, alias="MAX_REPLANS")
@@ -98,6 +114,8 @@ class Settings(BaseSettings):
         # the v1 fallback. An explicit REPLAY_PATH always wins.
         if self.orchestration == "multi" and "replay_path" not in self.model_fields_set:
             self.replay_path = REPO_ROOT / "data" / "golden" / "multi" / "llm.jsonl"
+            # derived, not given: keep it re-derivable when flags are overlaid (sources.py)
+            self.__pydantic_fields_set__.discard("replay_path")
         return self
 
     def sap_endpoint(self) -> tuple[str, dict[str, str]]:
@@ -113,6 +131,10 @@ class Settings(BaseSettings):
                 "SAP_MOCK_ON_BTP=1 needs SAP_MOCK_BTP_URL and SAP_MOCK_API_KEY (docs/v2-flags.md)"
             )
         return self.sap_mock_btp_url.rstrip("/"), headers
+
+    def case_api_headers(self) -> dict[str, str]:
+        """Headers for calling the Case API (the key, when one is configured)."""
+        return {"X-API-Key": self.case_api_key.get_secret_value()} if self.case_api_key else {}
 
     def require_model_id(self) -> str:
         if not self.bedrock_model_id:

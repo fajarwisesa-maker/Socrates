@@ -25,6 +25,7 @@ and the decisions made. **Update it every phase.**
 | v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; tested against the package run locally (rehearse 3/3); **waiting for the owner's `cf push`** (docs/btp-deploy.md) |
 | v2 steps 6 + 5 (UI additions, PII masking) | done: delay chip, Planner prediction details, Architecture tab (Planner + drawer), PII masking (`PII_MASKING=local`) with Planner chip; cumulative cap and Evaluations dropped (owner, 25 Oct); "Approved in SAP Joule" waits for step 4 |
 | v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
+| Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
@@ -102,6 +103,17 @@ DELAY_MODEL=rpt make dev              # SAP RPT-1.6 delay prediction in Assess (
 DELAY_MODEL=rpt make record-golden    # also records the RPT answers (rpt.jsonl) for replay
 ```
 
+Laptop modes, secrets and flags (`docs/connections.md`; nothing here prints a secret):
+
+```bash
+scripts/fill-env.sh               # owner, once: writes .env.aws / .env.replay / .env.v1 (hidden input)
+AWS_PROFILE=siaga scripts/put-sap-secret.sh   # owner: SAP values -> Secrets Manager siaga/sap
+make use-aws | use-replay | use-v1   # copy .env.<mode> -> .env (Demo Day / offline / v1)
+make env-check                    # each variable the mode needs: set / MISSING
+make flags-v2 | flags-v1 | flags-show   # SSM /siaga/flags/* (next case picks them up)
+make preflight                    # mode aws: one line per connection; local modes: local stack
+```
+
 Phase 5 (Case API + dashboard):
 
 ```bash
@@ -170,6 +182,10 @@ See `.env.example` for the full list.
 | `MAX_TOOL_CALLS` / `MAX_REPLANS` | `20` / `2` | enforced by the state machine |
 | `VERIFY_DELAY_SECONDS` | `60` | VERIFY timer |
 | `LLM_SIMULATE_THROTTLE` | unset | demo/test aid: `N` visible throttling retries on each case's first model call, or `exhaust` |
+| `SIAGA_MODE` | unset | `aws` \| `replay` \| `v1`: the laptop mode (`make use-*`); drives `make preflight` and `make demo-reset` |
+| `FLAGS_SOURCE` | `env` | `ssm`: flags from `/siaga/flags/*`, read at the start of every case |
+| `SECRETS_SOURCE` / `SAP_SECRET_ID` | `env` / `siaga/sap` | `aws`: SAP values from Secrets Manager, read once per process |
+| `CASE_API_KEY` | unset | when set, the Case API requires `X-API-Key`; dashboard proxy, preflight, rehearse send it |
 
 ## Architecture in brief
 
@@ -906,6 +922,93 @@ additive (no field removed).
   PII_MASKING=local 10/10; v1 9/9 (+1 skipped) and replay 8/8 (+1 skipped); rehearse v1
   3/3 fake and replay.
 
+### Environment and secrets setup (`SIAGA_env_setup_prompt.md`, 25 Oct)
+
+- **Leak check:** gitleaks 8.28.0 over all 27 commits found nothing. Over the working tree it
+  flagged 45 hits, all in git-ignored build output (`var/audit` idempotency keys, Next.js
+  preview/encryption keys in `web/.next*`, `build/`). `git grep` / `git log -p` for `AKIA` and
+  `aws_secret_access_key` found only variable names. No `.env` was ever committed.
+- **Map:** `docs/connections.md`. The secret `siaga/sap` holds `SAP_MOCK_BTP_URL`, which is
+  the brief's `SAP_MOCK_URL` row; `SAP_MOCK_URL` stays the local / AWS-hosted mock.
+- **`siaga_common/sources.py`** holds:
+  - `with_secrets` (the secret is read once per process and cached; errors name keys, never
+    values);
+  - `SsmFlags` (paginated read; writes only known names);
+  - `overlay` (a validated settings copy that never re-reads the environment and derives the
+    multi `REPLAY_PATH` again);
+  - `snapshot`;
+  - the presets `FLAGS_V2` / `FLAGS_V1`.
+  `BEDROCK_MODEL_ID` is an SSM parameter too. It is read per case, and the presets copy it
+  from the laptop `.env`.
+- **Per-case flags in the Case API:**
+  - Every `POST /cases` reads the flags and gets the agent built for those values. Agents
+    are cached per resulting settings and share the store, audit, KB and solver; a new SAP
+    client is built only when `SAP_MOCK_ON_BTP` changes, and a new LLM provider only when
+    the provider, model or replay recording changes.
+  - Approvals and VERIFY find the case's agent again from `case.flags`.
+  - If SSM fails, the case uses the last flags read and gets a `flags_warning` audit entry.
+  - `/config`, `/demo/reset` and `/demo/inject` use the current flags.
+  - Backend settings apply only when the process starts.
+- **Audit:** the `case` entry carries `flags` and `flags_source`. The `CaseRecord` gets
+  `flags`.
+- **Case API key:**
+  - When `CASE_API_KEY` is set, every request except `GET /health` (and CORS `OPTIONS`)
+    needs `X-API-Key`. The compare is constant-time; a missing or wrong key gets a 401.
+  - The dashboard adds the key on its server in `web/proxy.ts`. This is the Next 16 Proxy:
+    request headers set there reach the rewrite destination. `next.config.ts` reads
+    `CASE_API_URL` / `CASE_API_KEY` from the repo root `.env`; the shell wins.
+  - The browser never sees the key. This was checked against a keyed API: 401 direct, 200
+    through the dashboard.
+- **`GET /health/connections?deep=1`** (needs the key) checks from inside the process:
+  - the secret (key names present or missing);
+  - the flags and their source;
+  - SAP, through the agent's own SAP client;
+  - the backends;
+  - with `deep=1`, one Bedrock ping and one RPT-1.6 call on the demo row
+    (`delay_model.demo_query`).
+  No secret value is ever returned (tested).
+- **Laptop modes:**
+  - `.env.{aws,replay,v1}.example` are committed; the real files are git-ignored (checked
+    with `git check-ignore` in a test).
+  - `scripts/env_mode.py` (`make use-*`, `make env-check`) keeps the previous `.env` in
+    `var/env-backup/`. It flags things that do not belong in a mode, such as access keys in
+    `.env.aws`.
+  - Replay mode uses the new **`data/golden/v2/`**: multi + `DELAY_MODEL` + PII,
+    **recorded from the fake LLM and the offline delay stand-in (placeholder; the chip
+    reads "not RPT")**. The template runs offline to the golden outcome (tested).
+- **`scripts/fill-env.sh`:**
+  - It reads `CASE_API_URL` from the output `CaseApiUrl` of the stack `Siaga`.
+  - It asks for `CASE_API_KEY` hidden, or generates one.
+  - It writes files with mode 600 and keeps a `.bak` of each previous file.
+- **`scripts/put-sap-secret.sh`:**
+  - It creates `siaga/sap` if it is missing, with no value. There is no IaC yet, and the
+    stack will reference the secret by name (`infra/README.md`).
+  - It reads the AI Core service key JSON itself (`url`, `clientid`, `clientsecret`,
+    `serviceurls.AI_API_URL`; the `credentials` nesting is handled). The other values are
+    asked hidden; Enter keeps a current value.
+  - It stores the secret through a mode-600 temp file, never through a command line.
+  - Both scripts were tested with a stub `aws`: no value appears in stdout, stderr or any
+    aws command line.
+- **IAM template:** `infra/iam/siaga-config-read.json` allows GetSecretValue on
+  `siaga/sap-??????` and GetParametersByPath on `/siaga/flags`. It is for the Runtime role
+  and the Case API Lambda only.
+- **`make preflight`:**
+  - In mode aws it prints 9 lines with ✅ / ❌:
+    1. the STS account and user name;
+    2. env-check;
+    3. the Case API: key enforced and accepted;
+    4. to 8. from `/health/connections`: secret, Bedrock, BTP mock (must be BTP), AI Core,
+       AWS backends;
+    9. the SSM flags against flags-v2 + the model ID.
+  - In the local modes it runs the existing checks plus an env-mode line.
+  - `make demo-reset` in mode aws posts `/demo/reset` to the deployed API, which resets the
+    mock that the current flags point to (BTP under flags-v2).
+- `make help` now lists targets with digits (`use-v1`, `flags-v2`).
+- Results:
+  - pytest 223 passed (15 new);
+  - web-check passes;
+  - web smoke v1 (fake) 9/9 (+1 skipped) through the new proxy.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -920,5 +1023,9 @@ additive (no field removed).
 - SAP variables were added to the environment after this session started, so they do not
   reach it; a new session (or `.env` on the laptop) picks them up. Then: `make sap-check`,
   `DELAY_MODEL=rpt` demo run, `DELAY_MODEL=rpt make record-golden`.
+- Phase 7 is not deployed, so in mode aws the preflight lines 4–8 (deployed agent: secret,
+  Bedrock, BTP, AI Core, AWS backends) cannot pass. The Case API runs only with local
+  backends today. The env setup's step 4 rehearsals (`flags-v2` / `flags-v1` against AWS)
+  wait for that.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

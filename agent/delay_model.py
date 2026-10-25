@@ -351,6 +351,19 @@ class ReplayPredictor:
         return Prediction.model_validate(e["prediction"])
 
 
+def demo_query(created_at: str) -> dict[str, Any]:
+    """The demo case's row (Perceive's reading of the two demo signals), for previews and
+    connection checks that must not open a case."""
+    from agent.signals import build_signals
+    from siaga_common.settings import REPO_ROOT
+
+    demo = REPO_ROOT / "data" / "demo"
+    signals = build_signals(
+        (demo / "whatsapp_driver.txt").read_text(encoding="utf-8"), demo / "forwarder_notice.pdf"
+    )
+    return query_row({"cause": "flood", "lane": "SMG-JKT"}, signals, created_at)
+
+
 def make_delay_model(settings: Settings) -> DelayPredictor | None:
     if settings.delay_model == "signal":
         return None

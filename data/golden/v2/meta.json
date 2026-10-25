@@ -1,0 +1,206 @@
+{
+  "recorded_at": "2026-10-25T11:54:58+00:00",
+  "provider": "fake",
+  "orchestration": "multi",
+  "delay_model": "fake",
+  "delay_prediction": {
+    "signal_range_hours": [
+      48.0,
+      72.0
+    ],
+    "features": {
+      "cause": "flood",
+      "corridor": "Pantura",
+      "month": 10,
+      "rain_level": null,
+      "signal_sources": 2,
+      "official_notice": "y"
+    },
+    "status": "ok",
+    "provider": "fake",
+    "model": "offline stand-in (not RPT): median of similar past disruptions",
+    "predicted_hours": 64.0,
+    "interval_hours": [
+      49.0,
+      76.0
+    ],
+    "history_rows": 80,
+    "latency_ms": 0.0,
+    "used": "prediction",
+    "delay_for_risk_hours": [
+      64.0,
+      64.0
+    ],
+    "disagree": false,
+    "flag": null
+  },
+  "model": "fake",
+  "prompts": [
+    "critic_agent.v1",
+    "executor_agent.v1",
+    "impact_agent.v2",
+    "planner_agent.v1",
+    "signal_agent.v1"
+  ],
+  "llm_calls": [
+    {
+      "purpose": "signal",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "signal",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "impact",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 1,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.plan",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "planner.simulate",
+      "index": 3,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 2,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.review",
+      "index": 3,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "critic.explain",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    },
+    {
+      "purpose": "executor.summary",
+      "index": 0,
+      "latency_ms": 1.0,
+      "usage": {}
+    }
+  ],
+  "stage_timings_s": {
+    "PERCEIVE": "0.029",
+    "ASSESS": "0.118",
+    "PLAN": "0.033",
+    "SIMULATE": "0.116",
+    "REFLECT": "0.058",
+    "PLAN#2": "0.015",
+    "SIMULATE#2": "0.116",
+    "REFLECT#2": "0.097",
+    "ACT": "0.1",
+    "VERIFY": "0.028"
+  },
+  "seconds_to_approval_card": 0.77,
+  "outcome": {
+    "chosen_option": "B2",
+    "summary": {
+      "chosen": "B2",
+      "chosen_cost": 11400000,
+      "chosen_cost_display": "Rp 11.400.000",
+      "max_exposure": 340000000,
+      "max_exposure_display": "Rp 340.000.000",
+      "expected_exposure": 340000000,
+      "already_spent": 0,
+      "already_spent_display": "Rp 0",
+      "case_cost": 11400000,
+      "case_cost_display": "Rp 11.400.000",
+      "exposure_avoided": 340000000,
+      "exposure_avoided_display": "Rp 340.000.000",
+      "net_protected": 328600000,
+      "net_protected_display": "Rp 328.600.000",
+      "baseline": "A2",
+      "baseline_cost_display": "Rp 31.000.000",
+      "saving_vs_baseline": 19600000,
+      "saving_display": "Rp 19.600.000"
+    },
+    "tool_calls": 16,
+    "llm_calls": 18,
+    "replans": 1,
+    "actions": [
+      [
+        "stock_transfer",
+        "EXECUTED",
+        "STO-000001"
+      ],
+      [
+        "alternate_supplier",
+        "EXECUTED",
+        "4500018232"
+      ]
+    ]
+  }
+}

@@ -13,12 +13,10 @@ from __future__ import annotations
 import sys
 from datetime import UTC, datetime
 
-from agent.delay_model import PredictionUnavailable, combine, make_delay_model, query_row
-from agent.signals import build_signals
+from agent.delay_model import PredictionUnavailable, combine, demo_query, make_delay_model
 from siaga_common.settings import REPO_ROOT, get_settings
 from siaga_common.timeline import to_iso
 
-DEMO = REPO_ROOT / "data" / "demo"
 SIGNAL_RANGE = (48.0, 72.0)  # what Perceive reads from the demo signals ("2-3 hari", "48-72 hours")
 SLACK_HOURS = 32  # PO 4500018231 due Day 1 10:00, loading cutoff Day 2 18:00
 
@@ -28,11 +26,7 @@ def main() -> int:
     if s.delay_model == "signal":
         print("set DELAY_MODEL=rpt (SAP RPT-1.6 on AI Core) or DELAY_MODEL=fake (offline stand-in)")
         return 2
-    signals = build_signals(
-        (DEMO / "whatsapp_driver.txt").read_text(encoding="utf-8"), DEMO / "forwarder_notice.pdf"
-    )
-    disruption = {"cause": "flood", "lane": "SMG-JKT"}  # Perceive's reading of the demo signals
-    query = query_row(disruption, signals, to_iso(datetime.now(UTC)))
+    query = demo_query(to_iso(datetime.now(UTC)))
     model = make_delay_model(s)
     assert model is not None
     print(f"delay model: {s.delay_model}  (history: {s.history_path.relative_to(REPO_ROOT)})")

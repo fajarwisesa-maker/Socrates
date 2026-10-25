@@ -3,10 +3,10 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-aws use-replay use-v1 env-check flags-v2 flags-v1 flags-show
 
 help: ## List targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 install: ## Install Python + web deps and the pre-commit hook
 	uv sync
@@ -120,8 +120,31 @@ rehearse: ## Reset, run, approve, verify N times via the Case API (N=10); report
 rehearse-fault: ## Same, but inject a delayed transfer: passes only if VERIFY re-opens the case
 	$(UV) python scripts/rehearse.py -n $(N) --inject transfer_delayed
 
-preflight: ## Demo-day checklist: services up, LLM reachable or golden recording present
+preflight: ## Demo-day checklist: one line per connection for the active .env mode
 	$(UV) python scripts/preflight.py
+
+# ---- Laptop env modes (docs/connections.md); make the files with scripts/fill-env.sh ----
+use-aws: ## Mode aws (Demo Day): .env.aws -> .env; dashboard/preflight/rehearse use the deployed API
+	@$(UV) python scripts/env_mode.py use aws
+
+use-replay: ## Mode replay (offline fallback): .env.replay -> .env; all local, golden recording
+	@$(UV) python scripts/env_mode.py use replay
+
+use-v1: ## Mode v1 (oldest fallback): .env.v1 -> .env; v1 behaviour, local services + Bedrock
+	@$(UV) python scripts/env_mode.py use v1
+
+env-check: ## Every variable the active mode needs: set / MISSING (never prints values)
+	@$(UV) python scripts/env_mode.py check
+
+# ---- Flags in SSM Parameter Store /siaga/flags/* (read again at the start of each case) ----
+flags-v2: ## SSM flags = Demo Day v2 (multi, rpt, BTP, PII, AWS backends)
+	$(UV) python scripts/flags.py v2
+
+flags-v1: ## SSM flags = every v2 flag off, AWS backends kept
+	$(UV) python scripts/flags.py v1
+
+flags-show: ## Print the SSM flags (none is a secret)
+	$(UV) python scripts/flags.py show
 
 destroy: ## Tear down all AWS resources (Phase 7)
 	$(call not_yet,7)

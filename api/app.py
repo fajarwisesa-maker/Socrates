@@ -9,6 +9,11 @@
     POST /demo/reset                             restore SAP seed state, clear cases
     GET  /demo/inputs/whatsapp | /demo/inputs/pdf   the demo inputs, for preload buttons
     GET  /config                                 provider, replay flag, limits (UI badges)
+    GET  /health/connections?deep=1              what this process can reach (make preflight)
+
+With CASE_API_KEY set, every request except GET /health needs `X-API-Key`. With
+FLAGS_SOURCE=ssm the flags are read from SSM at the start of each case, and the case keeps
+the agent it started with (docs/connections.md).
 
 The agent runs in a background worker so requests return immediately; a scheduler thread
 fires VERIFY when a case's verify_due_at passes.
@@ -18,6 +23,7 @@ Run: uvicorn --factory api.app:create_app --port 8000
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import threading
@@ -27,20 +33,29 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from agent.case_store import NotFound
 from agent.clients import HttpSapClient, SapError
 from agent.factory import make_agent
-from agent.machine import CaseStateError
+from agent.machine import Agent, CaseStateError
 from agent.providers import make_provider
 from agent.providers.base import LLMProvider
 from agent.runtime import Runtime, build_runtime
 from agent.signals import build_signals
+from api.connections import check_connections
 from siaga_common.settings import REPO_ROOT, Settings, get_settings
+from siaga_common.sources import (
+    CASE_FLAGS,
+    ConfigSourceError,
+    SsmFlags,
+    overlay,
+    snapshot,
+    with_secrets,
+)
 
 log = logging.getLogger(__name__)
 DEMO = REPO_ROOT / "data" / "demo"
@@ -85,7 +100,13 @@ class ApprovalDecision(BaseModel):
 
 
 class CaseService:
-    """Owns the agent, the worker pool, per-case locks and the VERIFY scheduler."""
+    """Owns the agents, the worker pool, per-case locks and the VERIFY scheduler.
+
+    With a flag reader (FLAGS_SOURCE=ssm), each new case reads the flags and gets the agent
+    built for those values (built once per distinct set, sharing the store, audit, KB and
+    solver); approvals and VERIFY of that case use the same agent, found from the flags
+    stored on the case.
+    """
 
     def __init__(
         self,
@@ -93,13 +114,75 @@ class CaseService:
         llm: LLMProvider,
         reset_sap: Callable[[], dict[str, Any]],
         workers: int = 4,
+        flags: SsmFlags | None = None,
     ):
         self.rt, self.llm, self.reset_sap = runtime, llm, reset_sap
         self.agent = make_agent(runtime, llm)
+        self.flag_reader = flags
+        self._agents: dict[tuple[tuple[str, str], ...], Agent] = {
+            self._key(snapshot(runtime.settings)): self.agent
+        }
+        self._last_flags: dict[str, str] | None = None
+        self._agents_lock = threading.Lock()
         self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="case")
         self.locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._stop = threading.Event()
         self._scheduler: threading.Thread | None = None
+
+    @staticmethod
+    def _key(flags: dict[str, str]) -> tuple[tuple[str, str], ...]:
+        return tuple(sorted((k, v) for k, v in flags.items() if k in CASE_FLAGS))
+
+    def current_flags(self) -> tuple[dict[str, str], str | None]:
+        """(case flags for the next case, warning). SSM errors fall back to the last values
+        read (else the startup values) and say so; they never stop a case."""
+        if self.flag_reader is None:
+            return snapshot(self.rt.settings), None
+        try:
+            values = {k: v for k, v in self.flag_reader.read().items() if k in CASE_FLAGS}
+            self._last_flags = values
+            return values, None
+        except ConfigSourceError as e:
+            log.warning("flags: %s", e)
+            fallback = self._last_flags or snapshot(self.rt.settings)
+            return fallback, f"{e}; using the last flags read"
+
+    def agent_for(self, flags: dict[str, str]) -> Agent:
+        base = self.rt.settings
+        # "" = not set (e.g. no BEDROCK_MODEL_ID); the key is what the settings end up as,
+        # so the flags read from SSM and the full set stored on a case find the same agent
+        s = overlay(base, {k: v for k, v in flags.items() if k in CASE_FLAGS and v != ""})
+        key = self._key(snapshot(s))
+        with self._agents_lock:
+            if key not in self._agents:
+                rt = build_runtime(
+                    s,
+                    # the BTP flag picks the SAP endpoint; otherwise keep this process's SAP
+                    sap=self.rt.sap if s.sap_mock_on_btp == base.sap_mock_on_btp else None,
+                    solver=self.rt.solver,
+                    store=self.rt.store,
+                    audit=self.rt.audit,
+                    kb=self.rt.kb,
+                    clock=self.rt.clock,
+                )
+                replaying = s.replay or s.llm_provider == "replay"
+                same_llm = (s.llm_provider, s.replay, s.bedrock_model_id) == (
+                    base.llm_provider,
+                    base.replay,
+                    base.bedrock_model_id,
+                ) and (
+                    not replaying or s.replay_path == base.replay_path  # multi has its own
+                )
+                self._agents[key] = make_agent(rt, self.llm if same_llm else make_provider(s))
+            return self._agents[key]
+
+    def agent_for_case(self, case_id: str) -> Agent:
+        flags = self.rt.store.get_case(case_id).flags
+        return self.agent_for(flags) if flags else self.agent
+
+    def current_agent(self) -> tuple[Agent, str | None]:
+        flags, warning = self.current_flags()
+        return self.agent_for(flags), warning
 
     def submit(self, case_id: str, fn: Callable[[], Any]) -> None:
         def job() -> None:
@@ -129,7 +212,7 @@ class CaseService:
 
     def _verify_if_due(self, case_id: str) -> None:
         if case_id in self.agent.due_verifications([case_id]):  # re-check under the lock
-            self.agent.verify(case_id)
+            self.agent_for_case(case_id).verify(case_id)
 
     def shutdown(self) -> None:
         self._stop.set()
@@ -151,7 +234,7 @@ def create_app(
     reset_sap: Callable[[], dict[str, Any]] | None = None,
     background: bool = True,
 ) -> FastAPI:
-    s = settings or get_settings()
+    s = with_secrets(settings or get_settings())  # SECRETS_SOURCE=aws: siaga/sap, once
     if runtime is None:
         if s.embedded_sap and not s.sap_mock_on_btp:  # the BTP flag wins
             from services.sap_mock.embedded import embedded_sap
@@ -170,7 +253,8 @@ def create_app(
             runtime = build_runtime(s)
     if reset_sap is None:
         reset_sap = _http_reset(runtime.sap)  # type: ignore[arg-type]
-    service = CaseService(runtime, llm or make_provider(s), reset_sap)
+    flags = SsmFlags(s.aws_region) if s.flags_source == "ssm" else None
+    service = CaseService(runtime, llm or make_provider(s), reset_sap, flags=flags)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -181,6 +265,17 @@ def create_app(
 
     app = FastAPI(title="SIAGA Case API", version="0.1.0", lifespan=lifespan)
     app.state.service = service
+    if s.case_api_key:
+        expected = s.case_api_key.get_secret_value().encode()
+
+        @app.middleware("http")
+        async def _require_api_key(request: Request, call_next):
+            open_path = request.url.path == "/health" or request.method == "OPTIONS"
+            given = request.headers.get("x-api-key", "").encode()
+            if not open_path and not hmac.compare_digest(given, expected):
+                return JSONResponse({"detail": "missing or wrong X-API-Key"}, status_code=401)
+            return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -200,13 +295,22 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/health/connections")
+    def connections(deep: bool = False) -> dict[str, Any]:
+        """What this process can reach, for `make preflight`. Never returns a secret value;
+        `deep=1` also makes one Bedrock call and one RPT-1.6 call."""
+        agent, warning = service.current_agent()
+        return check_connections(agent.rt.settings, agent.rt, deep=deep, flags_warning=warning)
+
     @app.get("/config")
     def config() -> dict[str, Any]:
+        agent, _ = service.current_agent()
+        s = agent.rt.settings
         return {
             "llm_provider": service.llm.name,
             "orchestration": s.orchestration,
             "delay_model": s.delay_model,
-            "specialists": _specialists(service.rt.registry.names())
+            "specialists": _specialists(agent.rt.registry.names())
             if s.orchestration == "multi"
             else [],
             "replay": s.replay or s.llm_provider == "replay",
@@ -218,7 +322,8 @@ def create_app(
             "replay_source": _golden_meta(s) if (s.replay or s.llm_provider == "replay") else None,
             # v2: what each box of the architecture runs on in this process (Architecture view)
             "pii_masking": s.pii_masking,
-            "joule_approvals": False,  # v2 step 4 not built
+            "joule_approvals": False,  # v2 step 4 not built (JOULE_APPROVALS is ignored)
+            "flags_source": s.flags_source,
             "sap": _sap_info(s),
             "backends": {
                 "case_store": s.case_store,
@@ -243,8 +348,11 @@ def create_app(
             )
         except Exception as e:  # noqa: BLE001 - unreadable PDF
             raise HTTPException(422, f"could not read the PDF: {e}") from e
-        case = service.agent.start_case(signals)
-        service.submit(case.case_id, lambda: service.agent.run(case.case_id))
+        agent, warning = service.current_agent()
+        case = agent.start_case(signals)
+        if warning:
+            agent.rt.audit.append(case.case_id, "flags_warning", {"warning": warning})
+        service.submit(case.case_id, lambda: agent.run(case.case_id))
         return {"case_id": case.case_id, "status": case.status}
 
     @app.get("/cases")
@@ -295,7 +403,9 @@ def create_app(
 
         def job() -> None:
             try:
-                service.agent.decide(case_id, approval_id, approve, body.by, body.reason)
+                service.agent_for_case(case_id).decide(
+                    case_id, approval_id, approve, body.by, body.reason
+                )
             except CaseStateError as e:
                 log.warning("approval ignored: %s", e)
 
@@ -304,7 +414,8 @@ def create_app(
 
     @app.post("/demo/reset")
     def demo_reset() -> dict[str, Any]:
-        sap_state = service.reset_sap()
+        sap = service.current_agent()[0].rt.sap  # the BTP copy when the flags say so
+        sap_state = service.reset_sap() if sap is runtime.sap else _http_reset(sap)()  # type: ignore[arg-type]
         reset_store = getattr(store, "reset", None)
         if reset_store:
             reset_store()
@@ -314,7 +425,7 @@ def create_app(
     def demo_inject(body: dict[str, Any]) -> dict[str, Any]:
         """Hidden: forward a fault to the mock SAP (makes VERIFY fail). Not in the UI."""
         try:
-            return runtime.sap.post("/admin/inject", body)
+            return service.current_agent()[0].rt.sap.post("/admin/inject", body)
         except SapError as e:
             raise HTTPException(e.status, e.message) from e
 

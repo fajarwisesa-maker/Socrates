@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadSiagaSapSecretOnly",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:ap-southeast-1:<account-id>:secret:siaga/sap-??????"
+    },
+    {
+      "Sid": "ReadSiagaFlagsOnly",
+      "Effect": "Allow",
+      "Action": "ssm:GetParametersByPath",
+      "Resource": [
+        "arn:aws:ssm:ap-southeast-1:<account-id>:parameter/siaga/flags",
+        "arn:aws:ssm:ap-southeast-1:<account-id>:parameter/siaga/flags/*"
+      ]
+    }
+  ]
+}

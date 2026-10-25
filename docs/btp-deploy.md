@@ -69,6 +69,27 @@ LLM_PROVIDER=fake make rehearse N=3      # the full demo against the BTP-hosted 
 
 Send the app URL (no key) and the output of the last two commands back.
 
+This step-1 check runs the agent on the laptop, so the key sits in a hand-made `.env` for
+it. In the Demo Day setup (`make use-aws`, docs/connections.md) the laptop has no SAP key:
+the deployed agent reads the URL and key from Secrets Manager `siaga/sap`.
+
+## 7. If the key changes
+
+Run in your own terminal (the key is typed hidden, never echoed):
+
+```bash
+read -r -s -p "new SAP_MOCK_API_KEY: " SAP_MOCK_API_KEY; echo
+cf set-env siaga-sap-mock SAP_MOCK_API_KEY "$SAP_MOCK_API_KEY"
+cf restage siaga-sap-mock                # picks up the new key; the app re-seeds on start
+unset SAP_MOCK_API_KEY
+AWS_PROFILE=siaga scripts/put-sap-secret.sh   # same key into siaga/sap (Enter keeps the rest)
+make demo-reset                          # day 0 = today again (restage wiped the SQLite)
+make preflight                           # "BTP mock from the deployed agent" must be ✅
+```
+
+The deployed agent caches the secret per process, so it picks up the new key at its next
+start (the next cold start or deploy).
+
 ## Notes
 
 - Logs: `cf logs siaga-sap-mock --recent`. Restart: `cf restart siaga-sap-mock`.

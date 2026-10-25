@@ -1,0 +1,1 @@
+{"index": 0, "request_digest": "cbb930a31c8858cf", "prediction": {"provider": "fake", "model": "offline stand-in (not RPT): median of similar past disruptions", "prediction": 64.0, "interval": [49.0, 76.0], "history_rows": 80, "latency_ms": 0.0, "raw": {}}}

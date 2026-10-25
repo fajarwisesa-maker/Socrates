@@ -1,6 +1,14 @@
-"""Demo-day pre-flight: is everything the live demo needs up and configured?
+"""Demo-day pre-flight: one line per connection, ✅ or ❌ with the reason. No secrets.
 
     uv run python scripts/preflight.py      (make preflight)
+
+What it checks depends on the laptop mode in `.env` (SIAGA_MODE, `make use-*`):
+- aws: the laptop's AWS identity, the env file, the deployed Case API with its key, then,
+  through the API's /health/connections (so from AWS, with its IAM role): the siaga/sap
+  secret, Bedrock, the BTP mock, AI Core + one RPT-1.6 call, the AWS backends; and the
+  SSM flags against `make flags-v2`.
+- replay / v1 (or no mode): the local stack (golden recording or Bedrock, Case API, mock
+  SAP day 0, dashboard, CBC, Cedar).
 
 Exit code 1 if anything is red. Amber items are worth reading but do not block.
 """
@@ -13,10 +21,11 @@ import time
 
 import httpx
 
-from siaga_common.settings import get_settings
+from siaga_common.settings import Settings, export_aws_env, get_settings
+from siaga_common.sources import AWS_BACKENDS, ConfigSourceError, SsmFlags, diff, preset
 from siaga_common.timeline import day0_for, to_iso, today_wib
 
-GREEN, AMBER, RED = "\033[32m✓\033[0m", "\033[33m!\033[0m", "\033[31m✗\033[0m"
+GREEN, AMBER, RED = "✅", "⚠️ ", "❌"
 results: list[str] = []
 
 
@@ -35,12 +44,96 @@ def get(
         return None
 
 
+def env_line() -> str | None:
+    from scripts.env_mode import check
+
+    mode, problems = check(out=lambda *_: None)
+    if mode is None:
+        line(AMBER, ".env mode", "no SIAGA_MODE (hand-made .env?): make use-aws|use-replay|use-v1")
+    elif problems:
+        line(RED, f".env mode {mode}", "; ".join(problems) + " (make env-check)")
+    else:
+        line(GREEN, f".env mode {mode}", "env-check ok")
+    return mode
+
+
+def aws_identity(s: Settings) -> None:
+    try:
+        import boto3
+
+        who = boto3.client("sts", region_name=s.aws_region).get_caller_identity()
+        line(GREEN, "laptop AWS identity",
+             f"account {who['Account']}, user {who['Arn'].rsplit('/', 1)[-1]}")  # fmt: skip
+    except Exception as e:  # noqa: BLE001 - botocore errors carry no secret values
+        line(RED, "laptop AWS identity", f"{type(e).__name__} (aws sso login --profile siaga?)")
+
+
+CONNECTIONS = [
+    ("secret", "deployed agent reads siaga/sap"),
+    ("bedrock", "Bedrock from the deployed agent"),
+    ("sap_mock", "BTP mock from the deployed agent"),
+    ("aicore", "AI Core token + RPT-1.6 from the deployed agent"),
+]
+
+
+def aws_preflight(s: Settings) -> None:
+    aws_identity(s)
+    env_line()
+    url, headers = s.case_api_url.rstrip("/"), s.case_api_headers()
+    if not headers:
+        line(RED, "Case API", "CASE_API_KEY not set in .env")
+    no_key = get(f"{url}/config", timeout=10)
+    with_key = get(f"{url}/config", timeout=10, headers=headers)
+    if with_key is None:
+        line(RED, "Case API", f"not reachable at {url}")
+    elif with_key.status_code != 200:
+        line(RED, "Case API", f"HTTP {with_key.status_code} with the key (wrong CASE_API_KEY?)")
+    elif no_key is not None and no_key.status_code == 200:
+        line(RED, "Case API", f"{url} answers WITHOUT a key: CASE_API_KEY is not enforced")
+    else:
+        line(GREEN, "Case API", f"{url}, key required and accepted")
+
+    conn = get(f"{url}/health/connections?deep=1", timeout=90, headers=headers)
+    checks = conn.json().get("checks", {}) if conn is not None and conn.status_code == 200 else None
+    for key, what in CONNECTIONS:
+        if checks is None:
+            line(RED, what, "no answer from /health/connections")
+            continue
+        c = checks.get(key) or {"ok": False, "detail": "not reported"}
+        if key == "sap_mock" and c.get("mode") != "BTP":
+            c = {"ok": False, "detail": f"the agent uses the {c.get('mode')} mock, not BTP"}
+        line(GREEN if c["ok"] else RED, what, c["detail"])
+    if checks is None:
+        line(RED, "DynamoDB, S3 audit, solver Lambda", "no answer from /health/connections")
+    else:
+        have = checks["backends"]["values"]
+        want = {"case_store": "dynamodb", "audit": "s3", "kb": "bedrock",
+                "policy": "agentcore", "solver": "lambda"}  # fmt: skip
+        assert set(want.values()) == set(AWS_BACKENDS.values())
+        off = [f"{k}={have.get(k)}" for k, v in want.items() if have.get(k) != v]
+        line(RED if off else GREEN, "DynamoDB, S3 audit, solver Lambda",
+             f"local backends: {', '.join(off)} (Phase 7 not deployed)" if off
+             else "all AWS backends")  # fmt: skip
+    try:
+        bad = diff(SsmFlags(s.aws_region).read(), preset("v2", s.bedrock_model_id))
+        line(RED if bad else GREEN, "SSM /siaga/flags/* = make flags-v2",
+             ", ".join(f"{k}={a} (want {w})" for k, (a, w) in bad.items()) or "match")  # fmt: skip
+    except ConfigSourceError as e:
+        line(RED, "SSM /siaga/flags/*", str(e)[:160])
+
+
 def main() -> int:
+    export_aws_env()
     s = get_settings()
+    if s.siaga_mode == "aws":
+        print(f"SIAGA pre-flight  (mode aws, Case API {s.case_api_url}, region {s.aws_region})\n")
+        aws_preflight(s)
+        return summary()
     replay = s.replay or s.llm_provider == "replay"
     print(
         f"SIAGA pre-flight  (LLM {'replay' if replay else s.llm_provider}, region {s.aws_region})\n"
     )
+    env_line()
 
     # --- LLM ---------------------------------------------------------------------------
     meta_path = s.replay_path.parent / "meta.json"
@@ -81,7 +174,7 @@ def main() -> int:
         line(AMBER, "LLM provider", "fake (scripted) - fine for rehearsal, not for the live demo")
 
     # --- services ----------------------------------------------------------------------
-    api = get(f"{s.case_api_url}/config")
+    api = get(f"{s.case_api_url}/config", headers=s.case_api_headers())
     if api is None:
         line(RED, "Case API", f"not reachable at {s.case_api_url} (make dev / make replay)")
     else:
@@ -135,6 +228,10 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         line(RED, "Cedar policies", str(e)[:120])
 
+    return summary()
+
+
+def summary() -> int:
     reds = results.count(RED)
     print(f"\n{'READY' if not reds else f'{reds} BLOCKER(S)'}")
     return 1 if reds else 0

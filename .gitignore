@@ -1,4 +1,9 @@
 .env
+# laptop mode files (make use-aws|use-replay|use-v1); only the .example versions are committed
+.env.*
+!.env.example
+!.env.*.example
+.env.bak*
 .venv/
 __pycache__/
 *.pyc
