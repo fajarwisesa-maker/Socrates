@@ -27,14 +27,18 @@ def reset_case_store() -> None:
 def main() -> int:
     s = get_settings()
     reset_case_store()
+    url, headers = s.sap_endpoint()  # SAP_MOCK_ON_BTP=1: the copy on BTP (its SQLite is ephemeral)
     try:
-        r = httpx.post(f"{s.sap_mock_url}/admin/reset", timeout=10)
+        r = httpx.post(f"{url}/admin/reset", headers=headers, timeout=20)
         r.raise_for_status()
         body = r.json()
-        print(f"mock SAP reset via {s.sap_mock_url}: day0={body['day0']} counts={body['counts']}")
+        print(f"mock SAP reset via {url}: day0={body['day0']} counts={body['counts']}")
         return 0
     except httpx.ConnectError:
-        print(f"mock SAP not running at {s.sap_mock_url}; re-seeding {s.sap_db_path} directly")
+        if s.sap_mock_on_btp:
+            print(f"mock SAP on BTP not reachable at {url}", file=sys.stderr)
+            return 1
+        print(f"mock SAP not running at {url}; re-seeding {s.sap_db_path} directly")
     except httpx.HTTPError as e:
         print(f"reset failed: {e}", file=sys.stderr)
         return 1

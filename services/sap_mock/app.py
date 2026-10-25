@@ -22,6 +22,7 @@ Run: uvicorn --factory services.sap_mock.app:create_app --port 8001
 
 from __future__ import annotations
 
+import hmac
 import re
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
@@ -145,13 +146,35 @@ def _find_by(store: SapStore, entity_set: str, field: str, value: Any) -> Row | 
     return next((r for r in store.list(entity_set) if r.get(field) == value), None)
 
 
+_FROM_SETTINGS = object()
+
+
 def create_app(
-    store: SapStore | None = None, clock: Callable[[], datetime] | None = None
+    store: SapStore | None = None,
+    clock: Callable[[], datetime] | None = None,
+    api_key: str | None | object = _FROM_SETTINGS,
 ) -> FastAPI:
+    """api_key: required X-API-Key on every request (v2 step 1, the BTP copy shares an org).
+    Default: SAP_MOCK_API_KEY from the environment; unset = open (local demo)."""
     store = store or SqliteSapStore(get_settings().sap_db_path)
     now = clock or (lambda: datetime.now(UTC))
     app = FastAPI(title="SIAGA mock S/4HANA", version="0.1.0")
     app.state.store = store
+    if api_key is _FROM_SETTINGS:
+        secret = get_settings().sap_mock_api_key
+        api_key = secret.get_secret_value() if secret else None
+    if api_key:
+        expected = str(api_key).encode()
+
+        @app.middleware("http")
+        async def _require_api_key(request: Request, call_next):
+            given = request.headers.get("x-api-key", "").encode()
+            if not hmac.compare_digest(given, expected):
+                return JSONResponse(
+                    odata.error("Unauthorized", "missing or invalid X-API-Key header"),
+                    status_code=401,
+                )
+            return await call_next(request)
 
     if store.get_meta("day0") is None:  # first start on an empty DB
         reset_store(store)

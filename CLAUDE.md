@@ -22,7 +22,8 @@ and the decisions made. **Update it every phase.**
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
 | v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
 | v2 step 3 (RPT-1.6, `DELAY_MODEL`) | built and tested against a simulated AI Core (SDK response shape) and the offline stand-in; **real RPT call pending**: the SAP variables do not reach this session (`make sap-check`) |
-| v2 steps 1, 4–7 | step 1 next; order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
+| v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; tested against the package run locally (rehearse 3/3); **waiting for the owner's `cf push`** (docs/btp-deploy.md) |
+| v2 steps 4–7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
@@ -837,6 +838,31 @@ additive (no field removed).
   headers through `httpx.MockTransport`, timeout / HTTP errors, record → replay, both
   orchestrations keep the golden numbers, clamping, timeout fallback; the recorded-answer
   test skips until a real RPT answer is recorded.
+
+### SIAGA v2 step 1 decisions (mock S/4HANA on BTP, `SAP_MOCK_ON_BTP`)
+
+- **Package** (`make btp-package` → `build/btp/`, git-ignored): `services/sap_mock` without
+  the in-process helper, `siaga_common` (settings, timeline), `data/seed`,
+  `requirements.txt` pinned to this repo's versions (fastapi, uvicorn, pydantic,
+  pydantic-settings, python-dotenv), `runtime.txt` `python-3.12.x`, `manifest.yml`. pip,
+  not uv: uv support only reached the official CF Python buildpack in mid-October 2026,
+  and BTP may run an older buildpack. CF docs are blocked here; checked by search.
+- **Manifest**: 512M, 1 instance, `python_buildpack`, `random-route: true` (unique host in
+  the shared org, no domain guessing), port health check, uvicorn on `$PORT`.
+  `SAP_MOCK_API_KEY` only via `cf set-env`.
+- **API key**: `create_app(api_key=...)` (default: `SAP_MOCK_API_KEY` from the environment)
+  adds a middleware that refuses every request without the right `X-API-Key`
+  (constant-time compare, OData error, 401). No key configured = open, as before. The
+  in-process mock (`EMBEDDED_SAP`, tests) never asks for one.
+- **Switch**: `Settings.sap_endpoint()` returns (URL, headers): localhost or
+  `SAP_MOCK_BTP_URL`; the key header is sent whenever `SAP_MOCK_API_KEY` is set. Used by
+  the runtime, the Case API, the CLI probe, `make demo-reset` (resets the BTP copy) and
+  `make preflight`. The BTP flag wins over `EMBEDDED_SAP`.
+- `make sap-latency` measures round trips (stock lookup, filtered query, state).
+- Verified here against `build/btp` run in a clean venv from its own requirements:
+  401 without / with a wrong key, 200 with it, reset works; `make demo-reset`,
+  `make sap-latency` (localhost: ~2 ms median) and `make rehearse N=3` (multi, fake LLM,
+  fake delay model) 3/3, all 248 SAP calls served by the packaged app.
 
 ## Open items
 

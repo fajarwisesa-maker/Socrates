@@ -51,6 +51,11 @@ class Settings(BaseSettings):
 
     # --- Local service endpoints and paths ---
     sap_mock_url: str = Field("http://127.0.0.1:8001", alias="SAP_MOCK_URL")
+    # v2 step 1: the same mock S/4HANA on SAP BTP Cloud Foundry (the org is shared, so it
+    # requires X-API-Key; the mock checks it whenever SAP_MOCK_API_KEY is set where it runs)
+    sap_mock_on_btp: bool = Field(False, alias="SAP_MOCK_ON_BTP")
+    sap_mock_btp_url: str | None = Field(None, alias="SAP_MOCK_BTP_URL")
+    sap_mock_api_key: SecretStr | None = Field(None, alias="SAP_MOCK_API_KEY")
     # Case API only: run the mock S/4HANA in-process instead of calling SAP_MOCK_URL.
     embedded_sap: bool = Field(False, alias="EMBEDDED_SAP")
     solver_url: str = Field("http://127.0.0.1:8002", alias="SOLVER_URL")
@@ -91,6 +96,20 @@ class Settings(BaseSettings):
         if self.orchestration == "multi" and "replay_path" not in self.model_fields_set:
             self.replay_path = REPO_ROOT / "data" / "golden" / "multi" / "llm.jsonl"
         return self
+
+    def sap_endpoint(self) -> tuple[str, dict[str, str]]:
+        """(base URL, headers) of the mock S/4HANA: localhost, or BTP when SAP_MOCK_ON_BTP=1.
+        The only place that switches; nothing else changes with the flag."""
+        headers = (
+            {"X-API-Key": self.sap_mock_api_key.get_secret_value()} if self.sap_mock_api_key else {}
+        )
+        if not self.sap_mock_on_btp:
+            return self.sap_mock_url, headers
+        if not self.sap_mock_btp_url or not headers:
+            raise RuntimeError(
+                "SAP_MOCK_ON_BTP=1 needs SAP_MOCK_BTP_URL and SAP_MOCK_API_KEY (docs/v2-flags.md)"
+            )
+        return self.sap_mock_btp_url.rstrip("/"), headers
 
     def require_model_id(self) -> str:
         if not self.bedrock_model_id:

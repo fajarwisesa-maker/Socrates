@@ -75,10 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.embedded_sap:
         sap = embedded_sap()
     else:
+        url, headers = settings.sap_endpoint()
         try:
-            httpx.get(f"{settings.sap_mock_url}/admin/state", timeout=2).raise_for_status()
+            httpx.get(f"{url}/admin/state", headers=headers, timeout=5).raise_for_status()
         except httpx.HTTPError:
-            print(f"(mock SAP not reachable at {settings.sap_mock_url}; using embedded mock SAP)")
+            print(f"(mock SAP not reachable at {url}; using embedded mock SAP)")
             sap = embedded_sap()
     runtime = build_runtime(settings, sap=sap)
     llm = make_provider(settings)

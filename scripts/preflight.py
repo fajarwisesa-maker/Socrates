@@ -25,9 +25,11 @@ def line(mark: str, what: str, detail: str = "") -> None:
     print(f" {mark} {what}" + (f"  — {detail}" if detail else ""))
 
 
-def get(url: str, timeout: float = 3) -> httpx.Response | None:
+def get(
+    url: str, timeout: float = 3, headers: dict[str, str] | None = None
+) -> httpx.Response | None:
     try:
-        r = httpx.get(url, timeout=timeout)
+        r = httpx.get(url, timeout=timeout, headers=headers)
         return r if r.status_code < 500 else None
     except httpx.HTTPError:
         return None
@@ -94,16 +96,18 @@ def main() -> int:
         if cfg.get("embedded_sap"):
             line(GREEN, "mock SAP", "embedded in the Case API")
         else:
-            st = get(f"{s.sap_mock_url}/admin/state")
-            if st is None:
-                line(RED, "mock SAP", f"not reachable at {s.sap_mock_url}")
+            sap_url, sap_headers = s.sap_endpoint()
+            st = get(f"{sap_url}/admin/state", timeout=8, headers=sap_headers)
+            if st is None or st.status_code == 401:
+                why = "API key refused" if st is not None else "not reachable"
+                line(RED, "mock SAP", f"{why} at {sap_url}")
             else:
                 sap_day0 = st.json().get("day0")
                 today = to_iso(day0_for(today_wib()))
                 if sap_day0 != today:
                     line(AMBER, "mock SAP day 0", f"{sap_day0} != today {today}: press Reset demo")
                 else:
-                    line(GREEN, "mock SAP", f"{s.sap_mock_url}, day 0 = today")
+                    line(GREEN, "mock SAP", f"{sap_url}, day 0 = today")
     web = get("http://127.0.0.1:3000/")
     line(GREEN if web is not None else RED, "dashboard", "http://localhost:3000"
          if web is not None else "not reachable on :3000")  # fmt: skip

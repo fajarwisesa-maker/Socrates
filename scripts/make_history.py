@@ -85,7 +85,7 @@ def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8", newline="") as f:
         f.write(HEADER)
-        w = csv.DictWriter(f, fieldnames=["id", *rows[0]])
+        w = csv.DictWriter(f, fieldnames=["id", *rows[0]], lineterminator="\n")
         w.writeheader()
         for i, r in enumerate(rows, start=1):
             w.writerow({"id": f"H-{i:03d}", **r})

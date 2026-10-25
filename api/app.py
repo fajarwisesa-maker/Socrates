@@ -143,7 +143,7 @@ def create_app(
 ) -> FastAPI:
     s = settings or get_settings()
     if runtime is None:
-        if s.embedded_sap:
+        if s.embedded_sap and not s.sap_mock_on_btp:  # the BTP flag wins
             from services.sap_mock.embedded import embedded_sap
 
             sap, sap_store = embedded_sap()

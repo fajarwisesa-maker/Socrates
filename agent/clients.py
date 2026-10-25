@@ -54,8 +54,17 @@ def odata_key(*parts: str, **named: str) -> str:
 
 
 class HttpSapClient:
-    def __init__(self, base_url: str | None = None, client: httpx.Client | None = None):
-        self.http = client or httpx.Client(base_url=base_url or "", timeout=10)
+    def __init__(
+        self,
+        base_url: str | None = None,
+        client: httpx.Client | None = None,
+        headers: dict[str, str] | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ):
+        # headers: X-API-Key for the BTP-hosted mock (v2 step 1)
+        self.http = client or httpx.Client(
+            base_url=base_url or "", timeout=10, headers=headers, transport=transport
+        )
 
     def _check(self, r: httpx.Response) -> Row:
         body = r.json()

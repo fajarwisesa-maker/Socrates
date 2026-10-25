@@ -9,3 +9,4 @@ node_modules/
 web/.next/
 infra/cdk.out/
 .DS_Store
+build/

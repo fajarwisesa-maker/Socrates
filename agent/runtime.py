@@ -49,6 +49,11 @@ class Runtime:
         )
 
 
+def _sap_endpoint(s: Settings) -> tuple[str, None, dict[str, str]]:
+    url, headers = s.sap_endpoint()
+    return url, None, headers
+
+
 def build_runtime(
     settings: Settings | None = None,
     *,
@@ -94,7 +99,7 @@ def build_runtime(
         kb = LocalBM25KB() if s.kb_backend == "local" else _phase7("Bedrock Knowledge Base")
     return Runtime(
         settings=s,
-        sap=sap or HttpSapClient(s.sap_mock_url),
+        sap=sap or HttpSapClient(*_sap_endpoint(s)),
         solver=solver,
         store=store,
         audit=audit,

@@ -22,4 +22,5 @@ def embedded_sap(
 
     store = SqliteSapStore(":memory:")
     reset_store(store, day0)
-    return HttpSapClient(client=TestClient(create_app(store, clock=clock))), store
+    # in-process: no network, so no API key (whatever SAP_MOCK_API_KEY says)
+    return HttpSapClient(client=TestClient(create_app(store, clock=clock, api_key=None))), store
