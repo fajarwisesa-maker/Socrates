@@ -28,7 +28,8 @@ def make_provider(settings: Settings) -> LLMProvider:
         export_aws_env()  # credentials / Bedrock API key from .env reach boto3
         fallback = settings.llm_fallback == "sap_genai"
         provider = BedrockProvider(
-            settings.require_model_id(),
+            # with the fallback, a missing model ID moves each case to SAP (with the note)
+            settings.bedrock_model_id or "" if fallback else settings.require_model_id(),
             settings.aws_region,
             _temperature(settings),
             # with a fallback, one retry on throttling, then the case moves to SAP

@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+PLACEHOLDER = "<set-me>"  # unfilled value in the .env.<mode> templates
 
 
 class Settings(BaseSettings):
@@ -117,6 +118,15 @@ class Settings(BaseSettings):
     max_tool_calls: int = Field(20, alias="MAX_TOOL_CALLS")
     max_replans: int = Field(2, alias="MAX_REPLANS")
     verify_delay_seconds: int = Field(60, alias="VERIFY_DELAY_SECONDS")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _placeholders_are_unset(cls, data: Any) -> Any:
+        # `<set-me>` in a .env.<mode> template means "not filled in yet": treat it as unset,
+        # so checks say which variable is missing instead of failing on a fake URL
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v != PLACEHOLDER}
+        return data
 
     @model_validator(mode="after")
     def _multi_golden(self) -> Settings:

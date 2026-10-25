@@ -329,3 +329,23 @@ def test_demo_case_falls_back_from_bedrock_at_its_start(sap, tmp_path):
     assert notes[0].stage == "PERCEIVE" and "Operation not allowed" in notes[0].detail
     assert blocked.calls == 1  # Bedrock was tried once, at the start, then never again
     assert sum(e.kind == "llm_fallback" for e in audit) == 1
+
+
+def test_missing_aws_profile_or_model_moves_the_case_to_sap(monkeypatch):
+    """The laptop case: no `siaga` profile yet, no BEDROCK_MODEL_ID; nothing crashes."""
+    monkeypatch.setenv("AWS_PROFILE", "no-such-profile-siaga-test")
+    no_profile = BedrockProvider("apac.some-model", "ap-southeast-1")  # client built lazily
+    with pytest.raises(LLMError) as e:
+        no_profile.converse(REQ)
+    assert e.value.kind == "account" and "no-such-profile" in str(e.value)
+    for primary in (no_profile, BedrockProvider("", "ap-southeast-1")):
+        fb = FallbackProvider(primary, provider(AiCoreSim([OK])))
+        r = fb.converse(REQ.model_copy(update={"case_id": "x"}))
+        assert r.model == f"sap:{MODEL}" and r.fallback_reason
+
+
+def test_template_placeholders_count_as_unset():
+    s = Settings(_env_file=None, AICORE_AUTH_URL="<set-me>", BEDROCK_MODEL_ID="<set-me>",
+                 CASE_API_URL="<set-me>")  # fmt: skip
+    assert s.aicore_auth_url is None and s.bedrock_model_id is None
+    assert s.case_api_url == "http://127.0.0.1:8000"  # the default, not the placeholder

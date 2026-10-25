@@ -59,7 +59,7 @@ def env_line() -> str | None:
     return mode
 
 
-def aws_identity(s: Settings) -> None:
+def aws_identity(s: Settings, fail: str = RED) -> None:
     try:
         import boto3
 
@@ -67,7 +67,8 @@ def aws_identity(s: Settings) -> None:
         line(GREEN, "laptop AWS identity",
              f"account {who['Account']}, user {who['Arn'].rsplit('/', 1)[-1]}")  # fmt: skip
     except Exception as e:  # noqa: BLE001 - botocore errors carry no secret values
-        line(RED, "laptop AWS identity", f"{type(e).__name__} (aws sso login --profile siaga?)")
+        hint = "aws configure --profile siaga, or aws sso login --profile siaga"
+        line(fail, "laptop AWS identity", f"{type(e).__name__} ({hint})")
 
 
 CONNECTIONS = [
@@ -124,24 +125,26 @@ def aws_preflight(s: Settings) -> None:
         line(RED, "SSM /siaga/flags/*", str(e)[:160])
 
 
-def llm_line(what: str, provider) -> None:
+def llm_line(what: str, provider, fail: str = RED) -> None:
     from agent.providers import ping
 
     try:
         r = ping(provider)
         ok = r["tool_use"]
         call = "tool call ok" if ok else "tool call MISSING"
-        line(GREEN if ok else RED, what, f"{r['model']}: {call} in {r['latency_s']} s")
+        line(GREEN if ok else fail, what, f"{r['model']}: {call} in {r['latency_s']} s")
     except Exception as e:  # noqa: BLE001 - provider errors carry no secret values
-        line(RED, what, f"{type(e).__name__}: {str(e)[:160]}")
+        line(fail, what, f"{type(e).__name__}: {str(e)[:160]}")
 
 
 def local_preflight(s: Settings) -> None:
     """Mode local (laptop live): live LLM, BTP mock and RPT-1.6; everything else local."""
     env_line()
     bedrock = s.llm_provider == "bedrock"
+    # with the SAP fallback, a Bedrock problem is worth reading but does not stop the demo
+    soft = AMBER if s.llm_fallback else RED
     if bedrock:
-        aws_identity(s)
+        aws_identity(s, soft)
     else:
         line(AMBER, "laptop AWS identity", f"not used while LLM_PROVIDER={s.llm_provider}")
     # --- LLM: the primary, and the fallback on its own
@@ -150,11 +153,11 @@ def local_preflight(s: Settings) -> None:
 
         try:
             p = make_provider(s.model_copy(update={"llm_record_path": None}))
-        except RuntimeError as e:
-            line(RED, f"LLM {s.llm_provider}", str(e))
+        except Exception as e:  # noqa: BLE001 - missing settings / profile; no secret values
+            line(RED, f"LLM {s.llm_provider}", f"{type(e).__name__}: {str(e)[:160]}")
         else:
             if hasattr(p, "fallback"):
-                llm_line(f"LLM Bedrock {s.bedrock_model_id}", p.primary)
+                llm_line(f"LLM Bedrock {s.bedrock_model_id}", p.primary, soft)
                 llm_line(f"LLM fallback: Claude via SAP AI Core ({s.sap_genai_model})", p.fallback)
             else:
                 llm_line(f"LLM {s.llm_provider}", p)
@@ -292,7 +295,7 @@ def llm_checks(s: Settings, replay: bool) -> None:
 
         try:
             llm_line(f"LLM Claude via SAP AI Core ({s.sap_genai_model})", make_sap_genai(s))
-        except RuntimeError as e:
+        except Exception as e:  # noqa: BLE001
             line(RED, "LLM sap_genai", str(e))
     else:
         line(AMBER, "LLM provider", "fake (scripted) - fine for rehearsal, not for the live demo")

@@ -1068,6 +1068,13 @@ additive (no field removed).
   - local stores (SQLite, audit dir, KB, local backends);
   - then the `make dev` processes, CBC and Cedar.
   `/health/connections` uses the same ping (`agent.providers.ping`; key `llm`).
+- First laptop run (owner, 25 Oct) found three problems, now fixed:
+  - Preflight crashed on a missing `siaga` AWS profile. The Bedrock client is now built on
+    first use inside `converse()`, so a missing profile, credentials or `BEDROCK_MODEL_ID`
+    becomes `LLMError(kind="account")`, and with `LLM_FALLBACK` the case moves to SAP.
+  - With the fallback set, preflight shows Bedrock problems in amber, not red.
+  - `<set-me>` template values now count as unset, so messages name the missing
+    variable.
 - `make record-golden --provider sap_genai` works, and `meta.json` names the provider that
   answered (`provider`, `configured_provider`, `fallback_reason`, `models`).
 - Tests (`tests/test_sap_genai.py`, 16): the deployment lookup by name and through the

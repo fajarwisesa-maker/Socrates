@@ -13,6 +13,7 @@ from botocore.exceptions import (
     ClientError,
     ConnectionError,
     NoCredentialsError,
+    ProfileNotFound,
     ReadTimeoutError,
 )
 
@@ -69,15 +70,24 @@ class BedrockProvider:
         self.temperature = temperature
         self._sleep = sleep
         self.max_attempts = max_attempts  # lower with a fallback: fail over instead of waiting
-        self.client = client or boto3.client(
-            "bedrock-runtime",
-            region_name=region,
-            config=Config(
-                retries={"mode": "standard", "total_max_attempts": 1},  # retries are ours
-                read_timeout=120,
-                connect_timeout=10,
-            ),
-        )
+        self.region = region
+        self._client = client
+
+    @property
+    def client(self):
+        # Built on first use, inside converse(): a missing AWS profile or credentials is then
+        # an LLMError(kind="account") that LLM_FALLBACK acts on, not a crash at startup.
+        if self._client is None:
+            self._client = boto3.client(
+                "bedrock-runtime",
+                region_name=self.region,
+                config=Config(
+                    retries={"mode": "standard", "total_max_attempts": 1},  # retries are ours
+                    read_timeout=120,
+                    connect_timeout=10,
+                ),
+            )
+        return self._client
 
     def _kwargs(self, req: LLMRequest) -> dict:
         inference = {"maxTokens": req.max_tokens}
@@ -94,6 +104,8 @@ class BedrockProvider:
         return kwargs
 
     def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
+        if not self.model_id:
+            raise LLMError("Bedrock: BEDROCK_MODEL_ID is not set", kind="account")
         t0 = time.perf_counter()
         attempt = 1
         while True:
@@ -129,7 +141,7 @@ class BedrockProvider:
                     attempt = self._wait(attempt, "connection problem", on_retry)
                     continue
                 raise LLMError(f"Bedrock call failed after {attempt} attempts: {e}") from e
-            except NoCredentialsError as e:
+            except (NoCredentialsError, ProfileNotFound) as e:
                 raise LLMError(f"Bedrock call failed: {e}", kind="account") from e
             except BotoCoreError as e:
                 raise LLMError(f"Bedrock call failed: {e}") from e
