@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -35,6 +35,9 @@ agentcore-check: ## Which AgentCore features (Runtime, Gateway, Policy, Evaluati
 
 sap-check: ## v2: SAP AI Core token, deployments, one RPT-1.6 call; cf target; joule status
 	$(UV) python scripts/sap_check.py
+
+predict-demo: ## v2: preview the demo case's delay prediction (DELAY_MODEL=rpt|fake); no case, no risk
+	$(UV) python scripts/predict_demo.py
 
 btp-package: ## v2: package the mock S/4HANA for SAP BTP Cloud Foundry -> build/btp/
 	$(UV) python scripts/package_btp.py
