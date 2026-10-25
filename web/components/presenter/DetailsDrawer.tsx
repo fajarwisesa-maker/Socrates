@@ -10,7 +10,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { notices } from "@/lib/notices";
 import type { Step } from "@/lib/pacing";
-import { period, TOOL } from "@/lib/present";
+import { modelLabel, period, TOOL } from "@/lib/present";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Config, Precedent } from "@/lib/types";
 
@@ -237,11 +237,7 @@ function CaseFacts({
         <p className="text-ink-2">
           Model:{" "}
           <b className="text-ink">
-            {config.replay
-              ? `replay of a recorded run (${config.replay_source?.provider ?? "unknown"}${config.replay_source?.model ? `, ${config.replay_source.model}` : ""})`
-              : config.llm_provider === "bedrock"
-                ? `Amazon Bedrock · ${config.model ?? "model not set"}`
-                : config.llm_provider}
+            {modelLabel(config)}
           </b>
         </p>
       )}

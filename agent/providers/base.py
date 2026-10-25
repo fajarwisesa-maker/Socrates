@@ -33,6 +33,8 @@ class LLMResponse(BaseModel):
     usage: dict[str, Any] = {}
     latency_ms: float = 0.0
     model: str = ""
+    # set when LLM_FALLBACK moved this case off its primary provider (shown in the UI)
+    fallback_reason: str | None = None
 
     def tool_uses(self) -> list[dict[str, Any]]:
         return [b["toolUse"] for b in self.message["content"] if "toolUse" in b]
@@ -42,7 +44,15 @@ class LLMResponse(BaseModel):
 
 
 class LLMError(Exception):
-    """Provider failure the state machine turns into an escalation."""
+    """Provider failure the state machine turns into an escalation.
+
+    kind: "account" (credentials, access, account restrictions), "throttle" (still throttled
+    after the retries) or "other". LLM_FALLBACK acts on the first two only.
+    """
+
+    def __init__(self, message: str, kind: str = "other"):
+        super().__init__(message)
+        self.kind = kind
 
 
 # on_retry(attempt, max_attempts, wait_s, reason): called before a provider waits to retry

@@ -1,11 +1,11 @@
 """Laptop env modes: which `.env.<mode>` is active, and is it complete? Never prints a value.
 
-    uv run python scripts/env_mode.py use aws|replay|v1   (make use-aws / use-replay / use-v1)
+    uv run python scripts/env_mode.py use local|aws|replay|v1   (make use-local / use-aws / ...)
     uv run python scripts/env_mode.py check               (make env-check)
 
 `use` copies `.env.<mode>` to `.env` (the old `.env` is kept in var/env-backup/ unless it
 is a copy of a mode file). `.env.replay` has no secrets, so it is made from its template
-when missing; `.env.aws` and `.env.v1` come from scripts/fill-env.sh.
+when missing; `.env.local`, `.env.aws` and `.env.v1` come from scripts/fill-env.sh.
 """
 
 from __future__ import annotations
@@ -23,6 +23,23 @@ ROOT = Path(__file__).resolve().parent.parent
 PLACEHOLDER = "<set-me>"
 
 MODES: dict[str, dict] = {
+    "local": {
+        "about": "Demo Day: everything on this laptop, live LLM + BTP mock + RPT-1.6",
+        "required": [
+            "LLM_PROVIDER",
+            "AICORE_AUTH_URL",
+            "AICORE_CLIENT_ID",
+            "AICORE_CLIENT_SECRET",
+            "AICORE_API_URL",
+            "AICORE_RPT_DEPLOYMENT_ID",
+            "SAP_MOCK_BTP_URL",
+            "SAP_MOCK_API_KEY",
+            "CASE_API_URL",
+        ],
+        # (variable, value, then also required)
+        "required_if": [("LLM_PROVIDER", "bedrock", ["AWS_PROFILE", "BEDROCK_MODEL_ID"])],
+        "forbidden": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"],
+    },
     "aws": {
         "about": "Demo Day: dashboard + preflight + rehearse against the deployed Case API",
         "required": [
@@ -90,7 +107,11 @@ def check(env_file: Path | None = None, out=print) -> tuple[str | None, list[str
     spec = MODES[mode]
     out(f"mode: {mode} — {spec['about']}")
     problems = []
-    for name in spec["required"]:
+    required = list(spec["required"])
+    for var, value, more in spec.get("required_if", []):
+        if (os.environ.get(var) or values.get(var)) == value:
+            required += more
+    for name in required:
         # a variable already in the shell wins over .env (same as the settings)
         ok = _is_set(os.environ.get(name)) or _is_set(values.get(name))
         out(f"  {name:<18} {'set' if ok else 'MISSING'}")

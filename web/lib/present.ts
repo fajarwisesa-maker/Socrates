@@ -177,3 +177,27 @@ export function glossFor(e: { quote: string; gloss_en?: string | null }): string
   const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   return norm(g) === norm(e.quote) ? null : g;
 }
+
+export const SAP_MODEL_NOTE = "Model: Claude via SAP AI Core";
+
+/** The note shown when this case's model calls ran on SAP AI Core (LLM_PROVIDER=sap_genai,
+ *  or LLM_FALLBACK moved the case there). Read from the case's own events. */
+export function sapModelNote(events: CaseEvent[]): string | null {
+  const onSap = events.some(
+    (e) => e.status === "fallback" || (e.status === "llm" && String(e.data?.model ?? "").includes("sap:")),
+  );
+  return onSap ? SAP_MODEL_NOTE : null;
+}
+
+/** Where the model runs, from /config (Architecture view, details drawer). */
+export function modelLabel(config: Config | null): string {
+  if (!config) return "";
+  if (config.replay) {
+    const src = config.replay_source;
+    return `replay of a recorded run (${src?.provider ?? "recording"}${src?.model ? `, ${src.model}` : ""})`;
+  }
+  const fallback = config.llm_fallback ? " · fallback: Claude via SAP AI Core" : "";
+  if (config.llm_provider.startsWith("bedrock")) return `Amazon Bedrock · ${config.model ?? "model not set"}${fallback}`;
+  if (config.llm_provider === "sap_genai") return `Claude via SAP AI Core · ${config.model ?? ""}`;
+  return "scripted fake LLM (offline)";
+}

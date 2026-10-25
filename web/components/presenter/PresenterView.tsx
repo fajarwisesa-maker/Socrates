@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { dayShort } from "@/lib/format";
 import { useDwell, usePacing } from "@/lib/pacing";
-import { agentsByStage } from "@/lib/present";
+import { agentsByStage, sapModelNote } from "@/lib/present";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { CaseState } from "@/lib/useCase";
 import { DetailsDrawer } from "./DetailsDrawer";
@@ -89,6 +89,11 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           </span>
         )}
         <div className="ml-auto flex items-center gap-4">
+          {sapModelNote(events) && (
+            <span data-testid="model-note" className="text-sm font-medium text-ink-2">
+              {sapModelNote(events)}
+            </span>
+          )}
           {config?.replay && (
             <span
               data-testid="replay-badge"

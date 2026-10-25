@@ -16,7 +16,7 @@ and the decisions made. **Update it every phase.**
 | 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
 | 5 Case API and dashboard | done |
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
-| 7 AWS deployment | design note `docs/phase7-design.md` awaiting approval; build blocked on AWS access |
+| 7 AWS deployment | **dropped (owner, 25 Oct)**: no AWS stack. The secrets / SSM / `/health/connections` work stays as the production design |
 | 8 | not started |
 | v2 step 0 (safety net, access check) | done except the SAP checks (SAP access pending); tag `v1-demo` on `7bccb9a` is local only (this session cannot push tags) |
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
@@ -25,6 +25,7 @@ and the decisions made. **Update it every phase.**
 | v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; tested against the package run locally (rehearse 3/3); **waiting for the owner's `cf push`** (docs/btp-deploy.md) |
 | v2 steps 6 + 5 (UI additions, PII masking) | done: delay chip, Planner prediction details, Architecture tab (Planner + drawer), PII masking (`PII_MASKING=local`) with Planner chip; cumulative cap and Evaluations dropped (owner, 25 Oct); "Approved in SAP Joule" waits for step 4 |
 | v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
+| Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) and `LLM_FALLBACK=sap_genai` built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
@@ -103,12 +104,16 @@ DELAY_MODEL=rpt make dev              # SAP RPT-1.6 delay prediction in Assess (
 DELAY_MODEL=rpt make record-golden    # also records the RPT answers (rpt.jsonl) for replay
 ```
 
-Laptop modes, secrets and flags (`docs/connections.md`; nothing here prints a secret):
+Laptop modes, secrets and flags (`docs/connections.md`, `docs/demo-day-runbook.md`; nothing
+here prints a secret):
 
 ```bash
-scripts/fill-env.sh               # owner, once: writes .env.aws / .env.replay / .env.v1 (hidden input)
-AWS_PROFILE=siaga scripts/put-sap-secret.sh   # owner: SAP values -> Secrets Manager siaga/sap
-make use-aws | use-replay | use-v1   # copy .env.<mode> -> .env (Demo Day / offline / v1)
+scripts/fill-env.sh               # owner, once: writes .env.local / .env.replay / .env.v1 / .env.aws (hidden input)
+make use-local                    # Demo Day: laptop live (live LLM, BTP mock, RPT-1.6, local stores)
+make use-replay | use-v1          # fallbacks: recorded run offline / v1 on Bedrock
+LLM_PROVIDER=sap_genai make dev   # Claude on SAP AI Core (AICORE_*); LLM_FALLBACK=sap_genai = per-case fallback
+AWS_PROFILE=siaga scripts/put-sap-secret.sh   # production design only: SAP values -> siaga/sap
+make use-aws                      # production design only (not deployed)
 make env-check                    # each variable the mode needs: set / MISSING
 make flags-v2 | flags-v1 | flags-show   # SSM /siaga/flags/* (next case picks them up)
 make preflight                    # mode aws: one line per connection; local modes: local stack
@@ -165,7 +170,9 @@ See `.env.example` for the full list.
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `LLM_PROVIDER` | `bedrock` | `bedrock` \| `fake` \| `replay` |
+| `LLM_PROVIDER` | `bedrock` | `bedrock` \| `sap_genai` (Claude on SAP AI Core) \| `fake` \| `replay` |
+| `LLM_FALLBACK` | unset | `sap_genai`: a case whose first Bedrock call fails (account / throttling) runs on SAP AI Core |
+| `SAP_GENAI_MODEL` / `SAP_GENAI_DEPLOYMENT_ID` | `anthropic--claude-4.6-sonnet` / unset | the Generative AI Hub model; its deployment is looked up unless the ID is given |
 | `BEDROCK_MODEL_ID` | **none** | model or inference-profile ID; no default in code by design |
 | `AWS_REGION` | `ap-southeast-1` | |
 | `AWS_PROFILE` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`) / `AWS_BEARER_TOKEN_BEDROCK` | unset | AWS credentials: one of a profile, access keys, or a Bedrock API key. They can sit in `.env`; `export_aws_env()` passes `AWS_*` lines to boto3, and the shell environment wins. A Bedrock API key covers model calls; `make aws-check` needs a profile or access keys (STS) |
@@ -1009,6 +1016,67 @@ additive (no field removed).
   - web-check passes;
   - web smoke v1 (fake) 9/9 (+1 skipped) through the new proxy.
 
+### Laptop live, SAP AI Core LLM and fallback (owner's decisions, 25 Oct)
+
+- **No Phase 7.** Demo Day default is mode **`local`** (`.env.local.example`,
+  `make use-local`). The whole stack runs on the laptop with local backends; flags come
+  from `.env`: multi, `DELAY_MODEL=rpt`, `SAP_MOCK_ON_BTP=1`, `PII_MASKING=local`,
+  `JOULE_APPROVALS=0`. Live calls go to the LLM, the BTP mock and RPT-1.6. The SAP values
+  sit in the git-ignored `.env.local`, written with hidden input by `scripts/fill-env.sh`
+  (it reads the AI Core service key JSON). `REPLAY_PATH=data/golden/v2/llm.jsonl` there
+  makes `make record-golden` write the recording that `make use-replay` plays. Runbook:
+  `docs/demo-day-runbook.md`.
+- **How Claude runs on SAP AI Core** was read from SAP's SDK source, not guessed. The SAP
+  docs hosts are blocked here, and a web search found no page on it. Sources:
+  `sap-ai-sdk-gen` 7.4.1, files `gen_ai_hub/proxy/native/amazon/clients.py` and
+  `gen_ai_hub/proxy/gen_ai_hub_proxy/client.py`. The model name
+  `anthropic--claude-4.6-sonnet` is in the model list of `@sap-ai-sdk/orchestration`
+  2.17.0. The steps:
+  1. **Find the deployment:** `GET {AI_API_URL}/v2/lm/deployments?scenarioId=foundation-models&status=RUNNING`
+     with the `AI-Resource-Group` header. The model name is
+     `details.resources.backend_details.model.name`, or else the configuration's
+     `modelName` binding.
+  2. **Call it:** the AI Core deployment proxies the Bedrock runtime API. The unsigned
+     Converse body goes to `{deploymentUrl}/converse` with `Authorization: Bearer` and
+     `AI-Resource-Group`, and the response is the Converse response.
+- **`agent/aicore.py`** holds the OAuth token (cached), the deployment lookup, and the
+  errors (they never echo the client ID).
+- **`agent/providers/sap_genai.py`** reuses `BedrockProvider._kwargs`, dropping `modelId`,
+  so the request is byte-for-byte the Bedrock body:
+  - 429 / 5xx and connection errors are retried visibly (`on_retry`);
+  - a 401 refreshes the token once;
+  - a rejected temperature is dropped once.
+  The model is reported as `sap:<name>`. Recording and replay are unchanged.
+- **`LLM_FALLBACK=sap_genai`** (`agent/providers/fallback.py`):
+  - `LLMError` now has a `kind` (`account` / `throttle` / `other`). The Bedrock provider
+    sets it from the error code and message ("Operation not allowed", access denied,
+    invalid token → account).
+  - With a fallback set, Bedrock gets 2 attempts, so throttling moves the case quickly.
+  - A case moves only if its **first** primary call fails that way. Once Bedrock has
+    answered a case, later errors escalate as before.
+  - The first fallback answer writes an `llm_fallback` audit entry and a `fallback` event
+    titled "Model: Claude via SAP AI Core".
+  - Presenter (header) and Planner (badge) show that note whenever the case's llm events
+    ran on `sap:` (`sapModelNote` in `lib/present.ts`). `modelLabel()` replaces three
+    copies of the provider label.
+- **`make preflight` in mode local**, one line per connection:
+  - env-check;
+  - AWS identity (amber when the LLM is `sap_genai`);
+  - one tool call to Bedrock and, separately, one to the SAP fallback;
+  - the BTP mock: refuses calls without the key, accepts ours, day 0 = today;
+  - the AI Core token + one RPT-1.6 call;
+  - local stores (SQLite, audit dir, KB, local backends);
+  - then the `make dev` processes, CBC and Cedar.
+  `/health/connections` uses the same ping (`agent.providers.ping`; key `llm`).
+- `make record-golden --provider sap_genai` works, and `meta.json` names the provider that
+  answered (`provider`, `configured_provider`, `fallback_reason`, `models`).
+- Tests (`tests/test_sap_genai.py`, 16): the deployment lookup by name and through the
+  configuration; the URL, headers and body; retries, refresh, error kinds, temperature;
+  the factory; the fallback rules; record → replay keeps `fallback_reason`; and full demo
+  cases over the simulated wire (v1 and multi, plus Bedrock blocked → SAP with exactly one
+  note). Preflight in mode local was run against an AI Core stand-in and a keyed mock SAP:
+  every line answers.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -1023,9 +1091,11 @@ additive (no field removed).
 - SAP variables were added to the environment after this session started, so they do not
   reach it; a new session (or `.env` on the laptop) picks them up. Then: `make sap-check`,
   `DELAY_MODEL=rpt` demo run, `DELAY_MODEL=rpt make record-golden`.
-- Phase 7 is not deployed, so in mode aws the preflight lines 4–8 (deployed agent: secret,
-  Bedrock, BTP, AI Core, AWS backends) cannot pass. The Case API runs only with local
-  backends today. The env setup's step 4 rehearsals (`flags-v2` / `flags-v1` against AWS)
-  wait for that.
+- Phase 7 is dropped (owner, 25 Oct); mode aws stays a design.
+- Live runs wait for credentials that reach this session (or the laptop). In the 25 Oct
+  session the AWS key still gave `InvalidClientTokenId`, and no `AICORE_*` / BTP variable
+  was present. Then: `make use-local`, `make preflight`,
+  `LLM_PROVIDER=sap_genai make record-golden` (real `data/golden/v2/`; the "(fake)"
+  replay label goes away with it), and `make rehearse N=3` with per-stage timings.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

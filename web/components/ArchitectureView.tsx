@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown } from "lucide-react";
+import { modelLabel } from "@/lib/present";
 import type { CaseRecord, Config } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -22,11 +23,7 @@ function boxes(config: Config | null, record: CaseRecord | null) {
   const sap = config?.sap;
   const replay = !!config?.replay;
   const delay = config?.delay_model ?? "signal";
-  const model = replay
-    ? `replay of a recorded run (${config?.replay_source?.provider ?? "recording"})`
-    : config?.llm_provider === "bedrock"
-      ? `Amazon Bedrock · ${config.model ?? "model not set"}`
-      : "scripted fake LLM (offline)";
+  const model = modelLabel(config);
   const top: Box[] = [
     { id: "dashboard", title: "SIAGA dashboard", now: "this page (Next.js)", live: true },
     {

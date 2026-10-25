@@ -188,6 +188,8 @@ export interface Config {
   joule_approvals?: boolean;
   sap?: { mode: "local" | "embedded" | "btp"; host: string | null };
   backends?: { case_store: string; audit: string; kb: string; policy: string; solver: string };
+  /** LLM_FALLBACK: a case may move to Claude via SAP AI Core when Bedrock refuses it */
+  llm_fallback?: { provider: string; model: string } | null;
 }
 
 export interface DelayPrediction {

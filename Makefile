@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-aws use-replay use-v1 env-check flags-v2 flags-v1 flags-show
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay use-v1 env-check flags-v2 flags-v1 flags-show
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -124,7 +124,10 @@ preflight: ## Demo-day checklist: one line per connection for the active .env mo
 	$(UV) python scripts/preflight.py
 
 # ---- Laptop env modes (docs/connections.md); make the files with scripts/fill-env.sh ----
-use-aws: ## Mode aws (Demo Day): .env.aws -> .env; dashboard/preflight/rehearse use the deployed API
+use-local: ## Mode local (Demo Day, laptop live): .env.local -> .env; live LLM, BTP mock, RPT-1.6
+	@$(UV) python scripts/env_mode.py use local
+
+use-aws: ## Mode aws (production design, not deployed): .env.aws -> .env; the deployed Case API
 	@$(UV) python scripts/env_mode.py use aws
 
 use-replay: ## Mode replay (offline fallback): .env.replay -> .env; all local, golden recording

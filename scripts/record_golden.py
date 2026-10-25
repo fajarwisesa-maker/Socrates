@@ -10,7 +10,7 @@ written.
     data/golden/meta.json   provider, model, prompt versions, per-call latency and usage,
                             per-stage timings, outcome
 
-Usage: uv run python scripts/record_golden.py [--provider bedrock|fake]
+Usage: uv run python scripts/record_golden.py [--provider bedrock|sap_genai|fake]
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def check(cond: bool, what: str, failures: list[str]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--provider", choices=["bedrock", "fake"])
+    ap.add_argument("--provider", choices=["bedrock", "sap_genai", "fake"])
     ap.add_argument(
         "--out", type=Path, default=None, help="default: the folder of REPLAY_PATH for this mode"
     )
@@ -115,9 +115,16 @@ def main() -> int:
     ]
     audit = runtime.audit.read(c.case_id)
     prompts = sorted({e.payload["prompt"] for e in audit if e.kind == "llm_call"})
+    models = sorted({e["response"]["model"] for e in entries})
+    fell_back = next((e["response"].get("fallback_reason") for e in entries
+                      if e["response"].get("fallback_reason")), None)  # fmt: skip
     meta = {
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "provider": inner.name,
+        # the provider that answered (with LLM_FALLBACK it can differ from the configured one)
+        "provider": "sap_genai" if all(m.startswith("sap:") for m in models) else inner.name,
+        "configured_provider": inner.name,
+        "fallback_reason": fell_back,
+        "models": models,
         "orchestration": settings.orchestration,
         "delay_model": settings.delay_model,
         "delay_prediction": c.delay_prediction,

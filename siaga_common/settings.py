@@ -25,7 +25,17 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---
-    llm_provider: Literal["bedrock", "fake", "replay"] = Field("bedrock", alias="LLM_PROVIDER")
+    # sap_genai: Claude on SAP AI Core (Generative AI Hub), same Converse interface
+    llm_provider: Literal["bedrock", "fake", "replay", "sap_genai"] = Field(
+        "bedrock", alias="LLM_PROVIDER"
+    )
+    # sap_genai: a case whose first Bedrock call fails with an account or throttling error
+    # runs on Claude via SAP AI Core instead (agent/providers/fallback.py)
+    llm_fallback: Literal["", "sap_genai"] = Field("", alias="LLM_FALLBACK")
+    # the Generative AI Hub model name; its deployment is found in AICORE_RESOURCE_GROUP
+    # (scenario foundation-models) unless SAP_GENAI_DEPLOYMENT_ID names it
+    sap_genai_model: str = Field("anthropic--claude-4.6-sonnet", alias="SAP_GENAI_MODEL")
+    sap_genai_deployment_id: str | None = Field(None, alias="SAP_GENAI_DEPLOYMENT_ID")
     # Deliberately no default: the model must be chosen explicitly (see CLAUDE.md).
     bedrock_model_id: str | None = Field(None, alias="BEDROCK_MODEL_ID")
     aws_region: str = Field("ap-southeast-1", alias="AWS_REGION")
@@ -92,7 +102,7 @@ class Settings(BaseSettings):
 
     # --- Where configuration comes from (docs/connections.md, siaga_common/sources.py) ---
     # Informational: which laptop env file is active (make use-aws|use-replay|use-v1).
-    siaga_mode: Literal["aws", "replay", "v1"] | None = Field(None, alias="SIAGA_MODE")
+    siaga_mode: Literal["local", "aws", "replay", "v1"] | None = Field(None, alias="SIAGA_MODE")
     # env: flags from the environment / .env. ssm: SSM Parameter Store under
     # /siaga/flags/, read again at the start of every case (no redeploy to switch).
     flags_source: Literal["env", "ssm"] = Field("env", alias="FLAGS_SOURCE")

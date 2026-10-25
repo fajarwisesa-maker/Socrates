@@ -40,20 +40,28 @@ def _secret(s: Settings) -> dict[str, Any]:
     return _check(True, f"{s.sap_secret_id}: {len(present)} keys present", present=present)
 
 
-def _bedrock(s: Settings) -> dict[str, Any]:
-    if s.replay or s.llm_provider != "bedrock":
-        return _check(None, f"LLM is {'replay' if s.replay else s.llm_provider}: no Bedrock call")
-    if not s.bedrock_model_id:
-        return _check(False, "BEDROCK_MODEL_ID not set")
-    try:
-        from scripts.aws_check import converse_ping
+def _llm(s: Settings) -> dict[str, Any]:
+    """One tiny tool call through the configured provider (and its fallback on its own)."""
+    if s.replay or s.llm_provider not in ("bedrock", "sap_genai"):
+        return _check(None, f"LLM is {'replay' if s.replay else s.llm_provider}: no model call")
+    from agent.providers import make_provider, ping
 
-        r = converse_ping(s.aws_region, s.bedrock_model_id)
+    try:
+        p = make_provider(s.model_copy(update={"llm_record_path": None}))
+        targets = (
+            [("primary ", p.primary), ("fallback ", p.fallback)]
+            if hasattr(p, "fallback")
+            else [("", p)]
+        )
+        parts, ok = [], True
+        for label, provider in targets:
+            r = ping(provider)
+            ok = ok and r["tool_use"]
+            call = "tool call ok" if r["tool_use"] else "tool call MISSING"
+            parts.append(f"{label}{r['model']}: {call} in {r['latency_s']} s")
     except Exception as e:  # noqa: BLE001
         return _check(False, f"{type(e).__name__}: {str(e)[:160]}")
-    ok = bool(r["tool_use"])
-    return _check(ok, f"{s.bedrock_model_id}: tool call {'ok' if ok else 'MISSING'} in "
-                      f"{r['latency_s']} s")  # fmt: skip
+    return _check(ok, "; ".join(parts))
 
 
 def _sap(s: Settings, runtime: Any) -> dict[str, Any]:
@@ -118,6 +126,6 @@ def check_connections(
         ),  # fmt: skip
     }
     if deep:
-        checks["bedrock"] = _bedrock(s)
+        checks["llm"] = _llm(s)
         checks["aicore"] = _aicore(s)
     return {"checks": checks, "deep": deep}

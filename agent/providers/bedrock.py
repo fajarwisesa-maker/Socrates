@@ -8,7 +8,13 @@ from collections.abc import Callable
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError, ConnectionError, ReadTimeoutError
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    ConnectionError,
+    NoCredentialsError,
+    ReadTimeoutError,
+)
 
 from agent.providers.base import LLMError, LLMRequest, LLMResponse, RetryHook
 
@@ -25,6 +31,26 @@ RETRYABLE_CODES = {
 }
 MAX_ATTEMPTS = 6
 BACKOFF_S = (2.0, 4.0, 8.0, 16.0, 30.0)
+# Errors that say this account cannot use Bedrock right now (not this request): with
+# LLM_FALLBACK=sap_genai the case moves to SAP AI Core on them.
+ACCOUNT_CODES = {
+    "AccessDeniedException",
+    "UnrecognizedClientException",
+    "ExpiredTokenException",
+    "InvalidSignatureException",
+    "ResourceNotFoundException",  # model / profile not enabled in this account or region
+}
+ACCOUNT_MESSAGES = ("operation not allowed", "model access", "not authorized", "use case")
+
+
+def error_kind(code: str, message: str) -> str:
+    if code in ACCOUNT_CODES or (
+        code == "ValidationException" and any(m in message.lower() for m in ACCOUNT_MESSAGES)
+    ):
+        return "account"
+    if code in RETRYABLE_CODES and ("Throttl" in code or "TooMany" in code):
+        return "throttle"
+    return "other"
 
 
 class BedrockProvider:
@@ -37,10 +63,12 @@ class BedrockProvider:
         temperature: float | None = 0.0,
         client=None,
         sleep: Callable[[float], None] = time.sleep,
+        max_attempts: int = MAX_ATTEMPTS,
     ):
         self.model_id = model_id
         self.temperature = temperature
         self._sleep = sleep
+        self.max_attempts = max_attempts  # lower with a fallback: fail over instead of waiting
         self.client = client or boto3.client(
             "bedrock-runtime",
             region_name=region,
@@ -87,17 +115,22 @@ class BedrockProvider:
                     )
                     self.temperature = None
                     continue
-                if code in RETRYABLE_CODES and attempt < MAX_ATTEMPTS:
+                if code in RETRYABLE_CODES and attempt < self.max_attempts:
                     reason = "throttled" if "Throttl" in code or "TooMany" in code else code
                     attempt = self._wait(attempt, reason, on_retry)
                     continue
                 suffix = f" after {attempt} attempts" if code in RETRYABLE_CODES else ""
-                raise LLMError(f"Bedrock {code}: {err.get('Message')}{suffix}") from e
+                raise LLMError(
+                    f"Bedrock {code}: {err.get('Message')}{suffix}",
+                    kind=error_kind(code, err.get("Message", "")),
+                ) from e
             except (ConnectionError, ReadTimeoutError) as e:
-                if attempt < MAX_ATTEMPTS:
+                if attempt < self.max_attempts:
                     attempt = self._wait(attempt, "connection problem", on_retry)
                     continue
                 raise LLMError(f"Bedrock call failed after {attempt} attempts: {e}") from e
+            except NoCredentialsError as e:
+                raise LLMError(f"Bedrock call failed: {e}", kind="account") from e
             except BotoCoreError as e:
                 raise LLMError(f"Bedrock call failed: {e}") from e
         return LLMResponse(
@@ -110,8 +143,10 @@ class BedrockProvider:
 
     def _wait(self, attempt: int, reason: str, on_retry: RetryHook | None) -> int:
         wait = BACKOFF_S[min(attempt - 1, len(BACKOFF_S) - 1)]
-        log.warning("Bedrock %s; retry %d/%d in %.0f s", reason, attempt + 1, MAX_ATTEMPTS, wait)
+        log.warning(
+            "Bedrock %s; retry %d/%d in %.0f s", reason, attempt + 1, self.max_attempts, wait
+        )
         if on_retry is not None:
-            on_retry(attempt + 1, MAX_ATTEMPTS, wait, reason)
+            on_retry(attempt + 1, self.max_attempts, wait, reason)
         self._sleep(wait)
         return attempt + 1

@@ -4,6 +4,12 @@ No secret value appears in this file, in git, or in any deploy template. Secrets
 entered only with hidden input, by the owner, through `scripts/fill-env.sh` (laptop files)
 and `scripts/put-sap-secret.sh` (AWS Secrets Manager).
 
+> **Decision (owner, 25 Oct): no Phase 7.** Demo Day runs in laptop mode **`local`**
+> ("laptop live"): the whole stack on the laptop with local stores, live calls to the LLM,
+> the BTP mock and RPT-1.6, and the SAP values in the git-ignored `.env.local`. The AWS
+> parts below (the `siaga/sap` secret, SSM flags, `/health/connections` from AWS, mode
+> `aws`) stay in the code as the production design; nothing is deployed.
+
 ## Names and places
 
 | What | Name / location | State on 25 Oct |
@@ -15,11 +21,17 @@ and `scripts/put-sap-secret.sh` (AWS Secrets Manager).
 | Deployed stack | CloudFormation stack `Siaga` (override: `SIAGA_STACK`), output `CaseApiUrl` | **not deployed**: Phase 7 is still a design (`docs/phase7-design.md`) |
 | BTP mock | Cloud Foundry app `siaga-sap-mock` (random route; `cf app siaga-sap-mock`) | waiting for the owner's `cf push` (`docs/btp-deploy.md`) |
 | AI Core | the AI Core service key of the owner's subaccount; deployment of `sap-rpt-1.6` | values not visible to the build session |
-| Laptop env files | `.env.aws`, `.env.replay`, `.env.v1` (git-ignored, mode 600); `.env` = the active one | templates committed as `.env.*.example` |
+| Laptop env files | `.env.local`, `.env.replay`, `.env.v1`, `.env.aws` (git-ignored, mode 600); `.env` = the active one | templates committed as `.env.*.example`; written by `scripts/fill-env.sh` |
+| Claude on SAP AI Core | Generative AI Hub model `anthropic--claude-4.6-sonnet`, scenario `foundation-models`, resource group `default` | needs a RUNNING deployment of that model in the subaccount |
 
 ## Who needs what
 
-| Value | Laptop `.env.*` | Claude Code env | Secrets Manager `siaga/sap` | SSM `/siaga/flags/*` | BTP app (`cf set-env`) |
+Mode `local` (Demo Day) keeps everything it needs in `.env.local`: `AWS_PROFILE=siaga` (no
+keys), `BEDROCK_MODEL_ID`, `LLM_PROVIDER` / `LLM_FALLBACK=sap_genai`, the `AICORE_*` values
+(RPT-1.6 and Claude on AI Core), `SAP_MOCK_BTP_URL` + `SAP_MOCK_API_KEY`, and the v2 flags.
+The table below is the production (AWS) design.
+
+| Value | Laptop `.env.aws` | Claude Code env | Secrets Manager `siaga/sap` | SSM `/siaga/flags/*` | BTP app (`cf set-env`) |
 | --- | --- | --- | --- | --- | --- |
 | AWS credentials | `AWS_PROFILE=siaga` only | set, but STS answers `InvalidClientTokenId` in this session | — | — | — |
 | `AWS_REGION` | ✓ | default `ap-southeast-1` | — | — | — |
@@ -77,7 +89,8 @@ A `cf service-key` output nests these under `credentials`; the script handles bo
 
 | Command | Mode | What runs where |
 | --- | --- | --- |
-| `make use-aws` | `aws` (Demo Day default) | the laptop runs only the dashboard (`make web`), `make preflight` and `make rehearse`, all against the deployed Case API with `CASE_API_KEY`; flags from SSM |
+| `make use-local` | `local` (**Demo Day default**) | everything on the laptop (`make dev`), local stores; live LLM (Bedrock with the SAP AI Core fallback, or `sap_genai`), the BTP mock and RPT-1.6; v2 flags from `.env` |
+| `make use-aws` | `aws` (production design, not deployed) | the laptop runs only the dashboard (`make web`), `make preflight` and `make rehearse`, all against the deployed Case API with `CASE_API_KEY`; flags from SSM |
 | `make use-replay` | `replay` (offline fallback) | everything on the laptop (`make dev`) from `data/golden/v2/` (LLM + RPT answers recorded); no network to Bedrock, SAP or BTP |
 | `make use-v1` | `v1` (oldest fallback) | everything on the laptop (`make dev`), v1 behaviour, all v2 flags off, Bedrock via `AWS_PROFILE=siaga` |
 

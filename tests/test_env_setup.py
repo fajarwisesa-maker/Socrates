@@ -293,7 +293,7 @@ def test_connections_report_names_never_values(runtime, sap, monkeypatch):
     checks = r.json()["checks"]
     assert checks["secret"]["ok"] is True and "CASE_API_KEY" in checks["secret"]["present"]
     assert checks["sap_mock"]["ok"] is True  # through the agent's own SAP client
-    assert checks["bedrock"]["ok"] is None and checks["aicore"]["ok"] is None
+    assert checks["llm"]["ok"] is None and checks["aicore"]["ok"] is None
     assert checks["backends"]["values"]["case_store"] == "sqlite"
     for v in SECRET_VALUES:
         assert v not in r.text
@@ -383,7 +383,7 @@ def sandbox(tmp_path):
     (root / "scripts").mkdir(parents=True)
     for f in ("fill-env.sh", "put-sap-secret.sh"):
         shutil.copy(REPO_ROOT / "scripts" / f, root / "scripts" / f)
-    for m in ("aws", "replay", "v1"):
+    for m in ("local", "aws", "replay", "v1"):
         shutil.copy(REPO_ROOT / f".env.{m}.example", root / f".env.{m}.example")
     shutil.copy(REPO_ROOT / ".env.example", root / ".env.example")
     bin_ = tmp_path / "bin"
@@ -400,20 +400,40 @@ def sandbox(tmp_path):
 
 
 def test_fill_env_writes_private_files_without_echoing_secrets(sandbox):
-    root, env, _ = sandbox
-    answers = "anthropic.model-x\nn\ns3cr3t-typed-key\n"
+    root, env, tmp = sandbox
+    key_file = tmp / "aicore-key.json"
+    key_file.write_text(json.dumps({"credentials": {
+        "clientid": SECRET["AICORE_CLIENT_ID"], "clientsecret": SECRET["AICORE_CLIENT_SECRET"],
+        "url": SECRET["AICORE_AUTH_URL"] + "/",
+        "serviceurls": {"AI_API_URL": SECRET["AICORE_API_URL"]},
+    }}))  # fmt: skip
+    answers = "\n".join([
+        "anthropic.model-x",            # BEDROCK_MODEL_ID (not in .env.example)
+        "n",                            # Bedrock not working yet -> sap_genai
+        str(key_file),                  # AI Core service key
+        "d-rpt-1",                      # RPT deployment id
+        SECRET["SAP_MOCK_BTP_URL"] + "/",
+        SECRET["SAP_MOCK_API_KEY"],     # hidden
+    ]) + "\n"  # fmt: skip
     r = subprocess.run(
         ["bash", "scripts/fill-env.sh"], cwd=root, env=env, input=answers,
         capture_output=True, text=True, timeout=60,
     )  # fmt: skip
-    assert r.returncode == 0, r.stderr
-    assert "s3cr3t" not in r.stdout + r.stderr
+    assert r.returncode == 0, r.stdout + r.stderr
+    for v in SECRET_VALUES:
+        assert v not in r.stdout + r.stderr
+    local = (root / ".env.local").read_text()
+    assert "<set-me>" not in local and "LLM_PROVIDER=sap_genai" in local
+    for k in ("AICORE_AUTH_URL", "AICORE_CLIENT_ID", "AICORE_CLIENT_SECRET", "AICORE_API_URL",
+              "SAP_MOCK_BTP_URL", "SAP_MOCK_API_KEY"):  # fmt: skip
+        assert f"{k}={SECRET[k]}\n" in local, k  # trailing slashes dropped
+    assert "AICORE_RPT_DEPLOYMENT_ID=d-rpt-1" in local
+    assert env_mode.check(root / ".env.local", lambda *_: None)[1] == []
     aws = (root / ".env.aws").read_text()
-    assert "CASE_API_KEY=s3cr3t-typed-key" in aws
     assert "CASE_API_URL=https://abc.execute-api.ap-southeast-1.amazonaws.com" in aws
-    assert "BEDROCK_MODEL_ID=anthropic.model-x" in aws and "<set-me>" not in aws
+    assert "CASE_API_KEY=<set-me>" not in aws and "BEDROCK_MODEL_ID=anthropic.model-x" in aws
     assert "BEDROCK_MODEL_ID=anthropic.model-x" in (root / ".env.v1").read_text()
-    for m in ("aws", "replay", "v1"):
+    for m in ("local", "aws", "replay", "v1"):
         assert stat.S_IMODE((root / f".env.{m}").stat().st_mode) == 0o600
 
 

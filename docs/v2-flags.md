@@ -27,6 +27,13 @@ Both presets also store `BEDROCK_MODEL_ID` from the laptop's `.env` when it has 
 | `AUTO_EXEC_CAP` | `0` \| `1` | 5 | Cap a case's total Tier 2 auto-executions at Rp 50.000.000. | dropped (owner, 25 Oct) |
 | `PII_MASKING` | `off` \| `local` | 5 | Mask phone numbers, e-mails and personal names in incoming signals at intake, before any model call; the original stays in the audit trail only (`pii_masked`). `guardrails` (Bedrock Guardrails) is not built: it needs AWS access. | done (local) |
 
+## LLM provider (not a v2 flag)
+
+| Variable | Values (default first) | What it does |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `bedrock` \| `sap_genai` \| `fake` \| `replay` | `sap_genai`: Claude (`SAP_GENAI_MODEL`, default `anthropic--claude-4.6-sonnet`) on SAP AI Core, through the Bedrock Converse API that the AI Core foundation-model deployment proxies. The request, the response and the recording are the same as for Bedrock (`agent/providers/sap_genai.py`) |
+| `LLM_FALLBACK` | unset \| `sap_genai` | with `LLM_PROVIDER=bedrock`: if a case's **first** Bedrock call fails with an account error (e.g. "Operation not allowed", access denied, invalid token) or is still throttled after one retry, that case runs on Claude via SAP AI Core. The dashboard then shows "Model: Claude via SAP AI Core". Later errors in a case that Bedrock already answered escalate as usual |
+
 ## Related settings (not flags)
 
 | Variable | Used by | Notes |
@@ -48,5 +55,6 @@ AUTO_EXEC_CAP=0 PII_MASKING=off make dev
 ```
 
 Every flag defaults to off, so removing these lines from `.env` has the same effect. On the
-laptop the one-command switches are `make use-aws`, `make use-replay` and `make use-v1`;
-for the deployed agent, `make flags-v2` / `make flags-v1`.
+laptop the one-command switches are `make use-local` (Demo Day), `make use-replay` and
+`make use-v1` (docs/demo-day-runbook.md). `make use-aws` and `make flags-v2` / `make flags-v1`
+belong to the AWS production design, which is not deployed (owner, 25 Oct).

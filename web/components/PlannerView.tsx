@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { dayLabel } from "@/lib/format";
+import { sapModelNote } from "@/lib/present";
 import type { CaseState } from "@/lib/useCase";
 import ApprovalCards from "./ApprovalCards";
 import ArchitectureView from "./ArchitectureView";
@@ -46,6 +47,11 @@ export default function PlannerView({
               </span>
             )}
             {config && <Badge tone="slate">LLM: {config.llm_provider}</Badge>}
+            {sapModelNote(events) && (
+              <span data-testid="model-note">
+                <Badge tone="slate">{sapModelNote(events)}</Badge>
+              </span>
+            )}
             {record && <StatusBadge status={record.status} />}
             {record?.pii && (
               <span

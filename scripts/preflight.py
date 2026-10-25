@@ -49,7 +49,9 @@ def env_line() -> str | None:
 
     mode, problems = check(out=lambda *_: None)
     if mode is None:
-        line(AMBER, ".env mode", "no SIAGA_MODE (hand-made .env?): make use-aws|use-replay|use-v1")
+        line(
+            AMBER, ".env mode", "no SIAGA_MODE (hand-made .env?): make use-local|use-replay|use-v1"
+        )
     elif problems:
         line(RED, f".env mode {mode}", "; ".join(problems) + " (make env-check)")
     else:
@@ -70,7 +72,7 @@ def aws_identity(s: Settings) -> None:
 
 CONNECTIONS = [
     ("secret", "deployed agent reads siaga/sap"),
-    ("bedrock", "Bedrock from the deployed agent"),
+    ("llm", "LLM call from the deployed agent"),
     ("sap_mock", "BTP mock from the deployed agent"),
     ("aicore", "AI Core token + RPT-1.6 from the deployed agent"),
 ]
@@ -122,9 +124,118 @@ def aws_preflight(s: Settings) -> None:
         line(RED, "SSM /siaga/flags/*", str(e)[:160])
 
 
+def llm_line(what: str, provider) -> None:
+    from agent.providers import ping
+
+    try:
+        r = ping(provider)
+        ok = r["tool_use"]
+        call = "tool call ok" if ok else "tool call MISSING"
+        line(GREEN if ok else RED, what, f"{r['model']}: {call} in {r['latency_s']} s")
+    except Exception as e:  # noqa: BLE001 - provider errors carry no secret values
+        line(RED, what, f"{type(e).__name__}: {str(e)[:160]}")
+
+
+def local_preflight(s: Settings) -> None:
+    """Mode local (laptop live): live LLM, BTP mock and RPT-1.6; everything else local."""
+    env_line()
+    bedrock = s.llm_provider == "bedrock"
+    if bedrock:
+        aws_identity(s)
+    else:
+        line(AMBER, "laptop AWS identity", f"not used while LLM_PROVIDER={s.llm_provider}")
+    # --- LLM: the primary, and the fallback on its own
+    if s.llm_provider in ("bedrock", "sap_genai"):
+        from agent.providers import make_provider
+
+        try:
+            p = make_provider(s.model_copy(update={"llm_record_path": None}))
+        except RuntimeError as e:
+            line(RED, f"LLM {s.llm_provider}", str(e))
+        else:
+            if hasattr(p, "fallback"):
+                llm_line(f"LLM Bedrock {s.bedrock_model_id}", p.primary)
+                llm_line(f"LLM fallback: Claude via SAP AI Core ({s.sap_genai_model})", p.fallback)
+            else:
+                llm_line(f"LLM {s.llm_provider}", p)
+    else:
+        line(RED, "LLM", f"LLM_PROVIDER={s.llm_provider}: mode local needs a live model")
+    # --- BTP mock: the key is enforced and ours is accepted
+    try:
+        url, headers = s.sap_endpoint()
+    except RuntimeError as e:
+        line(RED, "BTP mock", str(e))
+    else:
+        open_ = get(f"{url}/admin/state", timeout=10)
+        keyed = get(f"{url}/admin/state", timeout=10, headers=headers)
+        if keyed is None or keyed.status_code != 200:
+            why = "not reachable" if keyed is None else f"HTTP {keyed.status_code} with the key"
+            line(RED, "BTP mock", f"{why} at {url}")
+        elif open_ is not None and open_.status_code == 200:
+            line(RED, "BTP mock", f"{url} answers without a key: SAP_MOCK_API_KEY not set there")
+        else:
+            day0, today = keyed.json().get("day0"), to_iso(day0_for(today_wib()))
+            stale = "" if day0 == today else f"; day 0 {day0} != today: make demo-reset"
+            line(GREEN if not stale else AMBER, "BTP mock",
+                 f"{url}, key required and accepted{stale}")  # fmt: skip
+    # --- AI Core token + one RPT-1.6 call
+    from datetime import UTC, datetime
+
+    from agent.delay_model import PredictionUnavailable, demo_query, make_delay_model
+
+    try:
+        model = make_delay_model(s.model_copy(update={"delay_model": "rpt", "replay": False,
+                                                      "llm_provider": "bedrock"}))  # fmt: skip
+        assert model is not None
+        p = model.predict("preflight", demo_query(to_iso(datetime.now(UTC))))
+        line(GREEN, "AI Core token + RPT-1.6",
+             f"{p.prediction:.1f} h for the demo case in {p.latency_ms:.0f} ms")  # fmt: skip
+    except (RuntimeError, PredictionUnavailable) as e:
+        line(RED, "AI Core token + RPT-1.6", str(e)[:200])
+    if s.delay_model != "rpt":
+        line(AMBER, "DELAY_MODEL", f"{s.delay_model}: the demo would not use RPT-1.6")
+    # --- local stores
+    local_stores(s)
+
+
+def local_stores(s: Settings) -> None:
+    import tempfile
+
+    problems = []
+    try:
+        from agent.case_store import SqliteCaseStore
+
+        s.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        SqliteCaseStore(s.sqlite_path).list_cases()
+    except Exception as e:  # noqa: BLE001
+        problems.append(f"case store {s.sqlite_path}: {e}")
+    try:
+        s.audit_dir.mkdir(parents=True, exist_ok=True)
+        tempfile.NamedTemporaryFile(dir=s.audit_dir).close()
+    except OSError as e:
+        problems.append(f"audit dir {s.audit_dir}: {e}")
+    try:
+        from agent.kb import LocalBM25KB
+
+        LocalBM25KB().search("Pantura flood", 1)
+    except Exception as e:  # noqa: BLE001
+        problems.append(f"KB: {e}")
+    backends = (s.case_store, s.audit_backend, s.kb_backend, s.policy_backend, s.solver_backend)
+    if backends != ("sqlite", "local", "local", "local", "inprocess"):
+        problems.append(f"backends {backends} are not all local")
+    line(RED if problems else GREEN, "local stores (SQLite cases, audit files, KB)",
+         "; ".join(problems) or f"{s.sqlite_path.name}, {s.audit_dir.name}/, BM25 KB")  # fmt: skip
+
+
 def main() -> int:
     export_aws_env()
     s = get_settings()
+    if s.siaga_mode == "local":
+        print(f"SIAGA pre-flight  (mode local: laptop live, LLM {s.llm_provider}"
+              + (f" + fallback {s.llm_fallback}" if s.llm_fallback else "") + ")\n")  # fmt: skip
+        local_preflight(s)
+        local_stack(s)
+        return summary()
     if s.siaga_mode == "aws":
         print(f"SIAGA pre-flight  (mode aws, Case API {s.case_api_url}, region {s.aws_region})\n")
         aws_preflight(s)
@@ -134,6 +245,12 @@ def main() -> int:
         f"SIAGA pre-flight  (LLM {'replay' if replay else s.llm_provider}, region {s.aws_region})\n"
     )
     env_line()
+    llm_checks(s, replay)
+    local_stack(s)
+    return summary()
+
+
+def llm_checks(s: Settings, replay: bool) -> None:
 
     # --- LLM ---------------------------------------------------------------------------
     meta_path = s.replay_path.parent / "meta.json"
@@ -145,7 +262,7 @@ def main() -> int:
             line(
                 AMBER,
                 "golden recording",
-                "recorded from the scripted fake LLM; re-record with Bedrock",
+                "placeholder from the scripted fake LLM; re-record live (make record-golden)",
             )
         else:
             line(
@@ -170,9 +287,20 @@ def main() -> int:
             line(AMBER, "golden recording", "none - no replay fallback if Bedrock fails on stage")
         else:
             line(GREEN, "replay fallback ready", "restart with REPLAY=1 if Bedrock misbehaves")
+    elif s.llm_provider == "sap_genai":
+        from agent.providers import make_sap_genai
+
+        try:
+            llm_line(f"LLM Claude via SAP AI Core ({s.sap_genai_model})", make_sap_genai(s))
+        except RuntimeError as e:
+            line(RED, "LLM sap_genai", str(e))
     else:
         line(AMBER, "LLM provider", "fake (scripted) - fine for rehearsal, not for the live demo")
 
+
+def local_stack(s: Settings) -> None:
+    """The processes of `make dev` (Case API, mock SAP, dashboard) and the deterministic core."""
+    replay = s.replay or s.llm_provider == "replay"
     # --- services ----------------------------------------------------------------------
     api = get(f"{s.case_api_url}/config", headers=s.case_api_headers())
     if api is None:
@@ -227,8 +355,6 @@ def main() -> int:
         line(GREEN, "Cedar policies", "validate against the schema")
     except Exception as e:  # noqa: BLE001
         line(RED, "Cedar policies", str(e)[:120])
-
-    return summary()
 
 
 def summary() -> int:

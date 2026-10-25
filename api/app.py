@@ -314,7 +314,13 @@ def create_app(
             if s.orchestration == "multi"
             else [],
             "replay": s.replay or s.llm_provider == "replay",
-            "model": s.bedrock_model_id if s.llm_provider == "bedrock" else None,
+            "model": {"bedrock": s.bedrock_model_id, "sap_genai": s.sap_genai_model}.get(
+                s.llm_provider
+            ),
+            # LLM_FALLBACK: a case may run on Claude via SAP AI Core (UI note from its events)
+            "llm_fallback": {"provider": s.llm_fallback, "model": s.sap_genai_model}
+            if s.llm_fallback
+            else None,
             "verify_delay_seconds": s.verify_delay_seconds,
             "max_tool_calls": s.max_tool_calls,
             "max_replans": s.max_replans,
