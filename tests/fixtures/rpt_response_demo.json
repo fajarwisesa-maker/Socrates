@@ -1,0 +1,9 @@
+{
+  "_comment": "SYNTHETIC fixture in the shape of the SAP RPT predict response (@sap-ai-sdk/rpt 2.17.0 PredictResponsePayload). Not a recorded AI Core answer; the recorded one goes to data/golden/multi/rpt.jsonl.",
+  "id": "fixture-0001",
+  "status": {"code": 0, "message": "ok"},
+  "predictions": [
+    {"id": "QUERY", "delay_hours": [{"prediction": 61.3, "confidence": null, "confidence_interval": [52.4, 70.1]}]}
+  ],
+  "metadata": {"num_columns": 8, "num_rows": 81, "num_predictions": 1, "num_query_rows": 1, "context_mode": "default"}
+}

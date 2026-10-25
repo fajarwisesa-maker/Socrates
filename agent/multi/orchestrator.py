@@ -68,6 +68,10 @@ Output = tuple[str, type[BaseModel], dict[str, Any]]
 Handler = Callable[[str, dict[str, Any]], dict[str, Any]]
 
 
+# tools that exist only behind a flag (DELAY_MODEL for predict_delay)
+OPTIONAL_TOOLS = {"predict_delay"}
+
+
 class AllowlistViolation(Escalate):
     """A specialist (its model or its code path) called a tool outside its allowlist."""
 
@@ -82,10 +86,11 @@ class MultiAgentOrchestrator(Agent):
         "status": "check_status",
         "execute_stock_transfer": "create_stock_transfer",  # the chosen plan's transfer
     }
+    AGENT_PREDICTS = True  # the Impact Agent calls predict_delay itself
 
     def __init__(self, runtime, llm, on_event=None):
         super().__init__(runtime, llm, on_event)
-        needed = set().union(*(s.allowlist for s in SPECIALISTS))
+        needed = set().union(*(s.allowlist for s in SPECIALISTS)) - OPTIONAL_TOOLS
         if missing := needed - set(self.registry.names()):
             raise RuntimeError(
                 f"ORCHESTRATION=multi needs a runtime built with the v2 tools; missing {missing}"
@@ -286,7 +291,7 @@ class MultiAgentOrchestrator(Agent):
             IMPACT,
             "impact",
             f"Disruption:\n{json.dumps(d.for_llm(), indent=2)}",
-            sorted(IMPACT.allowlist),
+            sorted(t for t in IMPACT.allowlist if t in self.registry.tools),
             handler=lambda name, args: self._assess_tool(case_id, d, found, impact, name, args),
         )
         if note:

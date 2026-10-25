@@ -230,11 +230,20 @@ def signal_agent(req: LLMRequest, n: int) -> dict[str, Any]:
 def impact_agent(req: LLMRequest, n: int) -> dict[str, Any]:
     d = _first_json(req)
     results = _tool_results(req)
+    offered = {t["toolSpec"]["name"] for t in req.tools}
     if not results:
-        return tool_call("find_open_pos", {"lane": d["lane"], "references": d["references"]})
+        find = ("find_open_pos", {"lane": d["lane"], "references": d["references"]})
+        # with DELAY_MODEL set, also ask for the learned delay in the same turn
+        return _calls(find, ("predict_delay", {})) if "predict_delay" in offered else _calls(find)
+    # the delay the risk function must use: predict_delay's, else the reported range
+    delay = next(
+        (r["delay_for_risk_hours"] for r in results if "delay_for_risk_hours" in r),
+        [d["delay_hours_min"], d["delay_hours_max"]],
+    )
+    pos_result = next((r for r in results if "purchase_orders" in r), None)
     last = results[-1]
-    if "purchase_orders" in last:
-        pos = last["purchase_orders"]
+    if "risk" not in last and pos_result is not None:
+        pos = pos_result["purchase_orders"]
         item = pos[0]["items"][0]
         return _calls(
             ("get_sales_orders", {"material": item["Material"], "plant": item["Plant"]}),
@@ -244,8 +253,8 @@ def impact_agent(req: LLMRequest, n: int) -> dict[str, Any]:
                     "material": item["Material"],
                     "plant": item["Plant"],
                     "affected_references": [p["PurchaseOrder"] for p in pos],
-                    "delay_hours_min": d["delay_hours_min"],
-                    "delay_hours_max": d["delay_hours_max"],
+                    "delay_hours_min": delay[0],
+                    "delay_hours_max": delay[1],
                 },
             ),
         )

@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -63,6 +63,21 @@ class Settings(BaseSettings):
     # single: the v1 state machine; multi: specialist Strands agents under the same
     # deterministic orchestrator
     orchestration: Literal["single", "multi"] = Field("single", alias="ORCHESTRATION")
+    # signal: Perceive's delay range; rpt: SAP RPT-1.6 on AI Core (combined in code with the
+    # signal range); fake: an offline, labelled stand-in for tests and runs without SAP
+    delay_model: Literal["signal", "rpt", "fake"] = Field("signal", alias="DELAY_MODEL")
+    rpt_timeout_seconds: float = Field(5.0, alias="RPT_TIMEOUT_SECONDS")
+    history_path: Path = Field(
+        REPO_ROOT / "data" / "history" / "disruptions.csv", alias="DELAY_HISTORY_PATH"
+    )
+
+    # --- SAP AI Core (service key; set in the environment, never committed or printed) ---
+    aicore_auth_url: str | None = Field(None, alias="AICORE_AUTH_URL")
+    aicore_client_id: str | None = Field(None, alias="AICORE_CLIENT_ID")
+    aicore_client_secret: SecretStr | None = Field(None, alias="AICORE_CLIENT_SECRET")
+    aicore_api_url: str | None = Field(None, alias="AICORE_API_URL")
+    aicore_resource_group: str = Field("default", alias="AICORE_RESOURCE_GROUP")
+    aicore_rpt_deployment_id: str | None = Field(None, alias="AICORE_RPT_DEPLOYMENT_ID")
 
     # --- Agent loop limits (enforced in code, not by the model) ---
     max_tool_calls: int = Field(20, alias="MAX_TOOL_CALLS")

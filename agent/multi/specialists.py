@@ -32,7 +32,8 @@ IMPACT = Specialist(
     "Impact Agent",
     "impact",
     ("ASSESS",),
-    frozenset({"find_open_pos", "get_sales_orders", "get_stock", "compute_risk"}),
+    # predict_delay exists only with DELAY_MODEL set (v2 step 3)
+    frozenset({"find_open_pos", "get_sales_orders", "get_stock", "predict_delay", "compute_risk"}),
     "choosing which lookups to run, explaining impact",
 )
 PLANNER = Specialist(

@@ -87,6 +87,9 @@ class Agent:
         "approval": "request_human_approval",
         "status": "get_action_status",
     }
+    # DELAY_MODEL set: who calls predict_delay. v1: code, before the ASSESS model runs;
+    # the multi-agent orchestrator: the Impact Agent, as one of its tools.
+    AGENT_PREDICTS = False
 
     def __init__(
         self,
@@ -432,7 +435,15 @@ class Agent:
         self._enter(case_id, "ASSESS")
         d = PerceivedDisruption.model_validate(self.store.get_case(case_id).disruption)
         found: dict[str, Any] = {"purchase_orders": []}
-        impact = self._assess_model(case_id, d, found)
+        if self._delay_on() and not self.AGENT_PREDICTS:
+            self._predict_delay(case_id)
+            lo, hi = self._effective_delay(case_id, d)
+            # the model sees the delay the risk function must use
+            impact = self._assess_model(
+                case_id, d.model_copy(update={"delay_hours_min": lo, "delay_hours_max": hi}), found
+            )
+        else:
+            impact = self._assess_model(case_id, d, found)
 
         if not impact:
             self._event(
@@ -461,6 +472,10 @@ class Agent:
             f"{display(day0, risk.deadline) if risk.deadline else '-'}; exposure "
             f"{format_idr(risk.max_exposure)} (expected {format_idr(risk.expected_exposure)})"
         )
+        prediction = self.store.get_case(case_id).delay_prediction
+        if prediction:
+            lo, hi = prediction["delay_for_risk_hours"]
+            detail += f"; delay used {lo:g}" + (f"-{hi:g} h" if hi != lo else " h")
         self._leave(
             case_id,
             "ASSESS",
@@ -469,6 +484,7 @@ class Agent:
             {
                 "risk": risk.model_dump(mode="json"),
                 "affected": affected,
+                **({"delay_prediction": prediction} if prediction else {}),
                 **self._stage_notes(case_id, "ASSESS"),
             },
         )
@@ -488,14 +504,23 @@ class Agent:
         args: dict[str, Any],
     ) -> dict[str, Any]:
         """Run one ASSESS tool for the model; keep what later stages need."""
-        if name == self.TOOLS["impact"] and (
-            args.get("delay_hours_min") != d.delay_hours_min
-            or args.get("delay_hours_max") != d.delay_hours_max
-        ):
-            return {
-                "error": "delay must equal the reported disruption delay "
-                f"({d.delay_hours_min}-{d.delay_hours_max} h)"
-            }
+        if name == self.TOOLS["impact"]:
+            predicted = self.store.get_case(case_id).delay_prediction
+            if self._delay_on() and predicted is None:
+                return {
+                    "error": "call predict_delay first; pass its delay_for_risk_hours as the "
+                    "delay range"
+                }
+            lo, hi = self._effective_delay(case_id, d)
+            if args.get("delay_hours_min") != lo or args.get("delay_hours_max") != hi:
+                return {
+                    "error": (
+                        f"delay must equal delay_for_risk_hours from predict_delay ({lo}-{hi} h)"
+                        if predicted
+                        else "delay must equal the reported disruption delay "
+                        f"({d.delay_hours_min}-{d.delay_hours_max} h)"
+                    )
+                }
         r = self._tool(case_id, "ASSESS", name, args)
         if r.status != "ok":
             return {
@@ -507,7 +532,63 @@ class Agent:
             found["purchase_orders"] = r.output["purchase_orders"]
         elif name == self.TOOLS["impact"]:
             impact.update(args=args, output=r.output)
+        elif name == "predict_delay":
+            self._prediction_event(case_id, r.output)
         return r.output
+
+    # ---- v2 step 3: learned delay (DELAY_MODEL); the rule is agent/delay_model.combine
+
+    def _delay_on(self) -> bool:
+        return self.rt.settings.delay_model != "signal"
+
+    def _effective_delay(self, case_id: str, d: PerceivedDisruption) -> tuple[float, float]:
+        """The delay the risk function uses: the combined prediction, else the signal."""
+        p = self.store.get_case(case_id).delay_prediction
+        if p:
+            lo, hi = p["delay_for_risk_hours"]
+            return lo, hi
+        assert d.delay_hours_min is not None and d.delay_hours_max is not None
+        return d.delay_hours_min, d.delay_hours_max
+
+    def _predict_delay(self, case_id: str) -> None:
+        """Code calls predict_delay (v1 path and fallbacks). Never fails the case: any problem
+        means the signal range is used, visibly."""
+        r = self._tool(case_id, "ASSESS", "predict_delay", {})
+        if r.status == "ok":
+            self._prediction_event(case_id, r.output)
+            return
+        from agent.delay_model import combine
+
+        d = self.store.get_case(case_id).disruption or {}
+        out = combine(None, d["delay_hours_min"], d["delay_hours_max"], {}, r.error or r.status)
+        self.store.update_case(case_id, delay_prediction=out)
+        self._prediction_event(case_id, out)
+
+    def _prediction_event(self, case_id: str, out: dict[str, Any] | None) -> None:
+        if not out:
+            return
+        lo, hi = out["signal_range_hours"]
+        if out["status"] != "ok":
+            self._event(
+                case_id,
+                "ASSESS",
+                "info",
+                "Prediction unavailable — using signal range",
+                f"{out.get('reason') or 'no answer'}; delay {lo:g}-{hi:g} h from the signals",
+                {"delay_prediction": out},
+            )
+            return
+        ci = out.get("interval_hours")
+        title = f"Delay predicted by {out['model']}: {out['predicted_hours']:g} h" + (
+            f" ({ci[0]:g}-{ci[1]:g} h)" if ci else ""
+        )
+        used = out["delay_for_risk_hours"][0]
+        detail = (
+            f"outside the signal range {lo:g}-{hi:g} h: clamped to {used:g} h ({out['flag']})"
+            if out["disagree"]
+            else f"inside the signal range {lo:g}-{hi:g} h: the risk function uses {used:g} h"
+        ) + f"; learned from {out['history_rows']} past disruptions (synthetic history)"
+        self._event(case_id, "ASSESS", "info", title, detail, {"delay_prediction": out})
 
     def _assess_model(
         self, case_id: str, d: PerceivedDisruption, found: dict[str, Any]
@@ -551,6 +632,8 @@ class Agent:
     def _assess_fallback(
         self, case_id: str, d: PerceivedDisruption, found: dict[str, Any]
     ) -> dict[str, Any]:
+        if self._delay_on() and self.store.get_case(case_id).delay_prediction is None:
+            self._predict_delay(case_id)
         if not found["purchase_orders"]:
             r = self._tool(
                 case_id,
@@ -570,12 +653,13 @@ class Agent:
             for p in pos
             if any(i["Material"] == item["Material"] for i in p["items"])
         ]
+        lo, hi = self._effective_delay(case_id, d)
         args = {
             "material": item["Material"],
             "plant": item["Plant"],
             "affected_references": refs,
-            "delay_hours_min": d.delay_hours_min,
-            "delay_hours_max": d.delay_hours_max,
+            "delay_hours_min": lo,
+            "delay_hours_max": hi,
         }
         r = self._tool(case_id, "ASSESS", self.TOOLS["impact"], args)
         if r.status != "ok":

@@ -77,6 +77,7 @@ class ToolContext:
     kb: PrecedentKB
     clock: Callable[[], datetime]
     max_tool_calls: int = 20
+    delay_model: Any = None  # v2 step 3: a DelayPredictor; None = DELAY_MODEL=signal
 
 
 class Tool(ABC):

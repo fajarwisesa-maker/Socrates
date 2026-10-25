@@ -61,11 +61,17 @@ def main() -> int:
 
     tmp = Path(tempfile.mkdtemp())
     sap, _ = embedded_sap()
+    # DELAY_MODEL set: record the RPT answers too, so replay needs no AI Core (rule 7)
+    from agent.delay_model import RecordingPredictor, make_delay_model
+
+    inner_delay = make_delay_model(settings)
+    delay = RecordingPredictor(inner_delay, tmp / "rpt.jsonl") if inner_delay else None
     runtime = build_runtime(
         settings,
         sap=sap,
         store=SqliteCaseStore(":memory:"),
         audit=LocalAuditWriter(tmp / "audit"),
+        delay_model=delay,
     )
     inner = make_provider(settings)
     recorder = RecordingProvider(inner, tmp / "llm.jsonl")
@@ -113,6 +119,8 @@ def main() -> int:
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "provider": inner.name,
         "orchestration": settings.orchestration,
+        "delay_model": settings.delay_model,
+        "delay_prediction": c.delay_prediction,
         "model": entries[0]["response"]["model"] if entries else None,
         "prompts": prompts,
         "llm_calls": [
@@ -137,6 +145,10 @@ def main() -> int:
     }
     args.out.mkdir(parents=True, exist_ok=True)
     shutil.copy(tmp / "llm.jsonl", args.out / "llm.jsonl")
+    if delay:
+        shutil.copy(tmp / "rpt.jsonl", args.out / "rpt.jsonl")
+    elif (args.out / "rpt.jsonl").exists():
+        (args.out / "rpt.jsonl").unlink()  # a recording without prediction must not replay one
     (args.out / "meta.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )

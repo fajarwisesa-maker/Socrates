@@ -540,8 +540,9 @@ class RescheduleCustomerOrder(Tool):
         return RescheduleOut(**ctx.sap.post("/SalesOrderReschedule", body))
 
 
-def build_registry(multi: bool = False) -> ToolRegistry:
-    """The v1 tools; with `multi` (ORCHESTRATION=multi) also the specialists' v2 tools."""
+def build_registry(multi: bool = False, delay: bool = False) -> ToolRegistry:
+    """The v1 tools; with `multi` (ORCHESTRATION=multi) also the specialists' v2 tools;
+    with `delay` (DELAY_MODEL set) also predict_delay."""
     registry = ToolRegistry([])
     tools: list[Tool] = [
         FindInboundPurchaseOrders(),
@@ -560,5 +561,9 @@ def build_registry(multi: bool = False) -> ToolRegistry:
         from agent.tools.v2 import v2_tools
 
         tools += v2_tools(registry)
+    if delay:
+        from agent.tools.v2 import PredictDelay
+
+        tools.append(PredictDelay())
     registry.tools = {t.name: t for t in tools}
     return registry

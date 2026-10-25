@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from agent.audit import AuditWriter, LocalAuditWriter
 from agent.case_store import CaseStore, SqliteCaseStore
 from agent.clients import HttpSapClient, HttpSolver, InProcessSolver, SapClient, SolverClient
+from agent.delay_model import DelayPredictor, make_delay_model
 from agent.kb import LocalBM25KB, PrecedentKB
 from agent.policy import LocalCedarPolicyEngine, PolicyEngine
 from agent.tools.base import ToolContext, ToolRegistry
@@ -31,6 +32,7 @@ class Runtime:
     kb: PrecedentKB
     registry: ToolRegistry
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
+    delay_model: DelayPredictor | None = None  # v2 step 3 (DELAY_MODEL)
 
     def context(self, case_id: str) -> ToolContext:
         return ToolContext(
@@ -43,6 +45,7 @@ class Runtime:
             kb=self.kb,
             clock=self.clock,
             max_tool_calls=self.settings.max_tool_calls,
+            delay_model=self.delay_model,
         )
 
 
@@ -56,10 +59,11 @@ def build_runtime(
     policy: PolicyEngine | None = None,
     kb: PrecedentKB | None = None,
     clock: Callable[[], datetime] | None = None,
+    delay_model: DelayPredictor | None = None,
 ) -> Runtime:
     s = settings or get_settings()
     clock = clock or (lambda: datetime.now(UTC))
-    registry = build_registry(multi=s.orchestration == "multi")
+    registry = build_registry(multi=s.orchestration == "multi", delay=s.delay_model != "signal")
 
     if solver is None:
         if s.solver_backend == "inprocess":
@@ -98,4 +102,5 @@ def build_runtime(
         kb=kb,
         registry=registry,
         clock=clock,
+        delay_model=delay_model if delay_model is not None else make_delay_model(s),
     )

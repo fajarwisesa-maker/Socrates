@@ -21,7 +21,8 @@ and the decisions made. **Update it every phase.**
 | v2 step 0 (safety net, access check) | done except the SAP checks (SAP access pending); tag `v1-demo` on `7bccb9a` is local only (this session cannot push tags) |
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
 | v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
-| v2 steps 3–7 | step 3 waiting for SAP access; 4–7 not started |
+| v2 step 3 (RPT-1.6, `DELAY_MODEL`) | built and tested against a simulated AI Core (SDK response shape) and the offline stand-in; **real RPT call pending**: the SAP variables do not reach this session (`make sap-check`) |
+| v2 steps 1, 4–7 | step 1 next; order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
 ## How to run
@@ -92,6 +93,9 @@ ORCHESTRATION=multi make replay       # on data/golden/multi/ (fake placeholder 
 ORCHESTRATION=multi make rehearse N=10   # report includes per-agent timings
 ORCHESTRATION=multi make web-smoke    # e2e incl. e2e/multi.spec.ts (skips on a v1 API)
 make agentcore-check                  # which AgentCore features answer in AWS_REGION (needs AWS creds)
+make sap-check                        # AI Core token, deployments, one RPT-1.6 call; cf target; joule status
+DELAY_MODEL=rpt make dev              # SAP RPT-1.6 delay prediction in Assess (fake = offline stand-in)
+DELAY_MODEL=rpt make record-golden    # also records the RPT answers (rpt.jsonl) for replay
 ```
 
 Phase 5 (Case API + dashboard):
@@ -795,6 +799,45 @@ additive (no field removed).
 - Results (fake LLM): pytest 171 passed; rehearse multi 10/10 fake and 10/10 replay;
   v1 3/3; web smoke multi 9/9 (fake) and 8/8 (replay), v1 8/8 + 1 skipped and 7/7.
 
+### SIAGA v2 step 3 decisions (SAP RPT-1.6, `DELAY_MODEL=signal|rpt|fake`)
+
+- **Combination rule (confirmed by the product owner, 25 Oct; `agent/delay_model.combine`)**:
+  a prediction inside Perceive's range is used as a point delay; outside, it is clamped to
+  the nearest bound and flagged "Model and signal disagree"; RPT unavailable → the signal
+  range with a neutral "Prediction unavailable — using signal range" event. The risk
+  function still computes every probability; a point is a zero-width uniform delay.
+- **API from the SDK, not from memory**: the SAP docs hosts are blocked here, so the request
+  and response shapes were read from the generated types of `@sap-ai-sdk/rpt` 2.17.0 (npm).
+  `POST {AICORE_API_URL}/v2/inference/deployments/{id}/predict` with `AI-Resource-Group`;
+  regression returns `prediction` plus `confidence_interval` (`confidence` is null), so
+  the "confidence" SIAGA shows is that interval. OAuth client credentials at
+  `{AICORE_AUTH_URL}/oauth/token`; the token is cached.
+- **Data**: `data/history/disruptions.csv`, 80 synthetic rows (`scripts/make_history.py`,
+  labelled in the file and `data/history/README.md`). The case row is built in code from
+  the case: cause, corridor (lane → corridor table), month (WIB), signal count, official
+  notice (a PDF signal); rain level unknown (null).
+- **Demo timing**: PO 4500018231 was due Day 1 10:00 and the cutoff is Day 2 18:00, so any
+  delay over 32 h keeps every golden number. Similar history rows (October-March Pantura
+  floods with a notice) sit around 49–76 h; the offline stand-in predicts 64 h.
+- **Tool `predict_delay`** (no arguments; registered only with DELAY_MODEL set; once per
+  case). v1 path: code calls it before the ASSESS model and shows the model the delay to
+  use. Multi: the Impact Agent calls it (prompt `impact_agent.v2`). The ASSESS guard
+  refuses `compute_risk` before a prediction and with any other delay; the deterministic
+  fallback predicts first.
+- **Timeout**: one 5 s budget (`RPT_TIMEOUT_SECONDS`) for token + prediction; any error or
+  timeout → unavailable, never an escalation.
+- **Record / replay**: `RecordingPredictor` / `ReplayPredictor` (`rpt.jsonl` next to the
+  LLM recording; per case, in order; no network). `make record-golden` records it when
+  DELAY_MODEL is set. Replay with DELAY_MODEL set and no `rpt.jsonl` refuses to start.
+- `DELAY_MODEL=fake` is an offline stand-in (median of similar rows), labelled "not RPT"
+  everywhere it shows; for tests and runs without SAP.
+- **Budget**: prediction adds one tool call. Multi golden path 16; reject → air → verify
+  reaches exactly 20 on the fake LLM (allowed, no margin).
+- Tests (`tests/test_delay_model.py`): request/response shape, the rule, OAuth + URL +
+  headers through `httpx.MockTransport`, timeout / HTTP errors, record → replay, both
+  orchestrations keep the golden numbers, clamping, timeout fallback; the recorded-answer
+  test skips until a real RPT answer is recorded.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -806,6 +849,8 @@ additive (no field removed).
   every model call: Anthropic's first-time use form (Bedrock console > Model catalog) was
   not submitted; check Nova to rule out an account-level block. v2 step 2 still needs
   3 Bedrock runs with per-agent timings (< 4 min total) and a Bedrock multi recording.
-- SAP access (AI Core service key, Cloud Foundry, Joule) for v2 steps 0 (checks), 1 and 3.
+- SAP variables were added to the environment after this session started, so they do not
+  reach it; a new session (or `.env` on the laptop) picks them up. Then: `make sap-check`,
+  `DELAY_MODEL=rpt` demo run, `DELAY_MODEL=rpt make record-golden`.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

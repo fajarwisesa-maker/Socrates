@@ -140,6 +140,58 @@ class ComputeRisk(AssessImpact):
     name = "compute_risk"
 
 
+class PredictDelayIn(_In):
+    """No arguments: the features come from this case's record, not from the model."""
+
+
+class PredictDelayOut(_Out):
+    status: str  # ok | unavailable
+    delay_for_risk_hours: list[float]
+    signal_range_hours: list[float]
+
+
+class PredictDelay(Tool):
+    name = "predict_delay"
+    description = (
+        "Predict this case's delay in hours with SAP RPT-1.6, a tabular model, from past "
+        "disruptions (cause, corridor, month, sources, official notice). Code combines it "
+        "with the reported delay range and returns `delay_for_risk_hours`: the delay to pass "
+        "to compute_risk."
+    )
+    kind = "read"
+    Input = PredictDelayIn
+    Output = PredictDelayOut
+
+    def policy_context(self, args, ctx):
+        return OBSERVE
+
+    def run(self, args: PredictDelayIn, ctx: ToolContext) -> PredictDelayOut:
+        from agent.delay_model import PredictionUnavailable, combine, query_row
+
+        case = ctx.store.get_case(ctx.case_id)
+        if case.delay_prediction:  # once per case: the same answer, no second AI Core call
+            return PredictDelayOut(**case.delay_prediction)
+        if ctx.delay_model is None:
+            raise ValueError("no delay model configured (DELAY_MODEL=signal)")
+        d = case.disruption or {}
+        if d.get("delay_hours_min") is None or d.get("delay_hours_max") is None:
+            raise ValueError("the reported disruption has no delay range")
+        query = query_row(d, case.signals, case.created_at)
+        reason, prediction = None, None
+        try:
+            prediction = ctx.delay_model.predict(ctx.case_id, query)
+        except PredictionUnavailable as e:
+            reason = str(e)
+        out = combine(prediction, d["delay_hours_min"], d["delay_hours_max"], query, reason)
+        ctx.store.update_case(ctx.case_id, delay_prediction=out)
+        ctx.audit.append(
+            ctx.case_id,
+            "delay_prediction",
+            {**out, "response": prediction.raw if prediction else None},
+        )
+        return PredictDelayOut(**out)
+
+
 # ============================================================== Planner Agent
 
 

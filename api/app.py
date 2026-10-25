@@ -195,6 +195,7 @@ def create_app(
         return {
             "llm_provider": service.llm.name,
             "orchestration": s.orchestration,
+            "delay_model": s.delay_model,
             "specialists": _specialists() if s.orchestration == "multi" else [],
             "replay": s.replay or s.llm_provider == "replay",
             "model": s.bedrock_model_id if s.llm_provider == "bedrock" else None,

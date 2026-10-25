@@ -1,0 +1,82 @@
+# SYNTHETIC DATA for the SIAGA hackathon prototype: invented, plausible history of Indonesian logistics disruptions (scripts/make_history.py). Not real events.
+id,cause,corridor,month,rain_level,signal_sources,official_notice,delay_hours
+H-001,flood,Pantura,11,moderate,1,n,49
+H-002,landslide,Trans-Java toll,1,heavy,1,n,56
+H-003,port_strike,Tanjung Priok,3,none,1,n,80
+H-004,accident,Pantura,1,heavy,1,n,3
+H-005,festive_congestion,Merak-Bakauheni,12,moderate,1,y,42
+H-006,flood,Trans-Java toll,11,moderate,2,n,20
+H-007,flood,Trans-Java toll,3,heavy,3,n,35
+H-008,port_strike,Tanjung Priok,6,none,2,y,76
+H-009,flood,Pantura,10,heavy,1,y,75
+H-010,accident,Trans-Java toll,1,none,2,n,6
+H-011,port_strike,Tanjung Priok,3,moderate,1,y,101
+H-012,festive_congestion,Merak-Bakauheni,3,moderate,3,n,32
+H-013,festive_congestion,Pantura,3,heavy,1,y,28
+H-014,festive_congestion,Pantura,3,heavy,2,y,19
+H-015,road_closure,Trans-Java toll,11,moderate,2,n,22
+H-016,landslide,Trans-Java toll,11,heavy,2,n,46
+H-017,festive_congestion,Pantura,12,light,2,y,35
+H-018,accident,Trans-Java toll,2,light,3,n,9
+H-019,road_closure,Pantura,12,none,1,n,15
+H-020,flood,Pantura,10,moderate,3,n,64
+H-021,port_strike,Tanjung Priok,3,none,2,y,106
+H-022,flood,Pantura,2,heavy,2,y,63
+H-023,road_closure,Trans-Java toll,6,none,3,n,15
+H-024,festive_congestion,Pantura,12,none,3,n,21
+H-025,flood,Pantura,10,moderate,2,y,64
+H-026,port_strike,Tanjung Priok,8,none,2,n,93
+H-027,flood,Trans-Java toll,2,moderate,3,n,20
+H-028,flood,Tanjung Priok,2,heavy,3,y,39
+H-029,flood,Tanjung Priok,2,moderate,3,n,27
+H-030,flood,Pantura,10,moderate,2,y,60
+H-031,accident,Trans-Java toll,11,heavy,1,n,3
+H-032,flood,Tanjung Priok,1,heavy,1,y,41
+H-033,road_closure,Trans-Java toll,11,heavy,3,y,19
+H-034,festive_congestion,Merak-Bakauheni,12,none,3,n,34
+H-035,road_closure,Trans-Java toll,11,light,1,n,18
+H-036,landslide,Trans-Java toll,11,heavy,2,n,32
+H-037,flood,Pantura,3,heavy,1,y,70
+H-038,road_closure,Trans-Java toll,7,light,2,n,9
+H-039,road_closure,Pantura,10,none,3,n,10
+H-040,accident,Pantura,5,none,2,n,5
+H-041,road_closure,Trans-Java toll,7,none,1,n,15
+H-042,landslide,Trans-Java toll,3,heavy,2,y,62
+H-043,road_closure,Pantura,7,light,3,y,22
+H-044,festive_congestion,Pantura,3,heavy,1,n,13
+H-045,flood,Trans-Java toll,12,moderate,1,y,22
+H-046,accident,Trans-Java toll,5,none,1,n,5
+H-047,landslide,Trans-Java toll,12,moderate,1,n,34
+H-048,flood,Pantura,1,heavy,1,n,66
+H-049,flood,Pantura,10,heavy,2,y,76
+H-050,festive_congestion,Merak-Bakauheni,4,light,3,n,42
+H-051,accident,Trans-Java toll,10,light,1,n,6
+H-052,festive_congestion,Pantura,4,none,1,n,26
+H-053,flood,Pantura,1,heavy,1,y,72
+H-054,flood,Pantura,12,moderate,1,y,51
+H-055,flood,Pantura,1,moderate,2,n,55
+H-056,accident,Pantura,6,none,3,n,6
+H-057,flood,Pantura,12,heavy,2,y,76
+H-058,port_strike,Tanjung Priok,6,light,1,n,53
+H-059,accident,Pantura,5,none,1,y,11
+H-060,port_strike,Tanjung Priok,8,none,1,y,61
+H-061,flood,Tanjung Priok,1,heavy,1,y,34
+H-062,festive_congestion,Merak-Bakauheni,3,heavy,2,n,33
+H-063,road_closure,Trans-Java toll,3,light,1,y,28
+H-064,landslide,Trans-Java toll,2,moderate,2,y,37
+H-065,road_closure,Pantura,11,light,1,y,12
+H-066,flood,Pantura,12,heavy,1,y,67
+H-067,landslide,Trans-Java toll,3,moderate,1,y,57
+H-068,landslide,Trans-Java toll,2,heavy,2,y,42
+H-069,flood,Trans-Java toll,12,moderate,2,y,22
+H-070,festive_congestion,Merak-Bakauheni,12,moderate,2,y,29
+H-071,flood,Pantura,3,heavy,2,n,65
+H-072,flood,Trans-Java toll,12,heavy,2,y,27
+H-073,road_closure,Trans-Java toll,7,none,2,n,11
+H-074,flood,Pantura,12,moderate,1,y,58
+H-075,flood,Pantura,10,moderate,1,y,49
+H-076,flood,Pantura,12,moderate,1,y,51
+H-077,accident,Pantura,10,moderate,2,y,10
+H-078,road_closure,Pantura,5,none,2,n,10
+H-079,accident,Trans-Java toll,7,none,2,y,10
+H-080,accident,Trans-Java toll,10,heavy,1,n,7
