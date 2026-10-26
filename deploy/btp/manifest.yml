@@ -1,0 +1,19 @@
+---
+# SIAGA mock S/4HANA on SAP BTP Cloud Foundry (v2 step 1). See docs/btp-deploy.md.
+# `make btp-package` copies this file next to the app code in build/btp/; push from there:
+#   make btp-package && cd build/btp && cf push --no-start
+applications:
+  - name: siaga-sap-mock
+    memory: 512M
+    instances: 1
+    buildpacks:
+      - python_buildpack
+    # random-route: a unique host on the landscape's shared domain (the org is shared)
+    random-route: true
+    # port health check: every HTTP endpoint requires X-API-Key, so there is no open /health
+    health-check-type: port
+    # the start command (CF runs it with bash, so $PORT is expanded)
+    command: python -m uvicorn --factory services.sap_mock.app:create_app --host 0.0.0.0 --port $PORT
+    env:
+      SAP_DB_PATH: var/sap_mock.db
+      # SAP_MOCK_API_KEY is set with `cf set-env`, never in this file

@@ -1,5 +1,7 @@
 """v2 step 1: the mock S/4HANA on SAP BTP (SAP_MOCK_ON_BTP): API key, URL switch, package."""
 
+import subprocess
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -106,3 +108,22 @@ def test_btp_package(tmp_path, monkeypatch):
     )
     assert not (out / "services" / "sap_mock" / "embedded.py").exists()
     assert not (out / "agent").exists()
+
+
+def test_committed_deploy_files_match_the_locked_environment():
+    """deploy/btp/ is the committed source of the CF deployment; its pins follow uv.lock."""
+    import importlib.metadata as md
+
+    deploy = REPO_ROOT / "deploy" / "btp"
+    for line in (deploy / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        name, version = line.split("==")
+        assert md.version(name) == version, (
+            f"{name}: deploy pins {version}, lock has {md.version(name)}"
+        )
+    manifest = (deploy / "manifest.yml").read_text(encoding="utf-8")
+    assert "name: siaga-sap-mock" in manifest and "random-route: true" in manifest
+    assert "uvicorn --factory services.sap_mock.app:create_app" in manifest
+    tracked = subprocess.run(["git", "ls-files", "deploy/btp"], cwd=REPO_ROOT,
+                             capture_output=True, text=True).stdout.split()  # fmt: skip
+    for f in ("manifest.yml", "requirements.txt", "runtime.txt", ".cfignore"):
+        assert f"deploy/btp/{f}" in tracked or (deploy / f).exists()

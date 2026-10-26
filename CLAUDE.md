@@ -22,7 +22,7 @@ and the decisions made. **Update it every phase.**
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
 | v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
 | v2 step 3 (RPT-1.6, `DELAY_MODEL`) | built and tested against a simulated AI Core (SDK response shape) and the offline stand-in; **real RPT call pending**: the SAP variables do not reach this session (`make sap-check`) |
-| v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; tested against the package run locally (rehearse 3/3); **waiting for the owner's `cf push`** (docs/btp-deploy.md) |
+| v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; deploy files committed in `deploy/btp/` (26 Oct); **not deployed yet** (owner: `cf apps` empty): app `siaga-sap-mock`, steps in docs/btp-deploy.md |
 | v2 steps 6 + 5 (UI additions, PII masking) | done: delay chip, Planner prediction details, Architecture tab (Planner + drawer), PII masking (`PII_MASKING=local`) with Planner chip; cumulative cap and Evaluations dropped (owner, 25 Oct); "Approved in SAP Joule" waits for step 4 |
 | v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
 | Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) and `LLM_FALLBACK=sap_genai` built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
@@ -867,10 +867,17 @@ additive (no field removed).
 
 ### SIAGA v2 step 1 decisions (mock S/4HANA on BTP, `SAP_MOCK_ON_BTP`)
 
+- **Deploy files are committed in `deploy/btp/`** (26 Oct; before, the manifest was only
+  generated into the git-ignored `build/btp/`, so the repo had none): `manifest.yml`
+  (app `siaga-sap-mock`), `requirements.txt` (exact pins; a test checks them against the
+  locked environment), `runtime.txt` `python-3.12.x`, `.cfignore`.
 - **Package** (`make btp-package` → `build/btp/`, git-ignored): `services/sap_mock` without
-  the in-process helper, `siaga_common` (settings, timeline), `data/seed`,
-  `requirements.txt` pinned to this repo's versions (fastapi, uvicorn, pydantic,
-  pydantic-settings, python-dotenv), `runtime.txt` `python-3.12.x`, `manifest.yml`. pip,
+  the in-process helper, `siaga_common` (settings, timeline), `data/seed`, plus the
+  `deploy/btp/` files. You push from inside `build/btp/`, where `cf push` finds
+  `manifest.yml` by default. The manifest has no `path:`, because how `path:` resolves
+  under `-f` could not be checked against the CF docs. Rechecked 26 Oct: a clean
+  Python 3.12 venv installed only from that `requirements.txt` runs the manifest's
+  start command; the app answers 401 without the key and 200 with it, and reset works. pip,
   not uv: uv support only reached the official CF Python buildpack in mid-October 2026,
   and BTP may run an older buildpack. CF docs are blocked here; checked by search.
 - **Manifest**: 512M, 1 instance, `python_buildpack`, `random-route: true` (unique host in
