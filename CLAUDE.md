@@ -13,39 +13,38 @@ and the decisions made. **Update it every phase.**
 | 1 Seed data + mock S/4HANA | done |
 | 2 Solver and risk | done |
 | 3 Tool layer, policy, audit, case store | done |
-| 4 Agent state machine | done with the `fake` LLM; **Bedrock run + PERCEIVE eval blocked on AWS credentials** |
+| 4 Agent state machine | done with the `fake` LLM; **live run + PERCEIVE eval on SAP AI Core wait for credentials** |
 | 5 Case API and dashboard | done |
-| 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
+| 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; a live recording + `make rehearse` on SAP AI Core wait for credentials |
 | 7 AWS deployment | **dropped (owner, 25 Oct)**: no AWS stack. The secrets / SSM / `/health/connections` work stays as the production design |
 | AWS: S3 audit trail + Lambda solver (owner 28 Oct) | built behind `AUDIT_BACKEND=s3` / `SOLVER_BACKEND=lambda`, `make aws-setup` creates both; tested against a local S3/Lambda stand-in (real boto3 + HTTP, browser e2e); **not yet run against the real account** |
 | 8 | not started |
 | v2 step 0 (safety net, access check) | done except the SAP checks (SAP access pending); tag `v1-demo` on `7bccb9a` is local only (this session cannot push tags) |
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
-| v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 Bedrock runs blocked** (account returns "Operation not allowed") |
+| v2 step 2 (multi-agent, `ORCHESTRATION=multi`) | done with the `fake` LLM; **3 live runs on SAP AI Core pending** |
 | v2 step 3 (RPT-1.6, `DELAY_MODEL`) | built and tested against a simulated AI Core (SDK response shape) and the offline stand-in; **real RPT call pending**: the SAP variables do not reach this session (`make sap-check`) |
 | v2 step 1 (BTP, `SAP_MOCK_ON_BTP`) | package, API key and switch built; deploy files committed in `deploy/btp/` (26 Oct); **not deployed yet** (owner: `cf apps` empty): app `siaga-sap-mock`, steps in docs/btp-deploy.md |
 | v2 steps 6 + 5 (UI additions, PII masking) | done: delay chip, Planner prediction details, Architecture tab (Planner + drawer), PII masking (`PII_MASKING=local`) with Planner chip; cumulative cap and Evaluations dropped (owner, 25 Oct); "Approved in SAP Joule" waits for step 4 |
 | v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
-| Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) and `LLM_FALLBACK=sap_genai` built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
+| Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
 | WhatsApp inbound (option A, owner 28 Oct) | built behind `WHATSAPP_INBOUND` (off by default): webhook app on :8010 (`make whatsapp`, `make tunnel`), dashboard follows the case; tested with signed payloads and Playwright; **not yet tried with a real Meta app** (docs/whatsapp-inbound.md) |
 | WhatsApp reply (option B, owner 28 Oct) | built behind `WHATSAPP_NOTIFY` (off by default): one reply with the outcome when a WhatsApp case ends; tested against a stand-in Cloud API; **not yet tried with a real token** |
 | WhatsApp via Twilio (owner 28 Oct) | built behind `WHATSAPP_PROVIDER=twilio`: sandbox webhook + replies, no Meta app (`scripts/fill-twilio.sh`); tested with signed form posts and a stand-in Twilio API; **not yet tried with a real Twilio account** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
+| Bedrock removed (owner, 28 Oct) | no Amazon Bedrock anywhere: Claude runs on SAP AI Core only (`LLM_PROVIDER=sap_genai`, the default); `LLM_FALLBACK`, `BEDROCK_MODEL_ID`, `make aws-check` / `aws-probe` / `agentcore-check` gone; `make install` works outside a git checkout |
 | "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters and the Plan stage restyle (added 28 Oct) |
 
 ## How to run
 
 ```bash
 uv sync                      # Python 3.12 venv + deps (uv installs 3.12 if missing)
-make install                 # also installs the pre-commit hook
-cp .env.example .env         # then set BEDROCK_MODEL_ID and AWS credentials
+make install                 # + the pre-commit hook (skipped outside a git checkout, e.g. a zip)
+scripts/fill-env.sh          # writes .env.local etc. (AI Core service key, hidden input)
 make test                    # pytest
 make lint / make fmt         # ruff check + ruff format
-make aws-check               # STS identity + ACTIVE non-legacy Claude models in AWS_REGION
-make aws-probe               # + one forced-tool Converse call per Sonnet model
-uv run python scripts/aws_check.py --model-id <id>   # one tiny Converse call
-SIAGA_RUN_AWS_TESTS=1 make test                     # include the live Bedrock test
+make sap-check               # AI Core token, deployments, one RPT-1.6 call
+SIAGA_RUN_LIVE_TESTS=1 make test                    # include the live SAP AI Core test
 ```
 
 Phase 1 (mock S/4HANA):
@@ -75,10 +74,10 @@ Phase 4 (agent):
 
 ```bash
 make demo-fake               # full case with the scripted LLM, embedded mock SAP, auto-approve
-make demo                    # same with the LLM from .env (Bedrock once credentials exist)
-make eval-perceive           # PERCEIVE accuracy on the 20-item test set (needs Bedrock)
+make demo                    # same with the LLM from .env (Claude on SAP AI Core)
+make eval-perceive           # PERCEIVE accuracy on the 20-item test set (needs SAP AI Core)
 uv run python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
-    --pdf data/demo/forwarder_notice.pdf [--provider fake|bedrock|replay] [--embedded-sap] \
+    --pdf data/demo/forwarder_notice.pdf [--provider fake|sap_genai|replay] [--embedded-sap] \
     [--auto-approve] [--verify-delay N]
 ```
 
@@ -101,7 +100,6 @@ ORCHESTRATION=multi make dev          # specialist Strands agents (Signal, Impac
 ORCHESTRATION=multi make replay       # on data/golden/multi/ (fake placeholder recording)
 ORCHESTRATION=multi make rehearse N=10   # report includes per-agent timings
 ORCHESTRATION=multi make web-smoke    # e2e incl. e2e/multi.spec.ts (skips on a v1 API)
-make agentcore-check                  # which AgentCore features answer in AWS_REGION (needs AWS creds)
 make sap-check                        # AI Core token, deployments, one RPT-1.6 call; cf target; joule status
 make btp-package / make sap-latency   # step 1: build/btp for cf push (docs/btp-deploy.md); round trips
 PII_MASKING=local make dev            # step 5: mask phones, e-mails, names before any model call
@@ -126,8 +124,8 @@ here prints a secret):
 ```bash
 scripts/fill-env.sh               # owner, once: writes .env.local / .env.replay / .env.v1 / .env.aws (hidden input)
 make use-local                    # Demo Day: laptop live (live LLM, BTP mock, RPT-1.6, local stores)
-make use-replay | use-v1          # fallbacks: recorded run offline / v1 on Bedrock
-LLM_PROVIDER=sap_genai make dev   # Claude on SAP AI Core (AICORE_*); LLM_FALLBACK=sap_genai = per-case fallback
+make use-replay | use-v1          # fallbacks: recorded run offline / v1 on SAP AI Core
+LLM_PROVIDER=sap_genai make dev   # Claude on SAP AI Core (AICORE_*), the default
 AWS_PROFILE=siaga scripts/put-sap-secret.sh   # production design only: SAP values -> siaga/sap
 make use-aws                      # production design only (not deployed)
 make env-check                    # each variable the mode needs: set / MISSING
@@ -175,7 +173,7 @@ Phase 6 (replay + hardening):
 ```bash
 make record-golden           # record the demo with the LLM from .env -> data/golden/
                              # (accepted only if it reaches Rp 11.4M, approve, RESOLVED)
-make replay                  # REPLAY=1 make dev: full stack on the recording, no Bedrock calls
+make replay                  # REPLAY=1 make dev: full stack on the recording, no model calls
 make replay-cli              # the recording through the CLI, instant
 make rehearse N=10           # reset -> case -> approve -> VERIFY, N times, via the Case API at
                              # CASE_API_URL (or an in-process one); report in var/rehearse/
@@ -195,16 +193,14 @@ See `.env.example` for the full list.
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `LLM_PROVIDER` | `bedrock` | `bedrock` \| `sap_genai` (Claude on SAP AI Core) \| `fake` \| `replay` |
-| `LLM_FALLBACK` | unset | `sap_genai`: a case whose first Bedrock call fails (account / throttling) runs on SAP AI Core |
+| `LLM_PROVIDER` | `sap_genai` | `sap_genai` (Claude on SAP AI Core) \| `fake` \| `replay` |
 | `SAP_GENAI_MODEL` / `SAP_GENAI_DEPLOYMENT_ID` | `anthropic--claude-4.6-sonnet` / unset | the Generative AI Hub model; its deployment is looked up unless the ID is given |
-| `BEDROCK_MODEL_ID` | **none** | model or inference-profile ID; no default in code by design |
 | `AWS_REGION` | `ap-southeast-1` | |
-| `AWS_PROFILE` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`) / `AWS_BEARER_TOKEN_BEDROCK` | unset | AWS credentials: one of a profile, access keys, or a Bedrock API key. They can sit in `.env`; `export_aws_env()` passes `AWS_*` lines to boto3, and the shell environment wins. A Bedrock API key covers model calls; `make aws-check` needs a profile or access keys (STS) |
+| `AWS_PROFILE` | unset | only for the optional S3 audit trail / Lambda solver (and mode aws): a named profile, never keys on the laptop. `export_aws_env()` passes `AWS_*` lines in `.env` to boto3; the shell environment wins |
 | `REPLAY` / `REPLAY_PATH` | `0` / `data/golden/llm.jsonl` | replay recorded LLM responses (no network) |
 | `REPLAY_SPEED` | `1.0` | 1.0 = recorded model latency (looks live), 0 = instant |
 | `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |
-| `LLM_TEMPERATURE` | `0` | sent to Bedrock; dropped automatically if the model rejects it; `off` = never |
+| `LLM_TEMPERATURE` | `0` | sent to the model; dropped automatically if the model rejects it; `off` = never |
 | `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | `AUDIT_BACKEND=s3` is built; the others stay local (Phase 7 dropped) |
 | `AUDIT_S3_BUCKET` / `AUDIT_S3_PREFIX` / `AUDIT_RETENTION_DAYS` | – / `audit/` / `1` | the Object Lock bucket (`make aws-setup`), key prefix, default retention it sets (governance) |
 | `SOLVER_LAMBDA_NAME` / `SOLVER_LAMBDA_FALLBACK` | `siaga-solver` / `1` | `SOLVER_BACKEND=lambda`: the function; 1 = solve in process when Lambda fails (labelled) |
@@ -245,7 +241,7 @@ services/       sap_mock/, solver/
 policy/         .cedar policies + schema
 siaga_common/   settings, timeline (day offsets <-> WIB/UTC), shared models
 data/           seed/, demo/ (inputs, precedents/), golden/ (replay recording)
-scripts/        operational scripts (aws_check.py, …)
+scripts/        operational scripts (preflight.py, fill-env.sh, rehearse.py, …)
 web/            Next.js dashboard (Phase 5)
 infra/          IaC (Phase 7)
 tests/          pytest
@@ -831,6 +827,43 @@ moments, drawer, error states and the washout check stay).
   multi 10/10 (+3), WhatsApp in + reply 11/11 (+2), AWS stand-in 10/10 (+3); rehearse 3/3,
   rehearse-fault 1/1; replay with the network cut 1/1 and its smoke 8/8.
 
+### Bedrock removed (owner's decision, 28 Oct)
+
+The owner does not use Amazon Bedrock any more. Everything Bedrock-specific is gone; the
+model is Claude on SAP AI Core. **Bedrock, `LLM_FALLBACK`, `BEDROCK_MODEL_ID` and AgentCore in
+the older sections of this file are history.**
+
+- **Providers:** `agent/providers/bedrock.py` and `fallback.py` deleted. `LLM_PROVIDER` is
+  `sap_genai` (the default) | `fake` | `replay`; `LLM_PROVIDER=bedrock` is refused by the
+  settings. `sap_genai.py` builds the Converse body itself (system, messages,
+  inferenceConfig, toolConfig with `toolChoice: auto`, no model id) and owns the backoff
+  (`MAX_ATTEMPTS` 6, waits 2/4/8/16/30 s). A 429 that never clears says "HTTP 429
+  (throttled)", so the dashboard titles it "The model stayed busy". `LLMResponse` lost
+  `fallback_reason`; the agent no longer writes `llm_fallback` / `fallback` entries.
+- **Settings:** `BEDROCK_MODEL_ID`, `LLM_FALLBACK` and `require_model_id()` removed.
+  `KB_BACKEND` and `POLICY_BACKEND` accept `local` only (Bedrock Knowledge Bases and
+  AgentCore Policy were Phase 7 designs). The flag presets use `LLM_PROVIDER=sap_genai` and
+  no longer store a model ID in SSM. AWS stays for the optional S3 audit trail, Lambda
+  solver and the mode-aws design (`AWS_PROFILE`).
+- **Scripts:** `scripts/aws_check.py` and `make aws-check` / `aws-probe` /
+  `agentcore-check` deleted. `fill-env.sh` asks no model question; it writes
+  `LLM_PROVIDER=sap_genai` and the AI Core values into `.env.local` and `.env.v1`. Mode v1
+  now runs on SAP AI Core (env-check requires the four `AICORE_*` values, no
+  `AWS_PROFILE`). Preflight checks one tool call on SAP AI Core, and the laptop AWS
+  identity only when an AWS backend is on. `/health/connections` and `/config` have no
+  fallback fields.
+- **`make install` outside git:** the pre-commit hook is installed only inside a git
+  checkout, so the repo unpacked from a zip installs (it failed with "git failed").
+- **Web:** the Bedrock model labels, the `llm_fallback` config field and the AgentCore /
+  Bedrock KB targets in the Architecture view are gone.
+- **Tests:** the Bedrock provider and fallback tests were removed. New: `sap_genai` is the
+  default and builds a `SapGenAIProvider`; `LLM_PROVIDER=bedrock` is rejected; a throttle
+  that never clears is a `throttle` error that says "throttled"; `fill-env.sh` writes no
+  Bedrock value in any mode file and `.env.v1` passes env-check. The live test
+  (`SIAGA_RUN_LIVE_TESTS=1`, marker `live`) makes one tool call on SAP AI Core.
+- Results: pytest 292 passed (2 skipped); web smoke 9/9 (+4 skipped), replay 8/8,
+  multi 10/10; rehearse 3/3.
+
 ### Native Windows support
 
 - **All text file I/O passes `encoding="utf-8"`.** Windows Python defaults to cp1252, which
@@ -1407,15 +1440,10 @@ moments, drawer, error states and the washout check stay).
 
 ## Open items
 
-- AWS credentials in the build container are proxy placeholders; STS returns
-  `InvalidClientTokenId`. Still to run once they exist: `make aws-probe`, pick the model,
-  `make eval-perceive` (target ≥ 18/20), `make demo` with Bedrock ×3 for stability and
-  per-stage timings, `make record-golden` (replace the fake placeholder), and
-  `make rehearse N=10` against Bedrock.
-- Bedrock on the owner's account returns `ValidationException: Operation not allowed` for
-  every model call: Anthropic's first-time use form (Bedrock console > Model catalog) was
-  not submitted; check Nova to rule out an account-level block. v2 step 2 still needs
-  3 Bedrock runs with per-agent timings (< 4 min total) and a Bedrock multi recording.
+- Live runs on Claude via SAP AI Core: `make eval-perceive` (target ≥ 18/20), `make demo`
+  ×3 for stability and per-stage timings, `make record-golden` (replace the fake
+  placeholder), `make rehearse N=10`, and 3 multi-agent runs with per-agent timings
+  (< 4 min total) plus a multi recording.
 - SAP variables were added to the environment after this session started, so they do not
   reach it; a new session (or `.env` on the laptop) picks them up. Then: `make sap-check`,
   `DELAY_MODEL=rpt` demo run, `DELAY_MODEL=rpt make record-golden`.
@@ -1430,5 +1458,3 @@ moments, drawer, error states and the washout check stay).
   docs/whatsapp-inbound.md).
 - The S3 audit trail and the Lambda solver have not run against a real AWS account yet:
   `make aws-setup` on the laptop (needs a working `AWS_PROFILE`), then `make preflight`.
-- `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
-  before the end of Phase 4).

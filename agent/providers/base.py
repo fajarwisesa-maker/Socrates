@@ -1,4 +1,4 @@
-"""LLM provider interface. Messages use the Bedrock Converse shape for every provider.
+"""LLM provider interface. Messages use the Converse shape for every provider.
 
     message  = {"role": "user"|"assistant", "content": [block, ...]}
     block    = {"text": str} | {"toolUse": {"toolUseId", "name", "input"}}
@@ -33,8 +33,6 @@ class LLMResponse(BaseModel):
     usage: dict[str, Any] = {}
     latency_ms: float = 0.0
     model: str = ""
-    # set when LLM_FALLBACK moved this case off its primary provider (shown in the UI)
-    fallback_reason: str | None = None
 
     def tool_uses(self) -> list[dict[str, Any]]:
         return [b["toolUse"] for b in self.message["content"] if "toolUse" in b]
@@ -47,7 +45,7 @@ class LLMError(Exception):
     """Provider failure the state machine turns into an escalation.
 
     kind: "account" (credentials, access, account restrictions), "throttle" (still throttled
-    after the retries) or "other". LLM_FALLBACK acts on the first two only.
+    after the retries) or "other".
     """
 
     def __init__(self, message: str, kind: str = "other"):

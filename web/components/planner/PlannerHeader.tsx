@@ -16,7 +16,6 @@ export function modelNote(config: Config | null, events: CaseEvent[]): string | 
   if (!config) return null;
   if (config.replay) return null; // the REPLAY plate says it
   if (config.llm_provider === "sap_genai") return "Model: Claude via SAP AI Core";
-  if (config.llm_provider.startsWith("bedrock")) return "Model: Claude on Amazon Bedrock";
   if (config.llm_provider === "fake") return "Model: scripted (fake), offline";
   return `Model: ${config.llm_provider}`;
 }

@@ -1,8 +1,8 @@
-"""LLM_PROVIDER=sap_genai (Claude on SAP AI Core) and LLM_FALLBACK=sap_genai.
+"""LLM_PROVIDER=sap_genai: Claude on SAP AI Core, the only live model provider.
 
 AI Core is simulated with httpx.MockTransport in the shape SAP's SDK uses (agent/aicore.py):
 OAuth token, `GET /v2/lm/deployments?scenarioId=foundation-models&status=RUNNING`, and the
-Bedrock Converse body posted to `{deploymentUrl}/converse`. Its model answers come from the
+Converse body posted to `{deploymentUrl}/converse`. Its model answers come from the
 same fake scripts the other tests use, so a whole demo case runs over the wire format.
 """
 
@@ -13,16 +13,12 @@ import json
 
 import httpx
 import pytest
-from botocore.exceptions import ClientError
 
 from agent.aicore import AiCore, AiCoreError
 from agent.factory import make_agent
 from agent.providers import make_provider
 from agent.providers.base import LLMError, LLMRequest, user_text
-from agent.providers.bedrock import BedrockProvider, error_kind
 from agent.providers.fake import FakeProvider
-from agent.providers.fallback import FallbackProvider
-from agent.providers.replay import RecordingProvider, ReplayProvider
 from agent.providers.sap_genai import SapGenAIProvider
 from agent.signals import build_signals
 from siaga_common.settings import REPO_ROOT, Settings
@@ -90,11 +86,14 @@ class AiCoreSim:
             assert "modelId" not in body
             if self.model is not None:  # answer like the model would, from the fake scripts
                 sent = _current.get()
-                expected = BedrockProvider.__new__(BedrockProvider)
-                expected.model_id, expected.temperature = "", 0.0
-                want = expected._kwargs(sent)
-                del want["modelId"]
-                assert body == json.loads(json.dumps(want))  # the Bedrock Converse body
+                want = {
+                    "system": [{"text": sent.system}],
+                    "messages": sent.messages,
+                    "inferenceConfig": {"maxTokens": sent.max_tokens, "temperature": 0.0},
+                }
+                if sent.tools:
+                    want["toolConfig"] = {"tools": sent.tools, "toolChoice": {"auto": {}}}
+                assert body == json.loads(json.dumps(want))  # the Converse body, no model id
                 r = self.model.converse(sent)
                 return httpx.Response(200, json={
                     "output": {"message": r.message}, "stopReason": r.stop_reason,
@@ -193,82 +192,27 @@ def test_missing_aicore_settings_are_named():
     assert "AICORE_AUTH_URL" in str(e.value) and "AICORE_CLIENT_ID" not in str(e.value)
 
 
-def test_factory_wraps_bedrock_with_the_sap_fallback(monkeypatch):
+def test_sap_genai_is_the_default_provider():
     s = Settings(
-        _env_file=None, LLM_PROVIDER="bedrock", BEDROCK_MODEL_ID="m", LLM_FALLBACK="sap_genai",
-        AICORE_AUTH_URL="https://a", AICORE_CLIENT_ID="c", AICORE_CLIENT_SECRET="s",
-        AICORE_API_URL="https://api",
+        _env_file=None, AICORE_AUTH_URL="https://a", AICORE_CLIENT_ID="c",
+        AICORE_CLIENT_SECRET="s", AICORE_API_URL="https://api",
     )  # fmt: skip
+    assert s.llm_provider == "sap_genai"
     p = make_provider(s)
-    assert isinstance(p, FallbackProvider) and p.name == "bedrock+fallback:sap_genai"
-    assert p.primary.max_attempts == 2 and p.fallback.model_name == MODEL
+    assert isinstance(p, SapGenAIProvider) and p.model_name == MODEL
 
 
-# --- Bedrock error kinds and the fallback ----------------------------------------------
+def test_bedrock_is_not_a_provider_any_more():
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, LLM_PROVIDER="bedrock")
 
 
-def client_error(code, msg):
-    return ClientError({"Error": {"Code": code, "Message": msg}}, "Converse")
-
-
-@pytest.mark.parametrize(
-    "code,msg,kind",
-    [
-        ("ValidationException", "Operation not allowed", "account"),
-        ("AccessDeniedException", "You don't have access to the model", "account"),
-        ("UnrecognizedClientException", "The security token is invalid", "account"),
-        ("ThrottlingException", "Too many requests", "throttle"),
-        ("ValidationException", "messages: field required", "other"),
-    ],
-)  # fmt: skip
-def test_bedrock_error_kinds(code, msg, kind):
-    assert error_kind(code, msg) == kind
-
-
-class Raising:
-    name = "bedrock"
-
-    def __init__(self, errors):
-        self.errors, self.calls = list(errors), 0
-
-    def converse(self, req, on_retry=None):
-        self.calls += 1
-        e = self.errors.pop(0) if self.errors else None
-        if e:
-            raise e
-        say = {"role": "assistant", "content": [{"text": "bedrock"}]}
-        return FakeProvider({"perceive": lambda r, n: say}).converse(req)
-
-
-def test_fallback_moves_a_case_at_its_start_only():
-    sap = provider(AiCoreSim([OK, OK, OK]))
-    fb = FallbackProvider(
-        Raising([LLMError("Bedrock ValidationException: Operation not allowed", "account")]), sap
-    )
-    r1 = fb.converse(REQ.model_copy(update={"case_id": "a"}))
-    assert r1.model == f"sap:{MODEL}" and "account error" in r1.fallback_reason
-    r2 = fb.converse(REQ.model_copy(update={"case_id": "a"}))  # stays on SAP for the case
-    assert r2.fallback_reason and fb.primary.calls == 1
-    # another case tries Bedrock again
-    assert fb.converse(REQ.model_copy(update={"case_id": "b"})).text() == "bedrock"
-    # once a case had a Bedrock answer, a later account error escalates as usual
-    fb.primary.errors = [LLMError("Bedrock AccessDeniedException: no", "account")]
-    with pytest.raises(LLMError):
-        fb.converse(REQ.model_copy(update={"case_id": "b"}))
-    # errors that are not about the account or throttling never move a case
-    fb.primary.errors = [LLMError("Bedrock ValidationException: bad request", "other")]
-    with pytest.raises(LLMError):
-        fb.converse(REQ.model_copy(update={"case_id": "c"}))
-
-
-def test_fallback_answers_are_recorded_and_replayed(tmp_path):
-    fb = FallbackProvider(
-        Raising([LLMError("throttled after 2 attempts", "throttle")]), provider(AiCoreSim([OK]))
-    )
-    rec = RecordingProvider(fb, tmp_path / "llm.jsonl")
-    first = rec.converse(REQ.model_copy(update={"case_id": "a"}))
-    again = ReplayProvider(tmp_path / "llm.jsonl").converse(REQ.model_copy(update={"case_id": "z"}))
-    assert again.fallback_reason == first.fallback_reason and again.model == f"replay:sap:{MODEL}"
+def test_throttling_that_never_clears_says_so():
+    """The dashboard titles the escalation "The model stayed busy" from the word."""
+    p = provider(AiCoreSim([429] * 6))
+    with pytest.raises(LLMError) as e:
+        p.converse(REQ)
+    assert e.value.kind == "throttle" and "throttled" in str(e.value)
 
 
 # --- whole demo cases over the wire ---------------------------------------------------
@@ -313,39 +257,10 @@ def test_demo_case_on_sap_genai(sap, tmp_path, orchestration):
     events, audit = demo_case(rt, provider(AiCoreSim(model=FakeProvider(golden_scripts()))))
     llm = [e for e in events if e.status == "llm"]
     assert llm and all(e.data["model"] == f"sap:{MODEL}" for e in llm)
-    assert not any(e.status == "fallback" for e in events)
     assert all(e.payload["model"] == f"sap:{MODEL}" for e in audit if e.kind == "llm_call")
 
 
-def test_demo_case_falls_back_from_bedrock_at_its_start(sap, tmp_path):
-    from agent.providers.scripts import golden_scripts
-
-    rt = build(sap, tmp_path, ORCHESTRATION="multi", DELAY_MODEL="fake", PII_MASKING="local")
-    blocked = Raising([LLMError("Bedrock ValidationException: Operation not allowed", "account")])
-    fb = FallbackProvider(blocked, provider(AiCoreSim(model=FakeProvider(golden_scripts()))))
-    events, audit = demo_case(rt, fb)
-    notes = [e for e in events if e.status == "fallback"]
-    assert len(notes) == 1 and notes[0].title == "Model: Claude via SAP AI Core"
-    assert notes[0].stage == "PERCEIVE" and "Operation not allowed" in notes[0].detail
-    assert blocked.calls == 1  # Bedrock was tried once, at the start, then never again
-    assert sum(e.kind == "llm_fallback" for e in audit) == 1
-
-
-def test_missing_aws_profile_or_model_moves_the_case_to_sap(monkeypatch):
-    """The laptop case: no `siaga` profile yet, no BEDROCK_MODEL_ID; nothing crashes."""
-    monkeypatch.setenv("AWS_PROFILE", "no-such-profile-siaga-test")
-    no_profile = BedrockProvider("apac.some-model", "ap-southeast-1")  # client built lazily
-    with pytest.raises(LLMError) as e:
-        no_profile.converse(REQ)
-    assert e.value.kind == "account" and "no-such-profile" in str(e.value)
-    for primary in (no_profile, BedrockProvider("", "ap-southeast-1")):
-        fb = FallbackProvider(primary, provider(AiCoreSim([OK])))
-        r = fb.converse(REQ.model_copy(update={"case_id": "x"}))
-        assert r.model == f"sap:{MODEL}" and r.fallback_reason
-
-
 def test_template_placeholders_count_as_unset():
-    s = Settings(_env_file=None, AICORE_AUTH_URL="<set-me>", BEDROCK_MODEL_ID="<set-me>",
-                 CASE_API_URL="<set-me>")  # fmt: skip
-    assert s.aicore_auth_url is None and s.bedrock_model_id is None
+    s = Settings(_env_file=None, AICORE_AUTH_URL="<set-me>", CASE_API_URL="<set-me>")
+    assert s.aicore_auth_url is None
     assert s.case_api_url == "http://127.0.0.1:8000"  # the default, not the placeholder

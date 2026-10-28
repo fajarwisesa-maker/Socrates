@@ -1,9 +1,9 @@
-"""Claude on SAP AI Core (Generative AI Hub) through the Bedrock Converse API it proxies.
+"""Claude on SAP AI Core (Generative AI Hub), the one live LLM provider.
 
-Same interface, request body and response shape as the Bedrock provider (both send the
-Converse body built by `BedrockProvider._kwargs`, minus the model id that Bedrock carries in
-the URL), so recording, replay, fallback and the agent's tool loop are unchanged. How the
-endpoint works: agent/aicore.py.
+The deployment takes a Converse request body (system, messages, inferenceConfig,
+toolConfig) and answers with a Converse response, so every provider shares the message
+shape in agent/providers/base.py and recording, replay and the agent's tool loop work the
+same way. How the endpoint works: agent/aicore.py.
 """
 
 from __future__ import annotations
@@ -16,11 +16,14 @@ import httpx
 
 from agent.aicore import AiCore, AiCoreError
 from agent.providers.base import LLMError, LLMRequest, LLMResponse, RetryHook
-from agent.providers.bedrock import BACKOFF_S, MAX_ATTEMPTS, BedrockProvider
 
 log = logging.getLogger(__name__)
 
+# Retried here, so every wait is visible to the agent (and on the dashboard as a neutral
+# "Retrying..." note). Anything else fails at once.
 RETRY_STATUS = {429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 6
+BACKOFF_S = (2.0, 4.0, 8.0, 16.0, 30.0)
 LABEL = "Claude via SAP AI Core"
 
 
@@ -42,10 +45,18 @@ class SapGenAIProvider:
         self._url: str | None = None
 
     def _body(self, req: LLMRequest) -> dict:
-        shape = BedrockProvider.__new__(BedrockProvider)  # reuse the one Converse builder
-        shape.model_id, shape.temperature = "", self.temperature
-        body = shape._kwargs(req)
-        del body["modelId"]  # a URI parameter in Bedrock; the deployment is the model here
+        """The Converse body. No model id: the deployment is the model."""
+        inference = {"maxTokens": req.max_tokens}
+        if self.temperature is not None:
+            inference["temperature"] = self.temperature
+        body = {
+            "system": [{"text": req.system}],
+            "messages": req.messages,
+            "inferenceConfig": inference,
+        }
+        if req.tools:
+            # current Claude models reject forced tool choice; prompts name the tool instead
+            body["toolConfig"] = {"tools": req.tools, "toolChoice": {"auto": {}}}
         return body
 
     def converse(self, req: LLMRequest, on_retry: RetryHook | None = None) -> LLMResponse:
@@ -94,7 +105,8 @@ class SapGenAIProvider:
                 if r.status_code in (401, 403, 404)
                 else "other"
             )
-            raise LLMError(f"SAP AI Core HTTP {r.status_code}: {text}", kind=kind)
+            status = f"{r.status_code} (throttled)" if r.status_code == 429 else r.status_code
+            raise LLMError(f"SAP AI Core HTTP {status}: {text}", kind=kind)
         resp = r.json()
         return LLMResponse(
             message=resp["output"]["message"],

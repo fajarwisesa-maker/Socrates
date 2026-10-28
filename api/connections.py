@@ -41,27 +41,17 @@ def _secret(s: Settings) -> dict[str, Any]:
 
 
 def _llm(s: Settings) -> dict[str, Any]:
-    """One tiny tool call through the configured provider (and its fallback on its own)."""
-    if s.replay or s.llm_provider not in ("bedrock", "sap_genai"):
+    """One tiny tool call through the configured provider."""
+    if s.replay or s.llm_provider != "sap_genai":
         return _check(None, f"LLM is {'replay' if s.replay else s.llm_provider}: no model call")
     from agent.providers import make_provider, ping
 
     try:
-        p = make_provider(s.model_copy(update={"llm_record_path": None}))
-        targets = (
-            [("primary ", p.primary), ("fallback ", p.fallback)]
-            if hasattr(p, "fallback")
-            else [("", p)]
-        )
-        parts, ok = [], True
-        for label, provider in targets:
-            r = ping(provider)
-            ok = ok and r["tool_use"]
-            call = "tool call ok" if r["tool_use"] else "tool call MISSING"
-            parts.append(f"{label}{r['model']}: {call} in {r['latency_s']} s")
+        r = ping(make_provider(s.model_copy(update={"llm_record_path": None})))
     except Exception as e:  # noqa: BLE001
         return _check(False, f"{type(e).__name__}: {str(e)[:160]}")
-    return _check(ok, "; ".join(parts))
+    call = "tool call ok" if r["tool_use"] else "tool call MISSING"
+    return _check(r["tool_use"], f"{r['model']}: {call} in {r['latency_s']} s")
 
 
 def _sap(s: Settings, runtime: Any) -> dict[str, Any]:

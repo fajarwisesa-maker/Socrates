@@ -10,7 +10,7 @@ written.
     data/golden/meta.json   provider, model, prompt versions, per-call latency and usage,
                             per-stage timings, outcome
 
-Usage: uv run python scripts/record_golden.py [--provider bedrock|sap_genai|fake]
+Usage: uv run python scripts/record_golden.py [--provider sap_genai|fake]
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def check(cond: bool, what: str, failures: list[str]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--provider", choices=["bedrock", "sap_genai", "fake"])
+    ap.add_argument("--provider", choices=["sap_genai", "fake"])
     ap.add_argument(
         "--out", type=Path, default=None, help="default: the folder of REPLAY_PATH for this mode"
     )
@@ -55,7 +55,7 @@ def main() -> int:
         overrides["llm_provider"] = args.provider
     settings = get_settings().model_copy(update=overrides)
     if settings.llm_provider == "replay":
-        print("refusing to record a replay of a replay; set LLM_PROVIDER=bedrock (or fake)")
+        print("refusing to record a replay of a replay; set LLM_PROVIDER=sap_genai (or fake)")
         return 2
     args.out = args.out or settings.replay_path.parent
 
@@ -116,14 +116,9 @@ def main() -> int:
     audit = runtime.audit.read(c.case_id)
     prompts = sorted({e.payload["prompt"] for e in audit if e.kind == "llm_call"})
     models = sorted({e["response"]["model"] for e in entries})
-    fell_back = next((e["response"].get("fallback_reason") for e in entries
-                      if e["response"].get("fallback_reason")), None)  # fmt: skip
     meta = {
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        # the provider that answered (with LLM_FALLBACK it can differ from the configured one)
-        "provider": "sap_genai" if all(m.startswith("sap:") for m in models) else inner.name,
-        "configured_provider": inner.name,
-        "fallback_reason": fell_back,
+        "provider": inner.name,
         "models": models,
         "orchestration": settings.orchestration,
         "delay_model": settings.delay_model,

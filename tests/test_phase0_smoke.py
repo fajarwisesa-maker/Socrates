@@ -8,21 +8,14 @@ from siaga_common.settings import Settings
 
 
 def test_defaults(monkeypatch):
-    for var in ("AWS_REGION", "BEDROCK_MODEL_ID", "LLM_PROVIDER", "MAX_TOOL_CALLS", "MAX_REPLANS"):
+    for var in ("AWS_REGION", "LLM_PROVIDER", "MAX_TOOL_CALLS", "MAX_REPLANS"):
         monkeypatch.delenv(var, raising=False)
     s = Settings(_env_file=None)
     assert s.aws_region == "ap-southeast-1"
+    assert s.llm_provider == "sap_genai"  # Claude on SAP AI Core; no Bedrock
     assert s.max_tool_calls == 20
     assert s.max_replans == 2
     assert s.verify_delay_seconds == 60
-
-
-def test_model_id_has_no_default(monkeypatch):
-    monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
-    s = Settings(_env_file=None)
-    assert s.bedrock_model_id is None
-    with pytest.raises(RuntimeError, match="BEDROCK_MODEL_ID"):
-        s.require_model_id()
 
 
 def test_cbc_solver_available():
@@ -50,12 +43,11 @@ def test_cedarpy_evaluates():
     assert not cedarpy.is_authorized(request, "forbid(principal, action, resource);", []).allowed
 
 
-@pytest.mark.aws
-@pytest.mark.skipif(os.getenv("SIAGA_RUN_AWS_TESTS") != "1", reason="needs AWS credentials")
-def test_bedrock_converse_tool_use():
-    from scripts.aws_check import converse_ping
+@pytest.mark.live
+@pytest.mark.skipif(os.getenv("SIAGA_RUN_LIVE_TESTS") != "1", reason="needs SAP AI Core")
+def test_sap_ai_core_converse_tool_use():
+    from agent.providers import make_sap_genai, ping
     from siaga_common.settings import get_settings
 
-    s = get_settings()
-    r = converse_ping(s.aws_region, s.require_model_id())
-    assert r["tool_use"] and r["tool_use"]["input"] == {"status": "ok"}
+    r = ping(make_sap_genai(get_settings()))
+    assert r["tool_use"] and r["model"].startswith("sap:")

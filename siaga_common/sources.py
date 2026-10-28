@@ -108,7 +108,6 @@ CASE_FLAGS = (
     "JOULE_APPROVALS",
     "LLM_PROVIDER",
     "REPLAY",
-    "BEDROCK_MODEL_ID",  # not in the presets: `make flags-v2|v1` copies it from the laptop .env
 )
 # Stored with the flags, applied when a process starts (they pick the store, audit, ...).
 BACKEND_FLAGS = ("CASE_STORE", "AUDIT_BACKEND", "KB_BACKEND", "POLICY_BACKEND", "SOLVER_BACKEND")
@@ -117,8 +116,8 @@ ALL_FLAGS = CASE_FLAGS + BACKEND_FLAGS
 AWS_BACKENDS = {
     "CASE_STORE": "dynamodb",
     "AUDIT_BACKEND": "s3",
-    "KB_BACKEND": "bedrock",
-    "POLICY_BACKEND": "agentcore",
+    "KB_BACKEND": "local",
+    "POLICY_BACKEND": "local",
     "SOLVER_BACKEND": "lambda",
 }
 # Demo Day (make flags-v2)
@@ -128,7 +127,7 @@ FLAGS_V2 = {
     "SAP_MOCK_ON_BTP": "1",
     "PII_MASKING": "local",
     "JOULE_APPROVALS": "0",
-    "LLM_PROVIDER": "bedrock",
+    "LLM_PROVIDER": "sap_genai",
     "REPLAY": "0",
     **AWS_BACKENDS,
 }
@@ -139,7 +138,7 @@ FLAGS_V1 = {
     "SAP_MOCK_ON_BTP": "0",
     "PII_MASKING": "off",
     "JOULE_APPROVALS": "0",
-    "LLM_PROVIDER": "bedrock",
+    "LLM_PROVIDER": "sap_genai",
     "REPLAY": "0",
     **AWS_BACKENDS,
 }
@@ -218,9 +217,8 @@ class SsmFlags:
             )
 
 
-def preset(name: str, model_id: str | None) -> dict[str, str]:
-    """A preset plus the Bedrock model ID the laptop uses, when it has one."""
-    return PRESETS[name] | ({"BEDROCK_MODEL_ID": model_id} if model_id else {})
+def preset(name: str) -> dict[str, str]:
+    return dict(PRESETS[name])
 
 
 def diff(

@@ -1,7 +1,7 @@
 """Simulated throttling for demos and tests (LLM_SIMULATE_THROTTLE).
 
-The first PERCEIVE call of each case goes through visible retries, exactly as the Bedrock
-provider reports real ones (on_retry), so the dashboard's "Retrying…" note and the
+The first PERCEIVE call of each case goes through visible retries, exactly as the SAP AI
+Core provider reports real ones (on_retry), so the dashboard's "Retrying…" note and the
 "model unavailable" escalation can be shown and tested without a real throttle.
 `N` = N retries, then the call succeeds; `exhaust` = retries run out (LLMError).
 """
@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable
 
 from agent.providers.base import LLMError, LLMProvider, LLMRequest, LLMResponse, RetryHook
-from agent.providers.bedrock import MAX_ATTEMPTS
+from agent.providers.sap_genai import MAX_ATTEMPTS
 
 
 class SimulatedThrottleProvider:
@@ -40,7 +40,8 @@ class SimulatedThrottleProvider:
                 self._sleep(self.wait_s)
             if self.exhaust:
                 raise LLMError(
-                    "Bedrock ThrottlingException: rate exceeded (simulated) "
-                    f"after {MAX_ATTEMPTS} attempts"
+                    "SAP AI Core HTTP 429 (throttled): rate exceeded (simulated) "
+                    f"after {MAX_ATTEMPTS} attempts",
+                    kind="throttle",
                 )
         return self.inner.converse(req, on_retry)

@@ -1,5 +1,7 @@
 # SIAGA v2 step 2 checkpoint: multi-agent orchestration
 
+> **Superseded in part (28 Oct):** Amazon Bedrock (models, Knowledge Bases, AgentCore) was removed from SIAGA at the owner's request. Claude runs on SAP AI Core only. Bedrock mentions below are history; see CLAUDE.md.
+
 Flag: `ORCHESTRATION=multi` (default `single` = v1). Design and decisions: CLAUDE.md,
 "SIAGA v2 step 2 decisions".
 

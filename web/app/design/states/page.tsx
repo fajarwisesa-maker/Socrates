@@ -38,7 +38,7 @@ const CASES: { name: string; events: CaseEvent[]; record: CaseRecord; live: bool
   {
     name: "Retries ran out: model unavailable (escalation)",
     events: [retry(1, 6), ev(2, "PERCEIVE", "escalated", "Escalated to a human planner")],
-    record: rec("LLM unavailable: Bedrock ThrottlingException: rate exceeded after 6 attempts"),
+    record: rec("LLM unavailable: SAP AI Core HTTP 429 (throttled): rate exceeded after 6 attempts"),
     live: true,
   },
   {

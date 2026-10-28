@@ -45,7 +45,7 @@ def main(argv: list[str], reader: SsmFlags | None = None) -> int:
     reader = reader or SsmFlags(get_settings().aws_region)
     try:
         if argv[0] in PRESETS:
-            reader.write(preset(argv[0], get_settings().bedrock_model_id))
+            reader.write(preset(argv[0]))
             print(f"set flags-{argv[0]}; the next case runs with them\n")
         show(reader)
     except ConfigSourceError as e:

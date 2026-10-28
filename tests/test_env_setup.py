@@ -95,7 +95,7 @@ def test_snapshot_lists_every_flag_as_stored_in_ssm():
     snap = snapshot(overlay(Settings(_env_file=None), FLAGS_V2 | {"CASE_STORE": "sqlite"}))
     assert snap["ORCHESTRATION"] == "multi" and snap["SAP_MOCK_ON_BTP"] == "1"
     assert snap["PII_MASKING"] == "local" and snap["JOULE_APPROVALS"] == "0"
-    assert set(snap) == set(FLAGS_V2) | {"BEDROCK_MODEL_ID"} and snap["BEDROCK_MODEL_ID"] == ""
+    assert set(snap) == set(FLAGS_V2) and snap["LLM_PROVIDER"] == "sap_genai"
 
 
 # --- secrets ----------------------------------------------------------------------------
@@ -161,12 +161,9 @@ def test_ssm_flags_read_paginated_and_written(monkeypatch):
     assert SsmFlags("ap-southeast-1", client=c).read() == FLAGS_V2  # unknown names ignored
     st.assert_no_pending_responses()
     writes = {f"/siaga/flags/{k}": v for k, v in FLAGS_V1.items()}
-    writes["/siaga/flags/BEDROCK_MODEL_ID"] = "apac.model-x"  # copied from the laptop .env
     c, st = ssm_stub([FLAGS_V1], writes)
     out: list[str] = []
-    monkeypatch.setattr(
-        flags_cli, "get_settings", lambda: Settings(_env_file=None, BEDROCK_MODEL_ID="apac.model-x")
-    )
+    monkeypatch.setattr(flags_cli, "get_settings", lambda: Settings(_env_file=None))
     assert flags_cli.main(["v1"], reader=SsmFlags("ap-southeast-1", client=c)) == 0
     st.assert_no_pending_responses()
     with pytest.raises(ValueError):
@@ -303,21 +300,21 @@ def test_connections_report_names_never_values(runtime, sap, monkeypatch):
 
 
 def test_env_check_never_prints_values(tmp_path, monkeypatch):
-    for name in ("AWS_PROFILE", "CASE_API_KEY", "CASE_API_URL", "BEDROCK_MODEL_ID"):
+    for name in ("AWS_PROFILE", "CASE_API_KEY", "CASE_API_URL", "FLAGS_SOURCE"):
         monkeypatch.delenv(name, raising=False)
     env = tmp_path / ".env"
     env.write_text(
-        "SIAGA_MODE=aws\nAWS_PROFILE=siaga\nAWS_REGION=ap-southeast-1\nBEDROCK_MODEL_ID=<set-me>\n"
+        "SIAGA_MODE=aws\nAWS_PROFILE=siaga\nAWS_REGION=ap-southeast-1\n"
         "CASE_API_URL=https://x.execute-api.example.com\nCASE_API_KEY=s3cr3t-case-key\n"
-        "FLAGS_SOURCE=ssm\nAWS_SECRET_ACCESS_KEY=s3cr3t-aws\n",
+        "FLAGS_SOURCE=<set-me>\nAWS_SECRET_ACCESS_KEY=s3cr3t-aws\n",
         encoding="utf-8",
     )
     out: list[str] = []
     mode, problems = env_mode.check(env, out.append)
     text = "\n".join(out)
     assert mode == "aws"
-    assert problems == ["BEDROCK_MODEL_ID missing", "AWS_SECRET_ACCESS_KEY present"]
-    assert "CASE_API_KEY       set" in text and "BEDROCK_MODEL_ID   MISSING" in text
+    assert problems == ["FLAGS_SOURCE missing", "AWS_SECRET_ACCESS_KEY present"]
+    assert "CASE_API_KEY       set" in text and "FLAGS_SOURCE       MISSING" in text
     assert "s3cr3t" not in text and "execute-api" not in text
 
 
@@ -408,8 +405,6 @@ def test_fill_env_writes_private_files_without_echoing_secrets(sandbox):
         "serviceurls": {"AI_API_URL": SECRET["AICORE_API_URL"]},
     }}))  # fmt: skip
     answers = "\n".join([
-        "anthropic.model-x",            # BEDROCK_MODEL_ID (not in .env.example)
-        "n",                            # Bedrock not working yet -> sap_genai
         str(key_file),                  # AI Core service key
         "d-rpt-1",                      # RPT deployment id
         SECRET["SAP_MOCK_BTP_URL"] + "/",
@@ -431,8 +426,12 @@ def test_fill_env_writes_private_files_without_echoing_secrets(sandbox):
     assert env_mode.check(root / ".env.local", lambda *_: None)[1] == []
     aws = (root / ".env.aws").read_text()
     assert "CASE_API_URL=https://abc.execute-api.ap-southeast-1.amazonaws.com" in aws
-    assert "CASE_API_KEY=<set-me>" not in aws and "BEDROCK_MODEL_ID=anthropic.model-x" in aws
-    assert "BEDROCK_MODEL_ID=anthropic.model-x" in (root / ".env.v1").read_text()
+    assert "CASE_API_KEY=<set-me>" not in aws and "BEDROCK" not in aws
+    v1 = (root / ".env.v1").read_text()
+    assert "LLM_PROVIDER=sap_genai" in v1 and f"AICORE_CLIENT_ID={SECRET['AICORE_CLIENT_ID']}" in v1
+    assert env_mode.check(root / ".env.v1", lambda *_: None)[1] == []
+    for m in ("local", "aws", "replay", "v1"):
+        assert "BEDROCK" not in (root / f".env.{m}").read_text()
     for m in ("local", "aws", "replay", "v1"):
         assert stat.S_IMODE((root / f".env.{m}").stat().st_mode) == 0o600
 

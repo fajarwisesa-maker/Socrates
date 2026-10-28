@@ -2,9 +2,9 @@
 
 Strands runs each specialist's agent loop (which tool to call next, tool execution, the
 conversation). The model call itself goes through the orchestrator's LLM path, so the
-`fake`, `replay`, recording and Bedrock providers, the retry events, the audit trail and
-the LLM call counter work exactly as in v1. Messages are already in the Bedrock Converse
-shape on both sides.
+`fake`, `replay`, recording and SAP AI Core providers, the retry events, the audit trail
+and the LLM call counter work exactly as in v1. Messages are already in the Converse shape
+on both sides.
 """
 
 from __future__ import annotations

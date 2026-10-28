@@ -1,4 +1,4 @@
-"""Precedent knowledge base. Local BM25 now; Bedrock Knowledge Base (S3 Vectors) in Phase 7."""
+"""Precedent knowledge base: local BM25 over the markdown files in data/demo/precedents."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 // SIAGA authority tiers (build brief §2.3). Evaluated before every tool call.
-// Locally with cedarpy (agent/policy.py); loaded into AgentCore Policy in Phase 7.
+// Evaluated with cedarpy (agent/policy.py).
 //
 // The context is computed by deterministic code from the tool's arguments and SAP data,
 // never by the LLM. `has_approval` is true only when a human approved exactly this

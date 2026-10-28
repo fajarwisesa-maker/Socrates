@@ -5,10 +5,12 @@
 What it checks depends on the laptop mode in `.env` (SIAGA_MODE, `make use-*`):
 - aws: the laptop's AWS identity, the env file, the deployed Case API with its key, then,
   through the API's /health/connections (so from AWS, with its IAM role): the siaga/sap
-  secret, Bedrock, the BTP mock, AI Core + one RPT-1.6 call, the AWS backends; and the
+  secret, the LLM, the BTP mock, AI Core + one RPT-1.6 call, the AWS backends; and the
   SSM flags against `make flags-v2`.
-- replay / v1 (or no mode): the local stack (golden recording or Bedrock, Case API, mock
-  SAP day 0, dashboard, CBC, Cedar).
+- local: the live LLM (Claude on SAP AI Core), the BTP mock, AI Core + RPT-1.6, the local
+  stores and any AWS backend that is on, then the local stack.
+- replay / v1 (or no mode): the local stack (golden recording or SAP AI Core, Case API,
+  mock SAP day 0, dashboard, CBC, Cedar).
 
 Exit code 1 if anything is red. Amber items are worth reading but do not block.
 """
@@ -113,15 +115,15 @@ def aws_preflight(s: Settings) -> None:
         line(RED, "DynamoDB, S3 audit, solver Lambda", "no answer from /health/connections")
     else:
         have = checks["backends"]["values"]
-        want = {"case_store": "dynamodb", "audit": "s3", "kb": "bedrock",
-                "policy": "agentcore", "solver": "lambda"}  # fmt: skip
+        want = {"case_store": "dynamodb", "audit": "s3", "kb": "local",
+                "policy": "local", "solver": "lambda"}  # fmt: skip
         assert set(want.values()) == set(AWS_BACKENDS.values())
         off = [f"{k}={have.get(k)}" for k, v in want.items() if have.get(k) != v]
         line(RED if off else GREEN, "DynamoDB, S3 audit, solver Lambda",
              f"local backends: {', '.join(off)} (Phase 7 not deployed)" if off
              else "all AWS backends")  # fmt: skip
     try:
-        bad = diff(SsmFlags(s.aws_region).read(), preset("v2", s.bedrock_model_id))
+        bad = diff(SsmFlags(s.aws_region).read(), preset("v2"))
         line(RED if bad else GREEN, "SSM /siaga/flags/* = make flags-v2",
              ", ".join(f"{k}={a} (want {w})" for k, (a, w) in bad.items()) or "match")  # fmt: skip
     except ConfigSourceError as e:
@@ -143,27 +145,18 @@ def llm_line(what: str, provider, fail: str = RED) -> None:
 def local_preflight(s: Settings) -> None:
     """Mode local (laptop live): live LLM, BTP mock and RPT-1.6; everything else local."""
     env_line()
-    bedrock = s.llm_provider == "bedrock"
-    # with the SAP fallback, a Bedrock problem is worth reading but does not stop the demo
-    soft = AMBER if s.llm_fallback else RED
-    if bedrock:
-        aws_identity(s, soft)
-    else:
-        line(AMBER, "laptop AWS identity", f"not used while LLM_PROVIDER={s.llm_provider}")
-    # --- LLM: the primary, and the fallback on its own
-    if s.llm_provider in ("bedrock", "sap_genai"):
+    if s.audit_backend == "s3" or s.solver_backend == "lambda":
+        aws_identity(s)  # the S3 audit trail / Lambda solver use the laptop's AWS profile
+    # --- LLM: Claude on SAP AI Core
+    if s.llm_provider == "sap_genai":
         from agent.providers import make_provider
 
         try:
             p = make_provider(s.model_copy(update={"llm_record_path": None}))
-        except Exception as e:  # noqa: BLE001 - missing settings / profile; no secret values
-            line(RED, f"LLM {s.llm_provider}", f"{type(e).__name__}: {str(e)[:160]}")
+        except Exception as e:  # noqa: BLE001 - missing settings; no secret values
+            line(RED, "LLM sap_genai", f"{type(e).__name__}: {str(e)[:160]}")
         else:
-            if hasattr(p, "fallback"):
-                llm_line(f"LLM Bedrock {s.bedrock_model_id}", p.primary, soft)
-                llm_line(f"LLM fallback: Claude via SAP AI Core ({s.sap_genai_model})", p.fallback)
-            else:
-                llm_line(f"LLM {s.llm_provider}", p)
+            llm_line(f"LLM Claude via SAP AI Core ({s.sap_genai_model})", p)
     else:
         line(RED, "LLM", f"LLM_PROVIDER={s.llm_provider}: mode local needs a live model")
     # --- BTP mock: the key is enforced and ours is accepted
@@ -191,7 +184,7 @@ def local_preflight(s: Settings) -> None:
 
     try:
         model = make_delay_model(s.model_copy(update={"delay_model": "rpt", "replay": False,
-                                                      "llm_provider": "bedrock"}))  # fmt: skip
+                                                      "llm_provider": "sap_genai"}))  # fmt: skip
         assert model is not None
         p = model.predict("preflight", demo_query(to_iso(datetime.now(UTC))))
         line(GREEN, "AI Core token + RPT-1.6",
@@ -370,8 +363,7 @@ def main() -> int:
     export_aws_env()
     s = get_settings()
     if s.siaga_mode == "local":
-        print(f"SIAGA pre-flight  (mode local: laptop live, LLM {s.llm_provider}"
-              + (f" + fallback {s.llm_fallback}" if s.llm_fallback else "") + ")\n")  # fmt: skip
+        print(f"SIAGA pre-flight  (mode local: laptop live, LLM {s.llm_provider})\n")
         local_preflight(s)
         local_stack(s)
         return summary()
@@ -409,23 +401,6 @@ def llm_checks(s: Settings, replay: bool) -> None:
                 "golden recording",
                 f"{meta and meta.get('model')} at {meta and meta.get('recorded_at')}",
             )
-    elif s.llm_provider == "bedrock":
-        if not s.bedrock_model_id:
-            line(RED, "BEDROCK_MODEL_ID", "not set")
-        else:
-            try:
-                from scripts.aws_check import converse_ping
-
-                r = converse_ping(s.aws_region, s.bedrock_model_id)
-                ok = bool(r["tool_use"])
-                line(GREEN if ok else RED, f"Bedrock {s.bedrock_model_id}",
-                     f"tool call {'ok' if ok else 'MISSING'} in {r['latency_s']} s")  # fmt: skip
-            except Exception as e:  # noqa: BLE001
-                line(RED, f"Bedrock {s.bedrock_model_id}", f"{type(e).__name__}: {str(e)[:120]}")
-        if not s.replay_path.exists():
-            line(AMBER, "golden recording", "none - no replay fallback if Bedrock fails on stage")
-        else:
-            line(GREEN, "replay fallback ready", "restart with REPLAY=1 if Bedrock misbehaves")
     elif s.llm_provider == "sap_genai":
         from agent.providers import make_sap_genai
 
@@ -433,6 +408,10 @@ def llm_checks(s: Settings, replay: bool) -> None:
             llm_line(f"LLM Claude via SAP AI Core ({s.sap_genai_model})", make_sap_genai(s))
         except Exception as e:  # noqa: BLE001
             line(RED, "LLM sap_genai", str(e))
+        if not s.replay_path.exists():
+            line(AMBER, "golden recording", "none - no replay fallback if the model fails on stage")
+        else:
+            line(GREEN, "replay fallback ready", "restart with REPLAY=1 if the model misbehaves")
     else:
         line(AMBER, "LLM provider", "fake (scripted) - fine for rehearsal, not for the live demo")
 

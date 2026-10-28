@@ -1,5 +1,7 @@
 # Phase 7 — AWS design note (for approval)
 
+> **Superseded in part (28 Oct):** Amazon Bedrock (models, Knowledge Bases, AgentCore) was removed from SIAGA at the owner's request. Claude runs on SAP AI Core only. Bedrock mentions below are history; see CLAUDE.md.
+
 Status: **proposal, nothing built yet.** Region `ap-southeast-1` (Singapore).
 
 ## 1. IaC tool: AWS CDK in Python

@@ -4,8 +4,9 @@
 #
 # - Secrets (AICORE_CLIENT_SECRET, SAP_MOCK_API_KEY, CASE_API_KEY) are asked with hidden
 #   input or read from the AI Core service key file, and never echoed.
-# - Values that are not secrets are shown: the model ID (from .env / .env.example if set),
-#   CASE_API_URL (from the deployed stack's outputs, when there is one), URLs, IDs.
+# - Values that are not secrets are shown: CASE_API_URL (from the deployed stack's outputs,
+#   when there is one), URLs, IDs.
+# - The model is Claude on SAP AI Core (LLM_PROVIDER=sap_genai) in every live mode.
 # - Files are written with mode 600. An existing file is kept as <name>.bak first.
 # Then: make use-local (or use-replay / use-v1 / use-aws).
 set -euo pipefail
@@ -17,15 +18,6 @@ PROFILE="${AWS_PROFILE:-siaga}"
 REGION="${AWS_REGION:-ap-southeast-1}"
 PY="${PYTHON:-python3}"
 command -v "$PY" >/dev/null || PY="uv run python"
-
-from_env_file() {  # value of $1 in .env / .env.example (not a secret: model ID only)
-  local f v
-  for f in .env .env.example; do
-    [ -f "$f" ] || continue
-    v=$(grep -E "^$1=" "$f" | tail -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//')
-    if [ -n "$v" ] && [ "$v" != "<set-me>" ]; then printf '%s' "$v"; return; fi
-  done
-}
 
 ask_hidden() {  # ask_hidden VAR "prompt": no echo, empty answers refused
   local __v=""
@@ -42,22 +34,11 @@ ask_shown() {  # ask_shown VAR "prompt": for values that are not secrets
   printf -v "$1" '%s' "$__v"
 }
 
-# --- LLM ---------------------------------------------------------------------------------
-FILL_BEDROCK_MODEL_ID=$(from_env_file BEDROCK_MODEL_ID || true)
-if [ -n "$FILL_BEDROCK_MODEL_ID" ]; then
-  echo "BEDROCK_MODEL_ID = $FILL_BEDROCK_MODEL_ID (from .env)"
-else
-  ask_shown FILL_BEDROCK_MODEL_ID "BEDROCK_MODEL_ID (e.g. an apac.* inference profile; make aws-check)"
-fi
-read -r -p "Does Bedrock answer model calls on the account yet? [y/N] " bedrock_ok
-if [ "$bedrock_ok" = "y" ] || [ "$bedrock_ok" = "Y" ]; then
-  FILL_LLM_PROVIDER=bedrock   # SAP AI Core stays the per-case fallback (LLM_FALLBACK)
-else
-  FILL_LLM_PROVIDER=sap_genai # Claude via SAP AI Core until Bedrock is unblocked
-fi
-echo "LLM_PROVIDER     = $FILL_LLM_PROVIDER (mode local)"
+# --- LLM: Claude on SAP AI Core ----------------------------------------------------------
+FILL_LLM_PROVIDER=sap_genai
+echo "LLM_PROVIDER = sap_genai (Claude on SAP AI Core; the model in SAP_GENAI_MODEL)"
 
-# --- SAP AI Core (mode local) ------------------------------------------------------------
+# --- SAP AI Core (model + RPT-1.6) -------------------------------------------------------
 echo
 read -r -p "Path to the AI Core service key JSON (Enter to type the values instead): " SK
 if [ -n "$SK" ]; then
@@ -125,12 +106,13 @@ write() {  # write <template> <target> KEY...: set each KEY whose FILL_KEY is no
   echo "wrote $dst"
 }
 echo
-write .env.local.example .env.local LLM_PROVIDER BEDROCK_MODEL_ID AICORE_AUTH_URL \
+write .env.local.example .env.local LLM_PROVIDER AICORE_AUTH_URL \
   AICORE_CLIENT_ID AICORE_CLIENT_SECRET AICORE_API_URL AICORE_RPT_DEPLOYMENT_ID \
   SAP_MOCK_BTP_URL SAP_MOCK_API_KEY
 write .env.replay.example .env.replay
-write .env.v1.example .env.v1 BEDROCK_MODEL_ID
-write .env.aws.example .env.aws BEDROCK_MODEL_ID CASE_API_URL CASE_API_KEY
+write .env.v1.example .env.v1 LLM_PROVIDER AICORE_AUTH_URL AICORE_CLIENT_ID \
+  AICORE_CLIENT_SECRET AICORE_API_URL
+write .env.aws.example .env.aws CASE_API_URL CASE_API_KEY
 
 left=$(grep -l '<set-me>' .env.local .env.replay .env.v1 2>/dev/null || true)
 echo

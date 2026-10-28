@@ -104,13 +104,9 @@ def build_runtime(
             audit = S3AuditWriter(audit, s.audit_s3_bucket, s.audit_s3_prefix,
                                   region=s.aws_region)  # fmt: skip
     if policy is None:
-        policy = (
-            LocalCedarPolicyEngine(registry.names())
-            if s.policy_backend == "local"
-            else _phase7("AgentCore Policy")
-        )
+        policy = LocalCedarPolicyEngine(registry.names())
     if kb is None:
-        kb = LocalBM25KB() if s.kb_backend == "local" else _phase7("Bedrock Knowledge Base")
+        kb = LocalBM25KB()
     return Runtime(
         settings=s,
         sap=sap or HttpSapClient(*_sap_endpoint(s)),

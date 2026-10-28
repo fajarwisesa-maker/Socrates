@@ -57,7 +57,7 @@ const TYPES = [
   { id: "stage", label: "Stage changes", kinds: ["stage_transition"] },
   { id: "tool", label: "Tool calls", kinds: ["tool_call"] },
   { id: "policy", label: "Policy decisions", kinds: ["policy_decision", "allowlist_violation"] },
-  { id: "model", label: "Model calls", kinds: ["llm_call", "llm_retry", "llm_fallback"] },
+  { id: "model", label: "Model calls", kinds: ["llm_call", "llm_retry"] },
   { id: "approval", label: "Approvals", kinds: ["approval"] },
 ] as const;
 type TypeId = (typeof TYPES)[number]["id"] | "other";

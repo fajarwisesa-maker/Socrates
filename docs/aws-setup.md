@@ -8,7 +8,8 @@ the fallback:
 | **Audit trail** | `AUDIT_BACKEND=s3` | Every audit entry is also stored as its own object in an **S3 bucket with Object Lock**. S3 then refuses to overwrite or delete it until the retention ends. |
 | **Solver** | `SOLVER_BACKEND=lambda` | Every risk calculation and plan optimisation (PuLP / CBC) runs as an **AWS Lambda** function, `siaga-solver` |
 
-The language model stays on Bedrock or SAP AI Core. This page covers AWS outside the model.
+The language model is Claude on SAP AI Core. This page covers the AWS pieces: the audit
+trail and the solver.
 
 ```
 agent ──solve──▶ AWS Lambda "siaga-solver" (Python 3.12, PuLP + CBC)
@@ -26,7 +27,6 @@ agent ──solve──▶ AWS Lambda "siaga-solver" (Python 3.12, PuLP + CBC)
 - Permissions: the account admin is enough for a hackathon. The minimum is in
   `infra/iam/siaga-laptop-aws.json`: what the setup needs once, and what a running demo needs
   (put and read audit objects, invoke the function).
-- Bedrock's model block ("Operation not allowed") does **not** affect S3 or Lambda.
 
 ## Once: create both and switch the laptop to them
 

@@ -1,13 +1,10 @@
-"""Lambda entry point (Phase 7 container image) with the same models as the FastAPI app.
+"""Lambda entry point (SOLVER_BACKEND=lambda) with the same models as the FastAPI app.
 
 Accepted events:
   * direct invoke:            {"operation": "solve", "payload": {...SolveRequest}}
   * health check:             {"operation": "ping"} -> a tiny CBC solve (proves the bundled
                               solver binary runs in this runtime)
   * API Gateway proxy (v1/v2): POST /{operation} with the request model as JSON body
-
-How AgentCore Gateway passes tool calls to a Lambda target is verified against the
-current AWS docs in Phase 7 before this handler is wired to it.
 """
 
 from __future__ import annotations

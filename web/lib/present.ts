@@ -180,12 +180,10 @@ export function glossFor(e: { quote: string; gloss_en?: string | null }): string
 
 export const SAP_MODEL_NOTE = "Model: Claude via SAP AI Core";
 
-/** The note shown when this case's model calls ran on SAP AI Core (LLM_PROVIDER=sap_genai,
- *  or LLM_FALLBACK moved the case there). Read from the case's own events. */
+/** The note shown when this case's model calls ran on SAP AI Core. Read from the case's
+ *  own events. */
 export function sapModelNote(events: CaseEvent[]): string | null {
-  const onSap = events.some(
-    (e) => e.status === "fallback" || (e.status === "llm" && String(e.data?.model ?? "").includes("sap:")),
-  );
+  const onSap = events.some((e) => e.status === "llm" && String(e.data?.model ?? "").includes("sap:"));
   return onSap ? SAP_MODEL_NOTE : null;
 }
 
@@ -196,8 +194,6 @@ export function modelLabel(config: Config | null): string {
     const src = config.replay_source;
     return `replay of a recorded run (${src?.provider ?? "recording"}${src?.model ? `, ${src.model}` : ""})`;
   }
-  const fallback = config.llm_fallback ? " · fallback: Claude via SAP AI Core" : "";
-  if (config.llm_provider.startsWith("bedrock")) return `Amazon Bedrock · ${config.model ?? "model not set"}${fallback}`;
   if (config.llm_provider === "sap_genai") return `Claude via SAP AI Core · ${config.model ?? ""}`;
   return "scripted fake LLM (offline)";
 }

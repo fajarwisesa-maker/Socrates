@@ -1,7 +1,7 @@
 """Policy engine: authorise every tool call against the Cedar tier policies.
 
-`PolicyEngine` is the seam for Phase 7 (AgentCore Policy). The local implementation
-evaluates `policy/*.cedar` with cedarpy. The schema's action list is generated from the
+`PolicyEngine` is the seam for another engine. The local implementation evaluates
+`policy/*.cedar` with cedarpy. The schema's action list is generated from the
 tool registry so that adding a tool never needs a hand edit of the schema.
 """
 

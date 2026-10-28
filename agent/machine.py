@@ -104,7 +104,6 @@ class Agent:
         self.store = runtime.store
         self.registry = runtime.registry
         self._stage_clock: dict[str, tuple[str, float]] = {}
-        self._fallback_noted: set[str] = set()  # cases already told they run on the fallback
 
     # ================================================================ public API
 
@@ -290,20 +289,6 @@ class Agent:
             )
 
         resp = self.llm.converse(req.model_copy(update={"case_id": case_id}), on_retry)
-        if resp.fallback_reason and case_id not in self._fallback_noted:
-            # LLM_FALLBACK moved this case to Claude via SAP AI Core (first time only)
-            self._fallback_noted.add(case_id)
-            self.rt.audit.append(
-                case_id, "llm_fallback", {"stage": stage, "reason": resp.fallback_reason}
-            )
-            self._event(
-                case_id,
-                stage,
-                "fallback",
-                "Model: Claude via SAP AI Core",
-                resp.fallback_reason,
-                {"model": resp.model, "reason": resp.fallback_reason},
-            )
         case = self.store.get_case(case_id)
         self.store.update_case(case_id, llm_call_count=case.llm_call_count + 1)
         wall = round(time.perf_counter() - t0, 3)

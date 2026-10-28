@@ -28,16 +28,15 @@ and `scripts/put-sap-secret.sh` (AWS Secrets Manager).
 
 ## Who needs what
 
-Mode `local` (Demo Day) keeps everything it needs in `.env.local`: `AWS_PROFILE=siaga` (no
-keys), `BEDROCK_MODEL_ID`, `LLM_PROVIDER` / `LLM_FALLBACK=sap_genai`, the `AICORE_*` values
-(RPT-1.6 and Claude on AI Core), `SAP_MOCK_BTP_URL` + `SAP_MOCK_API_KEY`, and the v2 flags.
+Mode `local` (Demo Day) keeps everything it needs in `.env.local`: `LLM_PROVIDER=sap_genai`,
+the `AICORE_*` values (Claude and RPT-1.6 on AI Core), `AWS_PROFILE=siaga` (no keys; only for
+the optional S3 audit trail and Lambda solver), `SAP_MOCK_BTP_URL` + `SAP_MOCK_API_KEY`, and the v2 flags.
 The table below is the production (AWS) design.
 
 | Value | Laptop `.env.aws` | Claude Code env | Secrets Manager `siaga/sap` | SSM `/siaga/flags/*` | BTP app (`cf set-env`) |
 | --- | --- | --- | --- | --- | --- |
 | AWS credentials | `AWS_PROFILE=siaga` only | set, but STS answers `InvalidClientTokenId` in this session | — | — | — |
 | `AWS_REGION` | ✓ | default `ap-southeast-1` | — | — | — |
-| `BEDROCK_MODEL_ID` | ✓ (preflight, replay recording) | not set | — | ✓ (`make flags-v2` copies it from the laptop) | — |
 | `CASE_API_URL` | ✓ (`aws`: stack output `CaseApiUrl`; local modes: `http://127.0.0.1:8000`) | default | — | — | — |
 | `CASE_API_KEY` | ✓ (`aws` only) | not set | ✓ (the API checks it) | — | — |
 | `AICORE_AUTH_URL`, `AICORE_CLIENT_ID`, `AICORE_CLIENT_SECRET`, `AICORE_API_URL`, `AICORE_RESOURCE_GROUP`, `AICORE_RPT_DEPLOYMENT_ID` | — | not in this session (added after it started) | ✓ | — | — |
@@ -66,7 +65,6 @@ What changed in the code to match this map (env setup, 25 Oct):
   `FLAGS_SOURCE=ssm` they are read for every case, and the flag values are recorded per case.
 - Before, nothing checked `CASE_API_KEY`. Now the Case API enforces it, and the dashboard, preflight
   and rehearse send it.
-- New SSM parameter `BEDROCK_MODEL_ID` (read per case, like the flags).
 - `make sap-check` / `make predict-demo` still read AI Core values from the environment:
   they are tools for the Claude Code env (or a laptop shell), not part of any laptop mode.
 
@@ -91,10 +89,10 @@ A `cf service-key` output nests these under `credentials`; the script handles bo
 
 | Command | Mode | What runs where |
 | --- | --- | --- |
-| `make use-local` | `local` (**Demo Day default**) | everything on the laptop (`make dev`), local stores; live LLM (Bedrock with the SAP AI Core fallback, or `sap_genai`), the BTP mock and RPT-1.6; v2 flags from `.env` |
+| `make use-local` | `local` (**Demo Day default**) | everything on the laptop (`make dev`), local stores; live LLM (Claude via SAP AI Core), the BTP mock and RPT-1.6; v2 flags from `.env` |
 | `make use-aws` | `aws` (production design, not deployed) | the laptop runs only the dashboard (`make web`), `make preflight` and `make rehearse`, all against the deployed Case API with `CASE_API_KEY`; flags from SSM |
-| `make use-replay` | `replay` (offline fallback) | everything on the laptop (`make dev`) from `data/golden/v2/` (LLM + RPT answers recorded); no network to Bedrock, SAP or BTP |
-| `make use-v1` | `v1` (oldest fallback) | everything on the laptop (`make dev`), v1 behaviour, all v2 flags off, Bedrock via `AWS_PROFILE=siaga` |
+| `make use-replay` | `replay` (offline fallback) | everything on the laptop (`make dev`) from `data/golden/v2/` (LLM + RPT answers recorded); no network to SAP AI Core or BTP |
+| `make use-v1` | `v1` (oldest fallback) | everything on the laptop (`make dev`), v1 behaviour, all v2 flags off, Claude via SAP AI Core |
 
 `make env-check` lists each variable the active mode needs as `set` or `MISSING`, and flags
 anything that does not belong in the mode (for example AWS access keys in `.env.aws`). It
@@ -102,7 +100,7 @@ never prints a value.
 
 ## IAM (for the Phase 7 stack)
 
-Only the AgentCore Runtime role and the Case API Lambda get read access, each on the one
+Only the deployed agent's role and the Case API Lambda get read access, each on the one
 resource it needs. Template: `infra/iam/siaga-config-read.json`.
 
 - `secretsmanager:GetSecretValue` on the ARN of `siaga/sap` only (`…:secret:siaga/sap-??????`).

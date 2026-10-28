@@ -9,7 +9,7 @@ Nothing is deployed yet. What the Phase 7 stack must do for configuration and se
   `secretsmanager.Secret.from_secret_name_v2(self, "SapSecret", "siaga/sap")`.)
 - **Flags** `/siaga/flags/*`: written by `make flags-v2` / `make flags-v1`, not by the
   stack, so switching needs no redeploy.
-- **IAM**: only the AgentCore Runtime role and the Case API Lambda get
+- **IAM**: only the deployed agent's role and the Case API Lambda get
   `iam/siaga-config-read.json` (GetSecretValue on that one secret, GetParametersByPath on
   that one path). The tools and solver Lambdas get neither.
 - **Environment of the deployed processes** (not secrets): `SECRETS_SOURCE=aws`,

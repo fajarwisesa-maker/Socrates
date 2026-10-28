@@ -3,14 +3,18 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay whatsapp tunnel use-v1 env-check flags-v2 flags-v1 flags-show aws-setup aws-status lambda-package audit-verify audit-sync
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay whatsapp tunnel use-v1 env-check flags-v2 flags-v1 flags-show aws-setup aws-status lambda-package audit-verify audit-sync
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-install: ## Install Python + web deps and the pre-commit hook
+install: ## Install Python + web deps (+ the pre-commit hook inside a git checkout)
 	uv sync
-	$(UV) pre-commit install
+	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+		$(UV) pre-commit install; \
+	else \
+		echo "not a git checkout (e.g. unpacked from a zip): skipping the pre-commit hook"; \
+	fi
 	cd web && npm ci
 
 test: ## Run the test suite
@@ -23,12 +27,6 @@ lint: ## Ruff lint + format check
 fmt: ## Auto-fix lint and format
 	$(UV) ruff check --fix .
 	$(UV) ruff format .
-
-aws-check: ## Show AWS identity and ACTIVE Claude models in AWS_REGION
-	$(UV) python scripts/aws_check.py
-
-aws-probe: ## Also prove tool use with a tiny Converse call per Sonnet model
-	$(UV) python scripts/aws_check.py --probe
 
 aws-setup: ## AWS: S3 audit bucket (Object Lock) + Lambda solver, test solve, switch .env.local
 	$(UV) python scripts/aws_setup.py all
@@ -44,9 +42,6 @@ audit-verify: ## AWS: read a case's audit trail back from S3 and check it (CASE=
 
 audit-sync: ## AWS: upload local audit entries missing in S3 (after being offline)
 	$(UV) python scripts/aws_setup.py sync-audit
-
-agentcore-check: ## Which AgentCore features (Runtime, Gateway, Policy, Evaluations…) answer in AWS_REGION
-	$(UV) python scripts/aws_check.py --agentcore
 
 sap-check: ## v2: SAP AI Core token, deployments, one RPT-1.6 call; cf target; joule status
 	$(UV) python scripts/sap_check.py
@@ -116,10 +111,10 @@ demo-fake: ## Same with the scripted fake LLM (no AWS needed)
 	$(UV) python -m agent.run --whatsapp data/demo/whatsapp_driver.txt \
 		--pdf data/demo/forwarder_notice.pdf --auto-approve --verify-delay 1 --provider fake
 
-eval-perceive: ## PERCEIVE accuracy on data/demo/perceive_testset.jsonl (needs Bedrock)
+eval-perceive: ## PERCEIVE accuracy on data/demo/perceive_testset.jsonl (needs the live model on SAP AI Core)
 	$(UV) python scripts/eval_perceive.py
 
-replay: ## Full stack (mock SAP + API + dashboard) on the golden recording; no Bedrock calls
+replay: ## Full stack (mock SAP + API + dashboard) on the golden recording; no model calls
 	REPLAY=1 $(MAKE) dev
 
 replay-cli: ## The golden recording through the CLI (instant)
@@ -156,7 +151,7 @@ use-aws: ## Mode aws (production design, not deployed): .env.aws -> .env; the de
 use-replay: ## Mode replay (offline fallback): .env.replay -> .env; all local, golden recording
 	@$(UV) python scripts/env_mode.py use replay
 
-use-v1: ## Mode v1 (oldest fallback): .env.v1 -> .env; v1 behaviour, local services + Bedrock
+use-v1: ## Mode v1 (oldest fallback): .env.v1 -> .env; v1 behaviour, local services + SAP AI Core
 	@$(UV) python scripts/env_mode.py use v1
 
 env-check: ## Every variable the active mode needs: set / MISSING (never prints values)

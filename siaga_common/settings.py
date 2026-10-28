@@ -26,23 +26,17 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---
-    # sap_genai: Claude on SAP AI Core (Generative AI Hub), same Converse interface
-    llm_provider: Literal["bedrock", "fake", "replay", "sap_genai"] = Field(
-        "bedrock", alias="LLM_PROVIDER"
-    )
-    # sap_genai: a case whose first Bedrock call fails with an account or throttling error
-    # runs on Claude via SAP AI Core instead (agent/providers/fallback.py)
-    llm_fallback: Literal["", "sap_genai"] = Field("", alias="LLM_FALLBACK")
+    # sap_genai: Claude on SAP AI Core (Generative AI Hub); fake: the scripted model for
+    # tests and offline demos; replay: the golden recording
+    llm_provider: Literal["sap_genai", "fake", "replay"] = Field("sap_genai", alias="LLM_PROVIDER")
     # the Generative AI Hub model name; its deployment is found in AICORE_RESOURCE_GROUP
     # (scenario foundation-models) unless SAP_GENAI_DEPLOYMENT_ID names it
     sap_genai_model: str = Field("anthropic--claude-4.6-sonnet", alias="SAP_GENAI_MODEL")
     sap_genai_deployment_id: str | None = Field(None, alias="SAP_GENAI_DEPLOYMENT_ID")
-    # Deliberately no default: the model must be chosen explicitly (see CLAUDE.md).
-    bedrock_model_id: str | None = Field(None, alias="BEDROCK_MODEL_ID")
     aws_region: str = Field("ap-southeast-1", alias="AWS_REGION")
     replay: bool = Field(False, alias="REPLAY")
-    # Brief: temperature 0. Current Claude models reject non-default sampling parameters;
-    # the Bedrock provider then drops it automatically. "off" never sends it.
+    # Brief: temperature 0. If the model rejects a sampling parameter, the provider drops it
+    # once and carries on. "off" never sends it.
     llm_temperature: str = Field("0", alias="LLM_TEMPERATURE")
     replay_path: Path = Field(REPO_ROOT / "data" / "golden" / "llm.jsonl", alias="REPLAY_PATH")
     # 1.0 = replay at the recorded model latency (looks live on stage), 0 = instant.
@@ -54,8 +48,8 @@ class Settings(BaseSettings):
     # --- Backends (local now, AWS in Phase 7) ---
     case_store: Literal["sqlite", "dynamodb"] = Field("sqlite", alias="CASE_STORE")
     audit_backend: Literal["local", "s3"] = Field("local", alias="AUDIT_BACKEND")
-    kb_backend: Literal["local", "bedrock"] = Field("local", alias="KB_BACKEND")
-    policy_backend: Literal["local", "agentcore"] = Field("local", alias="POLICY_BACKEND")
+    kb_backend: Literal["local"] = Field("local", alias="KB_BACKEND")
+    policy_backend: Literal["local"] = Field("local", alias="POLICY_BACKEND")
     solver_backend: Literal["inprocess", "http", "lambda"] = Field(
         "inprocess", alias="SOLVER_BACKEND"
     )
@@ -93,7 +87,7 @@ class Settings(BaseSettings):
     delay_model: Literal["signal", "rpt", "fake"] = Field("signal", alias="DELAY_MODEL")
     rpt_timeout_seconds: float = Field(5.0, alias="RPT_TIMEOUT_SECONDS")
     # step 5: mask phone numbers, e-mails and personal names in signals before any model
-    # call (local = deterministic masker; Bedrock Guardrails needs AWS access)
+    # call (local = deterministic masker)
     pii_masking: Literal["off", "local"] = Field("off", alias="PII_MASKING")
     history_path: Path = Field(
         REPO_ROOT / "data" / "history" / "disruptions.csv", alias="DELAY_HISTORY_PATH"
@@ -194,21 +188,13 @@ class Settings(BaseSettings):
         """Headers for calling the Case API (the key, when one is configured)."""
         return {"X-API-Key": self.case_api_key.get_secret_value()} if self.case_api_key else {}
 
-    def require_model_id(self) -> str:
-        if not self.bedrock_model_id:
-            raise RuntimeError(
-                "BEDROCK_MODEL_ID is not set. Pick a model with `make aws-check` "
-                "and put it in .env (no default is hardcoded on purpose)."
-            )
-        return self.bedrock_model_id
-
 
 def export_aws_env(env_file: Path | None = None) -> list[str]:
     """Copy AWS_* values from `.env` into os.environ for boto3.
 
-    pydantic-settings reads `.env` only for the fields above; boto3 reads credentials
-    (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN, AWS_PROFILE, or a
-    Bedrock API key in AWS_BEARER_TOKEN_BEDROCK) from the process environment. Variables
+    pydantic-settings reads `.env` only for the fields above; boto3 (S3 audit trail, Lambda
+    solver, SSM / Secrets Manager) reads credentials (AWS_PROFILE, or AWS_ACCESS_KEY_ID /
+    AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN) from the process environment. Variables
     already set in the real environment win. Returns the names exported (never values).
     """
     import os

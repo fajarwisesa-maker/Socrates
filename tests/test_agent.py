@@ -305,6 +305,6 @@ def test_throttle_exhausted_escalates_as_model_unavailable(runtime, signals):
     agent = Agent(runtime, llm)
     c = agent.run(agent.start_case(signals).case_id)
     assert c.status == "ESCALATED"
-    assert c.escalation_reason.startswith("LLM unavailable: Bedrock ThrottlingException")
+    assert c.escalation_reason.startswith("LLM unavailable: SAP AI Core HTTP 429 (throttled)")
     retries = [e for e in runtime.store.list_events(c.case_id) if e.status == "retry"]
     assert [e.data["attempt"] for e in retries] == [2, 3, 4, 5, 6]

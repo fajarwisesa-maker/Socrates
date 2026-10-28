@@ -213,8 +213,6 @@ export interface Config {
       last_error: string | null;
     };
   };
-  /** LLM_FALLBACK: a case may move to Claude via SAP AI Core when Bedrock refuses it */
-  llm_fallback?: { provider: string; model: string } | null;
   /** WHATSAPP_INBOUND: cases can open from a WhatsApp message; the dashboard follows them */
   whatsapp_inbound?: boolean;
   /** WHATSAPP_NOTIFY: a finished WhatsApp case replies to its sender with the outcome */

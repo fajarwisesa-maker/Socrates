@@ -46,14 +46,12 @@ function boxes(config: Config | null, record: CaseRecord | null) {
     now: `deterministic supervisor: stage order, ${config?.max_tool_calls ?? 20}-call budget, ${
       config?.max_replans ?? 2
     } replans · model: ${model}`,
-    target: "AgentCore Runtime",
     live: true,
   };
   const policy: Box = {
     id: "policy",
     title: "Gateway + Policy (Cedar tiers)",
-    now: b?.policy === "agentcore" ? "AgentCore Policy" : "Cedar via cedarpy, in process",
-    target: "AgentCore Gateway + Policy",
+    now: "Cedar via cedarpy, in process",
     live: true,
   };
   const tools: Box[] = [
@@ -102,8 +100,7 @@ function boxes(config: Config | null, record: CaseRecord | null) {
     {
       id: "kb",
       title: "Precedent KB",
-      now: b?.kb === "bedrock" ? "Bedrock Knowledge Base" : "BM25 over synthetic precedents, local",
-      target: "Bedrock KB on S3 Vectors",
+      now: "BM25 over synthetic precedents, local",
       live: true,
     },
     {

@@ -1,5 +1,7 @@
 # Dashboard redesign — step 1 audit
 
+> **Superseded in part (28 Oct):** Amazon Bedrock (models, Knowledge Bases, AgentCore) was removed from SIAGA at the owner's request. Claude runs on SAP AI Core only. Bedrock mentions below are history; see CLAUDE.md.
+
 Status: **checkpoint, nothing in `web/` or the backend changed yet.**
 Screenshots: 27 states of the current dashboard at 1280×720 (empty, signals loaded, running,
 awaiting approval, each stage expanded, options, approval card, VERIFY countdown, resolved,

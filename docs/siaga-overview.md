@@ -132,7 +132,7 @@ flowchart LR
     end
 
     TOOLS -->|OData V4| SAP["Mock S/4HANA<br/>local :8001 or SAP BTP (Cloud Foundry)"]
-    AGENT -->|Converse API| LLM["Claude<br/>Amazon Bedrock or SAP AI Core"]
+    AGENT -->|Converse API| LLM["Claude<br/>SAP AI Core (Generative AI Hub)"]
     TOOLS -->|predict| RPT["SAP RPT-1.6<br/>delay prediction (AI Core)"]
     API -->|outcome reply| WAOUT["WhatsApp reply<br/>(Meta or Twilio)"]
 ```
@@ -147,7 +147,7 @@ flowchart LR
 | **Critic** | `agent/critic.py` | Deterministic business rules: feasibility, safety stock, Incoterm, supplier capacity, cutoff, tier mapping |
 | **Solver** | `services/solver/` | Stockout risk, the MIP that prices options, comparison, timing re-checks; in process or on **AWS Lambda** (`SOLVER_BACKEND=lambda`) |
 | **Mock S/4HANA** | `services/sap_mock/` | OData-V4-shaped API with POs, stock, sales orders, suppliers, lanes, quotes; runs locally or on SAP BTP |
-| **LLM providers** | `agent/providers/` | Bedrock, SAP AI Core (`sap_genai`), fallback, replay, recording, and a scripted `fake` |
+| **LLM providers** | `agent/providers/` | Claude on SAP AI Core (`sap_genai`), replay, recording, and a scripted `fake` |
 | **Delay model** | `agent/delay_model.py` | SAP RPT-1.6 delay prediction, combined with the signal's delay range |
 | **Audit** | `agent/audit.py` | Append-only JSONL per case; each entry carries the hash of the previous one; with `AUDIT_BACKEND=s3` every entry is also an object in an **S3 Object Lock** bucket |
 | **Dashboard** | `web/` | Presenter mode for the projector, Planner mode for detail |
@@ -273,8 +273,8 @@ and the case becomes **REOPENED**, with a red banner on the dashboard. A hidden 
 **The model misbehaves or is unavailable.** An invalid structured output is sent back with
 the validation error and one nudge. After 5 turns the case escalates. If the model never
 completes ASSESS, a deterministic fallback makes the same lookups (visible as an event).
-Throttling is retried and shown as "Retrying…". If Bedrock refuses the case at its start, it
-can move to Claude on SAP AI Core (`LLM_FALLBACK=sap_genai`).
+Throttling is retried and shown as "Retrying…"; if it never clears, the case is handed to a
+planner ("The model stayed busy").
 
 ## 6. Humans in the loop: tiers and approvals
 
@@ -342,8 +342,7 @@ stage of the rail.
 
 | Integration | Switch | Notes |
 | --- | --- | --- |
-| **Claude on Amazon Bedrock** | `LLM_PROVIDER=bedrock`, `BEDROCK_MODEL_ID` | Converse API with tool use; temperature 0; visible throttling retries |
-| **Claude on SAP AI Core** (Generative AI Hub) | `LLM_PROVIDER=sap_genai`, or `LLM_FALLBACK=sap_genai` | Model `anthropic--claude-4.6-sonnet`; deployment looked up via AI Core; the same Converse body. As a fallback it takes over a case only if Bedrock refuses its first call, and the UI says "Model: Claude via SAP AI Core" |
+| **Claude on SAP AI Core** (Generative AI Hub) | `LLM_PROVIDER=sap_genai` (the default) | Model `anthropic--claude-4.6-sonnet`; deployment looked up via AI Core; Converse API with tool use; temperature 0; visible throttling retries. The UI says "Model: Claude via SAP AI Core" |
 | **SAP RPT-1.6** | `DELAY_MODEL=rpt` | Predicts the delay in hours from 80 past disruptions. A prediction inside the signal's range is used as a point; outside, it is clamped and flagged; unavailable falls back to the range. Never an escalation |
 | **Mock S/4HANA on SAP BTP** | `SAP_MOCK_ON_BTP=1` | Cloud Foundry app `siaga-sap-mock`, protected by an API key |
 | **WhatsApp (Meta Cloud API)** | `WHATSAPP_INBOUND=1`, `WHATSAPP_PROVIDER=meta` | A message from an allowed phone opens a case; `WHATSAPP_NOTIFY=1` sends the outcome back |
@@ -392,9 +391,9 @@ pass a projector washout check (contrast reduced by 30%).
 
 | Mode | Command | Model | SAP | When |
 | --- | --- | --- | --- | --- |
-| **Laptop live** (Demo Day default) | `make use-local` → `make dev` | Bedrock or Claude on SAP AI Core | BTP mock + RPT-1.6 | default |
+| **Laptop live** (Demo Day default) | `make use-local` → `make dev` | Claude on SAP AI Core | BTP mock + RPT-1.6 | default |
 | **Replay** | `make use-replay` → `make dev` | the recorded run | local mock | no network, or a live service misbehaves |
-| **v1** | `make use-v1` → `make dev` | Bedrock | local mock, no RPT | the v2 path misbehaves |
+| **v1** | `make use-v1` → `make dev` | Claude on SAP AI Core | local mock, no RPT | the v2 path misbehaves |
 | **Fake** (development, tests) | `LLM_PROVIDER=fake make dev` | scripted | local mock | no credentials |
 
 ```bash
@@ -420,11 +419,11 @@ Other useful commands:
 | --- | --- |
 | Agent, tools, policy, Critic, solver, audit, Case API, dashboard | Built and tested (pytest, Playwright, rehearse 10/10) with the scripted model and replay |
 | Multi-agent mode, RPT-1.6 integration, PII masking, BTP mock | Built and tested; the BTP mock is deployed by the owner |
-| Claude on SAP AI Core + fallback | Built and tested against a simulated AI Core; a live ping has succeeded on the owner's laptop |
+| Claude on SAP AI Core | Built and tested against a simulated AI Core; a live ping has succeeded on the owner's laptop |
 | S3 audit trail + Lambda solver | Built and tested against a local stand-in that speaks the S3 and Lambda protocols (real boto3, real HTTP, browser tests); not yet created in a real AWS account (`make aws-setup`) |
 | WhatsApp inbound + reply (Meta and Twilio) | Built and tested with signed payloads and stand-in APIs; not yet tried with a real account |
 | Golden recordings in `data/golden/` | **Placeholders from the scripted model**, labelled "(fake)" in the UI; to be re-recorded from a live run (`make record-golden`) |
-| Bedrock | Blocked on the owner's account ("Operation not allowed"); SAP AI Core is used instead |
+| Bedrock | Removed from the code (owner, 28 Oct); Claude runs on SAP AI Core only |
 | AWS deployment (Phase 7) | Dropped; the secrets / SSM / health-check design stays documented |
 
 Open items are tracked in [CLAUDE.md](../CLAUDE.md#open-items).

@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run one SIAGA case")
     ap.add_argument("--whatsapp", type=Path, help="WhatsApp message text file")
     ap.add_argument("--pdf", type=Path, help="forwarder PDF")
-    ap.add_argument("--provider", choices=["bedrock", "fake", "replay"])
+    ap.add_argument("--provider", choices=["sap_genai", "fake", "replay"])
     ap.add_argument("--embedded-sap", action="store_true", help="in-memory mock SAP")
     ap.add_argument("--auto-approve", action="store_true", help="approve Tier 3 requests")
     ap.add_argument("--verify-delay", type=int, help="override VERIFY_DELAY_SECONDS")

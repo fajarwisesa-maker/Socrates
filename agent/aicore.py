@@ -10,9 +10,9 @@ memory (the SAP docs hosts are blocked here): `sap-ai-sdk-gen` 7.4.1,
   `details.resources.backend_details.model.name` (else the configuration's `modelName`
   parameter binding). Names look like `anthropic--claude-4.6-sonnet` (the model list in
   `@sap-ai-sdk/orchestration` 2.17.0 has it).
-- Calls: the Amazon Bedrock runtime API proxied by the deployment. The SDK keeps the last
-  path segment of the Bedrock URL and posts the unchanged, unsigned Converse body to
-  `{deploymentUrl}/converse` with `Authorization: Bearer <token>` and `AI-Resource-Group`.
+- Calls: the deployment speaks the Converse API. The SDK posts the unsigned Converse body
+  to `{deploymentUrl}/converse` with `Authorization: Bearer <token>` and
+  `AI-Resource-Group`, and gets a Converse response back.
 """
 
 from __future__ import annotations

@@ -99,7 +99,7 @@ class Tool(ABC):
     def run(self, args: BaseModel, ctx: ToolContext) -> BaseModel: ...
 
     def spec(self) -> dict[str, Any]:
-        """Bedrock Converse `toolSpec` (and later the AgentCore Gateway tool definition)."""
+        """Converse `toolSpec` for the model."""
         return {
             "toolSpec": {
                 "name": self.name,

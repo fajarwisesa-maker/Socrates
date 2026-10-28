@@ -153,7 +153,7 @@ class CaseService:
 
     def agent_for(self, flags: dict[str, str]) -> Agent:
         base = self.rt.settings
-        # "" = not set (e.g. no BEDROCK_MODEL_ID); the key is what the settings end up as,
+        # "" = not set; the key is what the settings end up as,
         # so the flags read from SSM and the full set stored on a case find the same agent
         s = overlay(base, {k: v for k, v in flags.items() if k in CASE_FLAGS and v != ""})
         key = self._key(snapshot(s))
@@ -170,10 +170,10 @@ class CaseService:
                     clock=self.rt.clock,
                 )
                 replaying = s.replay or s.llm_provider == "replay"
-                same_llm = (s.llm_provider, s.replay, s.bedrock_model_id) == (
+                same_llm = (s.llm_provider, s.replay, s.sap_genai_model) == (
                     base.llm_provider,
                     base.replay,
-                    base.bedrock_model_id,
+                    base.sap_genai_model,
                 ) and (
                     not replaying or s.replay_path == base.replay_path  # multi has its own
                 )
@@ -314,7 +314,7 @@ def create_app(
     @app.get("/health/connections")
     def connections(deep: bool = False) -> dict[str, Any]:
         """What this process can reach, for `make preflight`. Never returns a secret value;
-        `deep=1` also makes one Bedrock call and one RPT-1.6 call."""
+        `deep=1` also makes one model call and one RPT-1.6 call."""
         agent, warning = service.current_agent()
         return check_connections(agent.rt.settings, agent.rt, deep=deep, flags_warning=warning)
 
@@ -330,13 +330,7 @@ def create_app(
             if s.orchestration == "multi"
             else [],
             "replay": s.replay or s.llm_provider == "replay",
-            "model": {"bedrock": s.bedrock_model_id, "sap_genai": s.sap_genai_model}.get(
-                s.llm_provider
-            ),
-            # LLM_FALLBACK: a case may run on Claude via SAP AI Core (UI note from its events)
-            "llm_fallback": {"provider": s.llm_fallback, "model": s.sap_genai_model}
-            if s.llm_fallback
-            else None,
+            "model": s.sap_genai_model if s.llm_provider == "sap_genai" else None,
             "verify_delay_seconds": s.verify_delay_seconds,
             "max_tool_calls": s.max_tool_calls,
             "max_replans": s.max_replans,

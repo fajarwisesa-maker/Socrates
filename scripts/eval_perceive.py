@@ -1,6 +1,6 @@
 """PERCEIVE accuracy on the 20-item test set. Target >= 18/20 with T01 and T02 passing.
 
-Usage: uv run python scripts/eval_perceive.py   (uses LLM_PROVIDER / BEDROCK_MODEL_ID)
+Usage: uv run python scripts/eval_perceive.py   (uses LLM_PROVIDER: Claude on SAP AI Core)
 """
 
 from __future__ import annotations

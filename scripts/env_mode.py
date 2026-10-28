@@ -39,7 +39,6 @@ MODES: dict[str, dict] = {
         ],
         # ({variable: value, ...} all true, then also required)
         "required_if": [
-            ({"LLM_PROVIDER": "bedrock"}, ["AWS_PROFILE", "BEDROCK_MODEL_ID"]),
             ({"AUDIT_BACKEND": "s3"}, ["AWS_PROFILE", "AUDIT_S3_BUCKET"]),
             ({"SOLVER_BACKEND": "lambda"}, ["AWS_PROFILE"]),
             ({"WHATSAPP_INBOUND": "1"}, ["WHATSAPP_ALLOWED_SENDERS"]),
@@ -64,7 +63,6 @@ MODES: dict[str, dict] = {
         "required": [
             "AWS_PROFILE",
             "AWS_REGION",
-            "BEDROCK_MODEL_ID",
             "CASE_API_URL",
             "CASE_API_KEY",
             "FLAGS_SOURCE",
@@ -93,12 +91,13 @@ MODES: dict[str, dict] = {
         "forbidden": ["AICORE_CLIENT_SECRET", "SAP_MOCK_API_KEY", "AWS_SECRET_ACCESS_KEY"],
     },
     "v1": {
-        "about": "oldest fallback: v1 behaviour, all v2 flags off, local services + Bedrock",
+        "about": "oldest fallback: v1 behaviour, all v2 flags off, local services + SAP AI Core",
         "required": [
-            "AWS_PROFILE",
-            "AWS_REGION",
-            "BEDROCK_MODEL_ID",
             "LLM_PROVIDER",
+            "AICORE_AUTH_URL",
+            "AICORE_CLIENT_ID",
+            "AICORE_CLIENT_SECRET",
+            "AICORE_API_URL",
             "SAP_MOCK_URL",
             "CASE_API_URL",
         ],
