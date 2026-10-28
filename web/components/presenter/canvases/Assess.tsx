@@ -15,9 +15,7 @@ export function AssessCanvas({ record, round }: { record: CaseRecord; round: num
   const risk = record.risk;
   const a = record.affected;
   if (!risk || !a) return <Frame stage="ASSESS" round={round} headline="Reading SAP: stock, orders, inbound POs…">{null}</Frame>;
-  const labels = a.labels;
   const atRisk = risk.orders.filter((o) => o.stockout_probability > 0);
-  const po = a.purchase_orders[0];
   const customer = (so: string) => a.sales_orders.find((s) => s.SalesOrder === so)?.YY1_SoldToPartyName ?? so;
   const chip = delayChip(record.delay_prediction);
 

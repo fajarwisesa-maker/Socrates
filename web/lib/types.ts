@@ -317,6 +317,8 @@ export interface SalesOrderRow {
   YY1_Channel?: string;
   RequestedQuantity: number;
   YY1_PenaltyAmountIDR?: number;
+  /** "OTIF_PENALTY" | "LOST_MARGIN" (SAP extension field) */
+  YY1_PenaltyType?: string;
 }
 
 export interface Affected {

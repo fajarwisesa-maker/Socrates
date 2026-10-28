@@ -30,6 +30,7 @@ test("v2: delay chip on Assess, PII chip and the Architecture tab in Planner mod
     await expect(page.getByTestId("pii-chip")).toHaveCount(0);
   }
   if (config.delay_model && config.delay_model !== "signal") {
+    await page.getByTestId("stage-ASSESS").getByRole("button").click();
     await expect(page.getByTestId("delay-details")).toContainText("risk uses");
   }
   await page.getByTestId("planner-tab-architecture").click();

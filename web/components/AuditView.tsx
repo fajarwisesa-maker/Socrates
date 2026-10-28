@@ -35,6 +35,20 @@ function summary(e: AuditEntry): string {
   }
 }
 
+function stageOf(e: AuditEntry): string {
+  const p = e.payload as Record<string, unknown>;
+  return String(p.stage ?? (e.kind === "stage_transition" ? p.to : "") ?? "");
+}
+
+function actorOf(e: AuditEntry): string {
+  const p = e.payload as Record<string, unknown>;
+  if (p.agent) return String(p.agent);
+  if (e.kind === "approval") return String(p.by ?? "planner");
+  if (e.kind === "llm_call" || e.kind === "llm_retry") return "model";
+  if (e.kind === "tool_call" || e.kind === "policy_decision") return `tool ${p.tool ?? ""}`.trim();
+  return "SIAGA";
+}
+
 export default function AuditView({
   caseId,
   version,
@@ -138,17 +152,34 @@ export default function AuditView({
             {open ? "Hide entries" : `Show ${data.entries.length} entries`}
           </button>
           {open && (
-            <div className="mt-2 max-h-80 overflow-auto">
-              <table className="w-full font-mono text-xs">
+            <div className={defaultOpen ? "mt-2 max-h-[70vh] overflow-auto" : "mt-2 max-h-80 overflow-auto"}>
+              <table className="w-full text-sm" data-testid="audit-table">
+                <thead className="sticky top-0 bg-road-white">
+                  <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
+                    <th className="py-1 pr-2">#</th>
+                    <th className="pr-2">Time</th>
+                    <th className="pr-2">Stage</th>
+                    <th className="pr-2">Actor</th>
+                    <th className="pr-2">Event</th>
+                    <th className="pr-2">Policy</th>
+                    <th>Hash</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {data.entries.map((e) => (
-                    <tr key={e.seq} className="border-t border-line">
-                      <td className="py-0.5 pr-2 text-ink-2">{e.seq}</td>
-                      <td className="pr-2 text-ink-2">{e.ts.slice(11, 19)}</td>
-                      <td className="pr-2 font-semibold">{e.kind}</td>
-                      <td className="pr-2">{summary(e)}</td>
-                      <td className="text-ink-2" title={`prev ${e.prev_hash}`}>
-                        {e.hash.slice(0, 10)}…
+                    <tr key={e.seq} className="border-b border-curb align-top">
+                      <td className="py-1 pr-2 font-mono text-xs text-ink-2">{e.seq}</td>
+                      <td className="pr-2 font-mono text-xs whitespace-nowrap">{e.ts.slice(11, 19)}</td>
+                      <td className="pr-2 text-xs">{stageOf(e)}</td>
+                      <td className="pr-2 text-xs">{actorOf(e)}</td>
+                      <td className="pr-2">
+                        <span className="font-mono text-xs font-bold">{e.kind}</span> <span className="text-xs">{summary(e)}</span>
+                      </td>
+                      <td className="pr-2 font-mono text-xs font-bold whitespace-nowrap">
+                        {e.kind === "policy_decision" ? `${e.payload.allowed ? "ALLOW" : "DENY"} · T${e.payload.tier}` : ""}
+                      </td>
+                      <td className="font-mono text-xs text-ink-2" title={`prev ${e.prev_hash}`}>
+                        {e.hash.slice(0, 8)}
                       </td>
                     </tr>
                   ))}

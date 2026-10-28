@@ -27,7 +27,7 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, [mode]);
 
-  const toggle = <ModeSwitch mode={mode} onChange={setMode} />;
+  const toggle = <ModeSwitch mode={mode} onChange={setMode} tone={mode === "presenter" ? "light" : "dark"} />;
   // reducedMotion="user": with prefers-reduced-motion, transforms are skipped; components
   // also check useReducedMotion() and show the end state at once.
   return (

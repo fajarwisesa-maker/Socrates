@@ -34,8 +34,11 @@ test("multi-agent: rail names the agents, Perceive shows the English gloss", asy
 
   await page.goto("/?mode=planner");
   await expect(page.getByTestId("agent-ASSESS")).toHaveText("Impact Agent");
+  await page.getByTestId("stage-ASSESS").getByRole("button").click();
   await expect(page.getByTestId("impact-note")).toContainText("Impact Agent");
+  await page.getByTestId("stage-REFLECT").getByRole("button").click();
   await expect(page.getByTestId("critic-note-B1")).toContainText("safety stock");
+  await page.getByTestId("stage-ACT").getByRole("button").click();
   await expect(page.getByTestId("approval-summary")).toContainText("approve by");
   await page.screenshot({ path: "e2e/screenshots/v2-planner.png", fullPage: true });
 });

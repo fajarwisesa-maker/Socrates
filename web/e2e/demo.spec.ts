@@ -4,7 +4,7 @@ const shots = (name: string) => ({ path: `e2e/screenshots/${name}.png`, fullPage
 
 test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await request.post("/api/demo/reset");
-  await page.goto("/?mode=planner"); // the dense view keeps the full set of test ids
+  await page.goto("/?mode=planner");
   await expect(page.getByTestId("signal-inbox")).toBeVisible();
   if (process.env.SIAGA_EXPECT_REPLAY) {
     await expect(page.getByTestId("replay-badge")).toContainText("REPLAY");
@@ -20,20 +20,22 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   const card = page.getByTestId("approval-card").first();
   await expect(card).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("exposure")).toHaveText("Rp 340.000.000");
-  await expect(page.getByTestId("option-B1")).toContainText("Rp 8.100.000");
-  await expect(page.getByTestId("option-B1")).toContainText("rejected: safety_stock");
-  await expect(page.getByTestId("option-B2")).toContainText("Rp 11.400.000");
-  await expect(page.getByTestId("option-B2")).toContainText("chosen");
-  await expect(page.getByTestId("option-A1")).toContainText("Rp 31.000.000");
   await expect(card).toContainText("Rp 7.500.000");
   await expect(card).toContainText("Day 1 18:00");
   await expect(page.getByTestId("stage-ACT")).toHaveAttribute("data-state", "waiting");
-  await page.getByTestId("stage-REFLECT").getByRole("button").click();
   await page.screenshot(shots("2-awaiting-approval"));
+  // The options table is on the Reflect sheet of the case file.
+  await page.getByTestId("stage-REFLECT").getByRole("button").click();
+  await expect(page.getByTestId("option-B1")).toContainText("Rp 8.100.000");
+  await expect(page.getByTestId("option-B1")).toContainText("rejected: safety stock");
+  await expect(page.getByTestId("option-B2")).toContainText("Rp 11.400.000");
+  await expect(page.getByTestId("option-B2")).toContainText("chosen");
+  await expect(page.getByTestId("option-A1")).toContainText("Rp 31.000.000");
 
+  await page.getByTestId("stage-ACT").getByRole("button").click();
   await page.getByTestId("approve").click();
   await expect(page.getByTestId("po-number")).toContainText(/45000182\d\d/, { timeout: 30_000 });
-  await expect(page.getByTestId("case-status")).toContainText("RESOLVED", { timeout: 90_000 });
+  await expect(page.getByTestId("case-status")).toHaveAttribute("data-status", "RESOLVED", { timeout: 90_000 });
   await expect(page.getByTestId("stage-VERIFY")).toHaveAttribute("data-state", "done");
   await expect(page.getByTestId("audit-status")).toContainText("hash chain verified", {
     timeout: 10_000,
@@ -45,14 +47,15 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
 
 test("rejecting the bridge PO replans the remaining shortfall to air", async ({ page, request }) => {
   await request.post("/api/demo/reset");
-  await page.goto("/?mode=planner"); // the dense view keeps the full set of test ids
+  await page.goto("/?mode=planner");
   await page.getByRole("button", { name: "Load demo WhatsApp" }).click();
   await page.getByRole("button", { name: "Load forwarder PDF" }).click();
   await expect(page.getByTestId("pdf-name")).toHaveText("forwarder_notice.pdf");
   await page.getByTestId("start-case").click();
 
-  const bridge = page.getByTestId("approval-card").filter({ hasText: /^Bridge PO/ });
+  const bridge = page.getByTestId("approval-card").filter({ has: page.getByText(/^Bridge PO:/) });
   await expect(bridge).toBeVisible({ timeout: 90_000 });
+  await bridge.getByTestId("reject-open").click();
   await bridge.getByPlaceholder(/Reason/).fill("V-2002 failed QC last month");
   await bridge.getByTestId("reject").click();
 

@@ -1,21 +1,46 @@
 "use client";
 
-import { Kbd } from "@/components/ui/kbd";
-import { Switch } from "@/components/ui/switch";
 import type { Mode } from "@/lib/mode";
+import { cn } from "@/lib/utils";
 
-/** Small Presenter / Planner switch (also the P key). */
-export function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+/** PLANNER | PRESENTER switch for the asphalt header (also the P key). */
+export function ModeSwitch({
+  mode,
+  onChange,
+  tone = "dark",
+}: {
+  mode: Mode;
+  onChange: (m: Mode) => void;
+  /** dark: on the asphalt header; light: on concrete */
+  tone?: "dark" | "light";
+}) {
+  const dark = tone === "dark";
   return (
-    <label className="flex items-center gap-2 text-sm font-medium text-ink-2 select-none" data-testid="mode-switch">
-      <span className={mode === "presenter" ? "text-ink" : undefined}>Presenter</span>
-      <Switch
-        checked={mode === "planner"}
-        onCheckedChange={(on) => onChange(on ? "planner" : "presenter")}
-        aria-label="Planner mode"
-      />
-      <span className={mode === "planner" ? "text-ink" : undefined}>Planner</span>
-      <Kbd>P</Kbd>
-    </label>
+    <div
+      role="radiogroup"
+      aria-label="Mode (P)"
+      data-testid="mode-switch"
+      className={cn(
+        "inline-flex shrink-0 overflow-hidden rounded-[6px] border-2 text-xs font-black tracking-[0.08em] uppercase",
+        dark ? "border-white" : "border-asphalt",
+      )}
+    >
+      {(["planner", "presenter"] as const).map((m) => (
+        <button
+          key={m}
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => onChange(m)}
+          className={cn(
+            "min-h-9 px-3 uppercase",
+            dark
+              ? mode === m ? "bg-white text-asphalt" : "text-white hover:bg-white/15"
+              : mode === m ? "bg-asphalt text-white" : "text-asphalt hover:bg-surface-2",
+          )}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
   );
 }

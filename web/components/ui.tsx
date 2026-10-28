@@ -16,10 +16,10 @@ export function Panel({
   return (
     <section
       data-testid={testId}
-      className={`rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)] ${className}`}
+      className={`rounded-[12px] border-2 border-asphalt bg-road-white ${className}`}
     >
-      <header className="flex items-center justify-between gap-3 border-b-2 border-surface-2 px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-2 uppercase">{title}</h2>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-asphalt px-4 py-3">
+        <h2 className="sign-label text-sm text-asphalt">{title}</h2>
         {right}
       </header>
       <div className="p-4">{children}</div>
