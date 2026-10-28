@@ -204,6 +204,11 @@ def local_preflight(s: Settings) -> None:
     local_stores(s)
     if s.whatsapp_inbound:
         whatsapp_line(s)
+    if s.whatsapp_notify:
+        if not s.whatsapp_inbound:
+            line(AMBER, "WhatsApp replies", "WHATSAPP_NOTIFY=1 without WHATSAPP_INBOUND=1: no case "
+                 "comes from WhatsApp, so nothing is ever sent")  # fmt: skip
+        whatsapp_notify_line(s)
 
 
 def whatsapp_line(s: Settings) -> None:
@@ -234,6 +239,21 @@ def whatsapp_line(s: Settings) -> None:
         line(
             GREEN, what, f"verification ok, {n} allowed sender(s); Meta must call it via the tunnel"
         )
+
+
+def whatsapp_notify_line(s: Settings) -> None:
+    """Option B: the access token and phone number ID are valid (a read; nothing is sent)."""
+    from api.whatsapp_notify import CloudApiSender, NotifyError
+
+    what = "WhatsApp replies"
+    try:
+        number = CloudApiSender(s).check()
+    except RuntimeError as e:
+        line(RED, what, str(e) + " (fill-whatsapp.sh)")
+    except NotifyError as e:
+        line(RED, what, f"{e} (a temporary access token expires after about a day)")
+    else:
+        line(GREEN, what, f"token ok, replies come from {number}")
 
 
 def local_stores(s: Settings) -> None:

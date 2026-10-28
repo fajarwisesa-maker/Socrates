@@ -1,10 +1,10 @@
 "use client";
 
-import { Info, Timer } from "lucide-react";
+import { Info, MessageCircle, Timer } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { caseClock } from "@/lib/caseClock";
 import { dayShort, juta, minutesSeconds, thousands } from "@/lib/format";
-import { plantName, supplierName } from "@/lib/present";
+import { plantName, supplierName, whatsappReply } from "@/lib/present";
 import type { CaseAction, CaseEvent, CaseRecord, Labels } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { LaneMap, type Flow } from "../LaneMap";
@@ -85,6 +85,12 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
               </motion.p>
             )}
           </div>
+        )}
+        {whatsappReply(events) && (
+          // WhatsApp option B: the outcome went back to the person who sent the message
+          <p className="flex items-center gap-2 text-xl font-medium text-brand-ink" data-testid="whatsapp-reply">
+            <MessageCircle className="size-5" aria-hidden /> {whatsappReply(events)}
+          </p>
         )}
         {inbound && !failed && (
           <p className="mt-auto flex gap-2 text-xl text-ink-2" data-testid="tier0-note">

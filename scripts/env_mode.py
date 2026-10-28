@@ -44,6 +44,7 @@ MODES: dict[str, dict] = {
                 "1",
                 ["WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_ALLOWED_SENDERS"],
             ),
+            ("WHATSAPP_NOTIFY", "1", ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]),
         ],
         "forbidden": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"],
     },

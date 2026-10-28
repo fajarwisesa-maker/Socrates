@@ -48,6 +48,7 @@ from agent.providers.base import LLMProvider
 from agent.runtime import Runtime, build_runtime
 from agent.signals import build_signals
 from api.connections import check_connections
+from api.whatsapp_notify import CloudApiSender, OutcomeNotifier
 from siaga_common.settings import REPO_ROOT, Settings, get_settings
 from siaga_common.sources import (
     CASE_FLAGS,
@@ -116,8 +117,10 @@ class CaseService:
         reset_sap: Callable[[], dict[str, Any]],
         workers: int = 4,
         flags: SsmFlags | None = None,
+        notifier: OutcomeNotifier | None = None,
     ):
         self.rt, self.llm, self.reset_sap = runtime, llm, reset_sap
+        self.notifier = notifier  # WhatsApp option B: reply with the outcome
         self.agent = make_agent(runtime, llm)
         self.flag_reader = flags
         self._agents: dict[tuple[tuple[str, str], ...], Agent] = {
@@ -192,6 +195,11 @@ class CaseService:
                     fn()
                 except Exception:  # noqa: BLE001 - the agent escalates; never kill the worker
                     log.exception("case %s job failed", case_id)
+                if self.notifier is not None:
+                    try:
+                        self.notifier.after_job(self.rt, case_id)
+                    except Exception:  # noqa: BLE001 - a reply never affects the case
+                        log.exception("case %s: outcome notification failed", case_id)
 
         self.pool.submit(job)
 
@@ -234,6 +242,7 @@ def create_app(
     llm: LLMProvider | None = None,
     reset_sap: Callable[[], dict[str, Any]] | None = None,
     background: bool = True,
+    notifier: OutcomeNotifier | None = None,
 ) -> FastAPI:
     s = with_secrets(settings or get_settings())  # SECRETS_SOURCE=aws: siaga/sap, once
     whatsapp_inbound = s.whatsapp_inbound  # a process setting (the webhook app), not a case flag
@@ -256,7 +265,11 @@ def create_app(
     if reset_sap is None:
         reset_sap = _http_reset(runtime.sap)  # type: ignore[arg-type]
     flags = SsmFlags(s.aws_region) if s.flags_source == "ssm" else None
-    service = CaseService(runtime, llm or make_provider(s), reset_sap, flags=flags)
+    if notifier is None and s.whatsapp_notify:
+        notifier = OutcomeNotifier(CloudApiSender(s))
+    service = CaseService(
+        runtime, llm or make_provider(s), reset_sap, flags=flags, notifier=notifier
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -334,6 +347,7 @@ def create_app(
             "flags_source": s.flags_source,
             # WhatsApp inbound: the dashboard then follows cases it did not start itself
             "whatsapp_inbound": whatsapp_inbound,
+            "whatsapp_notify": notifier is not None,
             "sap": _sap_info(s),
             "backends": {
                 "case_store": s.case_store,

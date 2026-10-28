@@ -200,6 +200,8 @@ export interface Config {
   llm_fallback?: { provider: string; model: string } | null;
   /** WHATSAPP_INBOUND: cases can open from a WhatsApp message; the dashboard follows them */
   whatsapp_inbound?: boolean;
+  /** WHATSAPP_NOTIFY: a finished WhatsApp case replies to its sender with the outcome */
+  whatsapp_notify?: boolean;
 }
 
 export interface DelayPrediction {

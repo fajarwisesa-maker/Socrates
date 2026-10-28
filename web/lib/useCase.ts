@@ -70,8 +70,14 @@ export function useCase(): CaseState {
         setRecord(c.case);
         setApprovals(c.approvals);
         setApiDown(false);
-        // Stop polling once the case is finished and its final event has arrived.
-        done.current = finished(c.case) && ev.events.length === 0;
+        // Stop polling once the case is finished and its final event has arrived. A case
+        // that came in on WhatsApp may still get its "reply sent" event: wait up to 20 s.
+        const replying =
+          !!config?.whatsapp_notify &&
+          c.case.signals.some((sg) => sg.via === "whatsapp_api") &&
+          !ev.events.some((e) => e.stage === "CASE" && /WhatsApp/.test(e.title)) &&
+          Date.now() - Date.parse(c.case.updated_at) < 20_000;
+        done.current = finished(c.case) && ev.events.length === 0 && !replying;
       } catch {
         if (alive) setApiDown(true);
       }
@@ -82,7 +88,7 @@ export function useCase(): CaseState {
       alive = false;
       clearInterval(t);
     };
-  }, [caseId, tick]);
+  }, [caseId, tick, config?.whatsapp_notify]);
 
   // WhatsApp inbound: a message can open a case at any time. When nothing is in progress
   // (no case, or the followed one is finished), switch to the newest case by itself.

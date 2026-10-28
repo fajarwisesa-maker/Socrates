@@ -48,7 +48,9 @@ Red = blocker. Amber = read it (for example: day 0 is not today, so run `make de
 
 With `WHATSAPP_INBOUND=1` (docs/whatsapp-inbound.md), also run `make whatsapp` and
 `make tunnel`, and paste the tunnel URL into the Meta app's webhook. Then a message from an
-allowed phone opens the case by itself. The buttons below stay the fallback.
+allowed phone opens the case by itself. The buttons below stay the fallback. With
+`WHATSAPP_NOTIFY=1` the phone also gets one reply with the outcome once the case is verified
+(generate a fresh access token that morning unless it is a system-user token).
 
 ## On stage
 

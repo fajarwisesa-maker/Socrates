@@ -32,3 +32,35 @@ test("whatsapp: the dashboard follows a case opened from WhatsApp", async ({ pag
   await expect(page.getByText("6281234567890")).toHaveCount(0);
   await page.screenshot({ path: "e2e/screenshots/whatsapp-live.png" });
 });
+
+// Option B (WHATSAPP_NOTIFY=1): once the WhatsApp case is verified, the Verify canvas says the
+// outcome went back to the sender. The smoke run points WHATSAPP_GRAPH_URL at a stand-in.
+test("whatsapp: the outcome reply shows on Verify", async ({ page, request }) => {
+  const config = await (await request.get("/api/config")).json();
+  test.skip(!config.whatsapp_inbound || !config.whatsapp_notify, "WHATSAPP_NOTIFY is off on this API");
+  await request.post("/api/demo/reset");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/?mode=presenter&auto=1");
+  await expect(page.getByTestId("presenter-start")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  const text = await (await request.get("/api/demo/inputs/whatsapp")).text();
+  const r = await request.post("/api/cases", {
+    multipart: {
+      whatsapp: text,
+      source_channel: "whatsapp_api",
+      source_ref: "wamid.e2e-reply",
+      source_sender: "6281234567890",
+      source_received_at: new Date().toISOString(),
+    },
+  });
+  expect(r.status()).toBe(202);
+  await expect(page.getByTestId("presenter-approve")).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId("presenter-approve").click();
+  await expect(page.getByTestId("final-line")).toHaveText("Rp 340 jt protected for Rp 11,4 jt", { timeout: 60_000 });
+  await expect(page.getByTestId("whatsapp-reply")).toHaveText("Reply sent on WhatsApp to +62 ••• 7890", {
+    timeout: 30_000,
+  });
+  await expect(page.getByText("6281234567890")).toHaveCount(0);
+  await page.screenshot({ path: "e2e/screenshots/whatsapp-reply.png" });
+});

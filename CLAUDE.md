@@ -27,6 +27,7 @@ and the decisions made. **Update it every phase.**
 | v2 steps 4, 7 | order agreed 25 Oct: 3 → 1 → 6 + 5 (PII only) → 4 only if 1 and 3 pass by 26 Oct 12:00 WIB → 7 from 27 Oct |
 | Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) and `LLM_FALLBACK=sap_genai` built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
 | WhatsApp inbound (option A, owner 28 Oct) | built behind `WHATSAPP_INBOUND` (off by default): webhook app on :8010 (`make whatsapp`, `make tunnel`), dashboard follows the case; tested with signed payloads and Playwright; **not yet tried with a real Meta app** (docs/whatsapp-inbound.md) |
+| WhatsApp reply (option B, owner 28 Oct) | built behind `WHATSAPP_NOTIFY` (off by default): one reply with the outcome when a WhatsApp case ends; tested against a stand-in Cloud API; **not yet tried with a real token** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
@@ -200,6 +201,7 @@ See `.env.example` for the full list.
 | `LLM_SIMULATE_THROTTLE` | unset | demo/test aid: `N` visible throttling retries on each case's first model call, or `exhaust` |
 | `SIAGA_MODE` | unset | `local` \| `aws` \| `replay` \| `v1`: the laptop mode (`make use-*`); drives `make preflight` and `make demo-reset` |
 | `WHATSAPP_INBOUND` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` / `WHATSAPP_ALLOWED_SENDERS` / `WHATSAPP_PORT` / `WHATSAPP_MAX_AGE_SECONDS` | `0` / – / – / – / `8010` / `600` | WhatsApp inbound webhook (`make whatsapp`); docs/whatsapp-inbound.md |
+| `WHATSAPP_NOTIFY` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_GRAPH_VERSION` / `WHATSAPP_GRAPH_URL` | `0` / – / – / `26.0` / `https://graph.facebook.com` | option B: reply to the sender with the outcome (Case API, outbound) |
 | `FLAGS_SOURCE` | `env` | `ssm`: flags from `/siaga/flags/*`, read at the start of every case |
 | `SECRETS_SOURCE` / `SAP_SECRET_ID` | `env` / `siaga/sap` | `aws`: SAP values from Secrets Manager, read once per process |
 | `CASE_API_KEY` | unset | when set, the Case API requires `X-API-Key`; dashboard proxy, preflight, rehearse send it |
@@ -1159,6 +1161,49 @@ additive (no field removed).
 - Results: pytest 258 passed; web smoke with WHATSAPP_INBOUND=1 + multi + fake delay + PII
   11/11.
 
+### WhatsApp reply (option B, owner's decision 28 Oct)
+
+- **What:** with `WHATSAPP_NOTIFY=1` (and inbound on), a case opened from WhatsApp sends its
+  sender one reply when it becomes RESOLVED, ESCALATED or REOPENED, threaded under their
+  message (`context.message_id`). Nothing is sent while it waits for approval, and cases from
+  the dashboard buttons never get a reply.
+- **Text from code** (`api/whatsapp_notify.outcome_text`), from the case's own figures:
+  "SIAGA #1a2b3c: resolved. Rp 340 jt protected for Rp 11,4 jt. Signal to verified in 0m 52s.
+  …". `siaga_common.money.format_juta` mirrors the dashboard's juta form (half up). No model
+  writes it, and it carries no personal data.
+- **Contract from SDK source** (pywa `api.py` `send_message` and `get_business_phone_number`;
+  Meta's docs host is blocked here): `POST {graph}/v26.0/{phone_number_id}/messages` with
+  `Authorization: Bearer`, body `messaging_product`, `recipient_type: individual`,
+  `to` (digits) or `recipient` (business-scoped user ID), `type: text`,
+  `text {body, preview_url: false}`, `context {message_id}`. 26.0 is the latest Graph version
+  pywa knows (`WHATSAPP_GRAPH_VERSION`). A free-form text is inside the 24-hour customer
+  service window because the sender wrote minutes earlier.
+- **Where it runs:** `CaseService.submit` calls `OutcomeNotifier.after_job` after every agent
+  job, under the case's lock, inside a try/except, so a reply can never change or break a case.
+  The recipient and message ID come from the `signal_received` audit entry (the case holds the
+  masked sender only).
+- **Once per outcome:** an audit `notification_sent` (to, Meta's message ID, text) or
+  `notification_failed` (HTTP status + Meta's error message, never the token) for a status
+  stops any later send for it. A failure is not retried. The case gets an event:
+  "Outcome sent on WhatsApp to +62 ••• 7890" or the warning "WhatsApp reply not sent".
+- **UI:** `/config.whatsapp_notify`; the Verify canvas shows the reply line
+  (`whatsappReply`, `data-testid="whatsapp-reply"`). `useCase` keeps polling up to 20 s after
+  a WhatsApp case finishes, so that event shows up.
+- **Setup:** `scripts/fill-whatsapp.sh` asks "reply too? [y/N]", then the token hidden and the
+  phone number ID shown; `env-check` requires both when `WHATSAPP_NOTIFY=1`. Preflight reads
+  the phone number with the token (sends nothing). The temporary token from API Setup expires
+  after about 24 hours; a system-user token is the Demo Day choice.
+- Tests (`tests/test_whatsapp_notify.py`, 9): the juta format, the text per outcome, the
+  request shape (`to` / `recipient` / context), errors without the token, the preflight read,
+  a webhook case approved and verified → exactly one reply with "Rp 340 jt protected for
+  Rp 11,4 jt" (the token appears nowhere, the full number only in the audit), dashboard cases
+  get none, and a 401 is audited while the case stays RESOLVED. e2e
+  `whatsapp.spec.ts` checks the Verify line "Reply sent on WhatsApp to +62 ••• 7890" (skips
+  with the flag off).
+- Results: pytest 267 passed (2 skipped); web-check passes; web smoke with WHATSAPP_INBOUND=1,
+  WHATSAPP_NOTIFY=1 against a local Graph stand-in, multi, fake delay, PII 12/12; v1 9/9
+  (+3 skipped).
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -1179,7 +1224,8 @@ additive (no field removed).
   was present. Then: `make use-local`, `make preflight`,
   `LLM_PROVIDER=sap_genai make record-golden` (real `data/golden/v2/`; the "(fake)"
   replay label goes away with it), and `make rehearse N=3` with per-stage timings.
-- WhatsApp inbound has not been tried with a real Meta app and tunnel yet (owner's setup:
+- WhatsApp inbound and the reply (option B) have not been tried with a real Meta app,
+  token and tunnel yet (owner's setup:
   docs/whatsapp-inbound.md).
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

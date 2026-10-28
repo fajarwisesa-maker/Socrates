@@ -201,3 +201,9 @@ export function modelLabel(config: Config | null): string {
   if (config.llm_provider === "sap_genai") return `Claude via SAP AI Core · ${config.model ?? ""}`;
   return "scripted fake LLM (offline)";
 }
+
+/** WhatsApp option B: "Reply sent on WhatsApp to +62 ••• 7890" once the outcome went out. */
+export function whatsappReply(events: CaseEvent[]): string | null {
+  const sent = events.find((e) => e.stage === "CASE" && e.title.startsWith("Outcome sent on WhatsApp"));
+  return sent ? sent.title.replace("Outcome sent on WhatsApp", "Reply sent on WhatsApp") : null;
+}

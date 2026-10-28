@@ -109,6 +109,13 @@ class Settings(BaseSettings):
     whatsapp_port: int = Field(8010, alias="WHATSAPP_PORT")
     # older messages are ignored (Meta retries undelivered webhooks for a long time)
     whatsapp_max_age_seconds: int = Field(600, alias="WHATSAPP_MAX_AGE_SECONDS")
+    # option B: when a case opened from WhatsApp ends (resolved, escalated, re-opened), the
+    # Case API replies to the sender with the outcome, through the Cloud API (Graph API).
+    whatsapp_notify: bool = Field(False, alias="WHATSAPP_NOTIFY")
+    whatsapp_access_token: SecretStr | None = Field(None, alias="WHATSAPP_ACCESS_TOKEN")
+    whatsapp_phone_number_id: str | None = Field(None, alias="WHATSAPP_PHONE_NUMBER_ID")
+    whatsapp_graph_version: str = Field("26.0", alias="WHATSAPP_GRAPH_VERSION")
+    whatsapp_graph_url: str = Field("https://graph.facebook.com", alias="WHATSAPP_GRAPH_URL")
 
     # step 4 (not built): Tier 3 approvals from the SAP Joule capability
     joule_approvals: bool = Field(False, alias="JOULE_APPROVALS")

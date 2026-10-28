@@ -249,3 +249,17 @@ def test_fill_whatsapp_writes_env_local_without_echoing_the_secret(tmp_path):
     assert env.count("WHATSAPP_INBOUND=") == 1  # replaced in place, not appended twice
     assert stat.S_IMODE((root / ".env.local").stat().st_mode) == 0o600
     assert not (root / ".env.local.bak").exists()
+    assert "WHATSAPP_NOTIFY=0\n" in env  # no answer = replies stay off
+
+    # option B: token hidden, phone number ID shown
+    r = subprocess.run(
+        ["bash", "scripts/fill-whatsapp.sh"], cwd=root,
+        input="s3cr3t-app-secret\n6281234567890\ny\nEAAG-s3cr3t-token\n106540352242922\n",
+        capture_output=True, text=True, timeout=30, env=os.environ,
+    )  # fmt: skip
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "EAAG-s3cr3t-token" not in r.stdout + r.stderr
+    env = (root / ".env.local").read_text()
+    assert "WHATSAPP_NOTIFY=1\n" in env and "WHATSAPP_ACCESS_TOKEN=EAAG-s3cr3t-token\n" in env
+    assert "WHATSAPP_PHONE_NUMBER_ID=106540352242922\n" in env
+    assert env.count("WHATSAPP_NOTIFY=") == 1
