@@ -150,7 +150,7 @@ export function delayChip(
   p: DelayPrediction | null | undefined,
 ): { hours: string | null; text: string; tone: "brand" | "human" | "muted" } | null {
   if (!p) return null;
-  if (p.status !== "ok") return { hours: null, text: "Prediction unavailable — using signal range", tone: "muted" };
+  if (p.status !== "ok") return { hours: null, text: "Prediction unavailable: using signal range", tone: "muted" };
   const rows = p.history_rows ?? 0;
   const source =
     p.provider === "fake"

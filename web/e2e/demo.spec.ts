@@ -172,7 +172,7 @@ test("details drawer (D): step events, options + Critic, audit chain, case facts
   await expect(drawer).toBeVisible();
   await expect(drawer.getByTestId("drawer-step-events")).toContainText("Stock transfer");
   await drawer.getByTestId("drawer-tab-options").click();
-  await expect(drawer.getByTestId("option-B1")).toContainText("rejected: safety_stock");
+  await expect(drawer.getByTestId("option-B1")).toContainText("rejected: safety stock");
   await expect(drawer.getByTestId("drawer-critic")).toContainText("Bandung DC would drop to 50 cartons");
   await drawer.getByTestId("drawer-tab-audit").click();
   await expect(drawer.getByTestId("audit-status")).toContainText("hash chain verified");

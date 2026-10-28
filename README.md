@@ -16,7 +16,7 @@ No make or bash (e.g. Windows without WSL): `uv sync`, `cd web && npm ci`, then
 
 ## Screenshots
 
-Presenter mode (projector, 1280×720), one stage at a time, from the replay of the demo case:
+"Jalan Tol" design (Indonesian toll-road signs). Presenter mode (projector, 1280×720), one stage at a time, from the scripted demo case:
 
 | | |
 | --- | --- |
@@ -26,7 +26,8 @@ Presenter mode (projector, 1280×720), one stage at a time, from the replay of t
 
 | | |
 | --- | --- |
-| ![Drawer](docs/screenshots/7-details-drawer.png) Details drawer (`D`): solver table, Critic checks, audit trail | ![Planner](docs/screenshots/8-planner-mode.png) Planner mode (`P`): the dense view for Q&A |
-| ![States](docs/screenshots/9-error-states.png) Error and guard-rail states (`/design/states`) | ![Projector check](docs/screenshots/10-projector-check-washed.png) Projector check: the same screen at 30% less contrast |
+| ![Drawer](docs/screenshots/7-details-drawer.png) Details drawer (`D`): solver table, Critic checks, audit trail | ![Planner](docs/screenshots/8-planner-mode.png) Planner mode (`P`): the case file with the KM rail, one stage sheet and the margin |
+| ![Inbox](docs/screenshots/11-planner-inbox.png) Planner inbox: cases grouped by what they need, approve-by countdown | ![Projector check](docs/screenshots/10-projector-check-washed.png) Projector check: the same screen at 30% less contrast |
+| ![States](docs/screenshots/9-error-states.png) Error and guard-rail states (`/design/states`) | |
 
 The golden run in the screenshots is the placeholder recording from the scripted (fake) LLM; see CLAUDE.md, Open items.

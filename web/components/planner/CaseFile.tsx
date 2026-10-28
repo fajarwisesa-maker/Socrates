@@ -215,7 +215,7 @@ function KmRail({
   return (
     <nav aria-label="Route of the case" data-testid="timeline" className="min-w-0">
       <SignHeading className="mb-3">Route</SignHeading>
-      <ol className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-0 lg:overflow-visible">
+      <ol className="flex flex-wrap gap-2 lg:flex-col lg:flex-nowrap lg:gap-0">
         {STAGES.map((stage, i) => {
           const info = stageInfo(stage, events, record, now);
           const post = postState(stage, info.state, events, record);
@@ -300,8 +300,15 @@ function Margin({
             <Row
               k="Net protected"
               v={juta(s.net_protected)}
-              exact={record.status === "RESOLVED" ? "verified in SAP" : "once the plan is verified"}
-              highlight
+              exact={
+                record.status === "RESOLVED"
+                  ? "verified in SAP"
+                  : record.status === "REOPENED"
+                    ? "not confirmed: verification failed"
+                    : "once the plan is verified"
+              }
+              highlight={record.status !== "REOPENED"}
+              struck={record.status === "REOPENED"}
             />
           </>
         ) : (
@@ -357,12 +364,28 @@ function Margin({
   );
 }
 
-function Row({ k, v, exact, highlight, testId }: { k: string; v: string; exact?: string | null; highlight?: boolean; testId?: string }) {
+function Row({
+  k,
+  v,
+  exact,
+  highlight,
+  struck,
+  testId,
+}: {
+  k: string;
+  v: string;
+  exact?: string | null;
+  highlight?: boolean;
+  struck?: boolean;
+  testId?: string;
+}) {
   return (
     <div className="border-b-2 border-white/60 py-2 last-of-type:border-0">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-base font-bold">{k}</span>
-        <span className={cn("text-2xl font-black whitespace-nowrap", highlight && "text-signal-yellow")}>{v}</span>
+        <span className={cn("text-2xl font-black whitespace-nowrap", highlight && "text-signal-yellow", struck && "line-through decoration-2")}>
+          {v}
+        </span>
       </div>
       {exact && (
         <div className="text-right font-mono text-xs">

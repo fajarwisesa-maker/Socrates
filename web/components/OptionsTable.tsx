@@ -20,7 +20,7 @@ function outcome(o: SolverResult, record: CaseRecord) {
     return (
       <span className="flex flex-col items-start gap-1">
         <span className="whitespace-normal">
-          <Badge tone="red">rejected: {failed.map((c) => c.rule).join(", ")}</Badge>
+          <Badge tone="red">rejected: {failed.map((c) => c.rule.replaceAll("_", " ")).join(", ")}</Badge>
         </span>
         <span className="text-xs text-risk-ink">{failed.map((c) => c.plain || c.detail).join("; ")}</span>
       </span>

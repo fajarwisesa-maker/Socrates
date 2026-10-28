@@ -77,3 +77,42 @@ needs is added to the tests; the assertions stay the same.
 
 Tokens, sign components, lane map, Assess, Act with the approval sign, Verify, Presenter.
 May be skipped: Simulate mini maps, audit filters, the Plan stage restyle.
+
+## 8. Results (Phase 5, 28 Oct)
+
+**Built**
+
+- Tokens, Overpass + Overpass Mono (bundled), type scale, white logo in every header, and
+  the sign components (`components/signs.tsx`).
+- `LaneMap` with every road state (plus `failed`: a route that did not hold in SAP), the
+  layout config (`lib/laneLayout.ts`), a text alternative, a legend strip and the mini
+  variant. Gallery: `/design/map`.
+- Planner: asphalt header with nav, inbox grouped by what each case needs, case file
+  (case sign, KM rail, one stage sheet per stage, margin), the approval sign in all its
+  states (shared with Presenter), audit table.
+- Presenter rebuilt on the same pieces: asphalt header with the yellow clock, KM-post rail,
+  impact gantry sign, key footer. Pacing, keys and every Presenter test id are unchanged.
+- Reopened path: red plate with its reason in both modes, the late route in red on the
+  map, net protected struck through as "not confirmed".
+
+**Skipped (allowed by the owner's priority list)**
+
+- Audit trail filters. The audit table has the new columns but no filters.
+- Plan stage: restyled through the shared tokens and cards only, no new layout.
+- (Simulate mini maps were built.)
+
+**Checks**
+
+- `make test`: 305 passed, 2 skipped.
+- `make web-smoke`: 9 passed (+4 skipped); `SMOKE_LLM=replay`: 8 passed (+4);
+  multi + fake delay model + PII: 10 passed (+3); `WHATSAPP_INBOUND=1 WHATSAPP_NOTIFY=1`
+  against a Graph stand-in: 11 passed (+2); `SMOKE_AWS=1`: 10 passed (+3).
+  The projector washout check runs in every one of them and passes.
+- `make rehearse N=3`: 3/3 (fake LLM). `make rehearse-fault N=1`: 1/1.
+- Replay with the network cut (proxy pointed at a dead port, AWS variables unset):
+  `rehearse -n 1 --local` 1/1 and the replay smoke 8 passed (+4).
+- Screenshots of every stage in both modes at 1280×720 and 1440×900 reviewed. Fixed from
+  the review: Assess and Verify overflow at 1280×720, the approval sign overflowing its
+  column, the header title truncation, a zero-width middle dot in the bundled Overpass
+  subset (now drawn from Overpass Mono), table wrapping, the KM rail hiding stages below
+  `lg` (it wraps now), the reopened map painting the confirmed PO red.

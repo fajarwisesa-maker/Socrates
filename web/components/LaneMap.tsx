@@ -83,6 +83,13 @@ function Road({ road }: { road: MapRoad }) {
           <path {...common} stroke="var(--signal-yellow)" strokeWidth={8} strokeDasharray="14 8" strokeLinecap="butt" />
         </g>
       );
+    case "failed":
+      return (
+        <g>
+          <path {...common} stroke="var(--stop-red)" strokeWidth={13} />
+          <path {...common} stroke="#fff" strokeWidth={4} strokeDasharray="10 8" strokeLinecap="butt" />
+        </g>
+      );
     case "rejected":
       return (
         <g>

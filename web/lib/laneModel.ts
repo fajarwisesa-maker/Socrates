@@ -6,7 +6,7 @@ import { MAP_H, MAP_W, place, placeInText, type Anchor } from "./laneLayout";
 import { CAUSE, plantName, supplierName } from "./present";
 import type { CaseAction, CaseRecord, PlannedAction, SolverResult } from "./types";
 
-export type RoadState = "blocked" | "faded" | "candidate" | "chosen" | "pending" | "verified" | "rejected";
+export type RoadState = "blocked" | "faded" | "candidate" | "chosen" | "pending" | "verified" | "rejected" | "failed";
 export type PlateTone = "green" | "white" | "yellow" | "red" | "asphalt";
 
 export interface Plate {
@@ -75,6 +75,7 @@ export const LEGEND_TEXT: Record<RoadState, string> = {
   pending: "Route waiting for your approval",
   verified: "Route verified in SAP",
   rejected: "Rejected route",
+  failed: "Late or missing in SAP",
 };
 
 interface Base {
@@ -182,7 +183,8 @@ function route(record: CaseRecord, b: Base, key: string, i: number, state: RoadS
 } {
   const p = place(key, i + 2);
   const d = place(b.dest, 1);
-  const tone: PlateTone = state === "candidate" || state === "rejected" ? "white" : state === "pending" ? "yellow" : "green";
+  const tone: PlateTone =
+    state === "failed" ? "red" : state === "candidate" || state === "rejected" ? "white" : state === "pending" ? "yellow" : "green";
   // one plate per source keeps each in its own row at the Presenter canvas width
   const plates: Plate[] = [{ text: label ? `${name} · ${label}` : name, tone, icon: state === "verified" ? "check" : undefined }];
   return {
@@ -206,7 +208,7 @@ function dedupe(nodes: MapNode[]): MapNode[] {
 }
 
 function finish(title: string, nodes: MapNode[], roads: MapRoad[], badges: MapBadge[]): LaneModel {
-  const order: RoadState[] = ["blocked", "faded", "candidate", "chosen", "pending", "verified", "rejected"];
+  const order: RoadState[] = ["blocked", "faded", "candidate", "chosen", "pending", "verified", "failed", "rejected"];
   const legend = order.filter((s) => roads.some((r) => r.state === s));
   return { nodes: dedupe(nodes), roads, badges, legend, title };
 }
@@ -262,10 +264,22 @@ export function laneModel(record: CaseRecord, view: LaneView): LaneModel | null 
   const shown = record.actions.filter(
     (x: CaseAction) => x.kind !== "reschedule_customer" && (x.status === "EXECUTED" || x.status === "PENDING_APPROVAL"),
   );
+  // a re-opened case: each route is judged by its own SAP check
+  const held = (x: CaseAction) => record.verification?.checks.find((k) => k.ref === x.sap_ref)?.ok;
   const r = shown.map((x, i) => {
     const ref = x.planned?.reference ?? "";
     const state: RoadState =
-      x.status === "PENDING_APPROVAL" ? "pending" : resolved ? "verified" : reopened ? "rejected" : "chosen";
+      x.status === "PENDING_APPROVAL"
+        ? "pending"
+        : resolved
+          ? "verified"
+          : reopened
+            ? held(x) === false
+              ? "failed"
+              : held(x)
+                ? "verified"
+                : "chosen"
+            : "chosen";
     const label = `${x.kind === "spot_air" ? "" : `${VERB[x.kind] ?? x.kind} `}${thousands(x.quantity)} ctn`;
     return route(record, b, sourceKey(x.kind, ref), i, state, sourceName(record, x.kind, ref), label);
   });

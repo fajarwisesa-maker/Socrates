@@ -32,6 +32,7 @@ and the decisions made. **Update it every phase.**
 | WhatsApp via Twilio (owner 28 Oct) | built behind `WHATSAPP_PROVIDER=twilio`: sandbox webhook + replies, no Meta app (`scripts/fill-twilio.sh`); tested with signed form posts and a stand-in Twilio API; **not yet tried with a real Twilio account** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
+| "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components; skipped: audit filters, a new Plan layout |
 
 ## How to run
 
@@ -156,7 +157,7 @@ make web-smoke               # Playwright: full demo + reject path on a producti
                              # with its own API/ports; screenshots in web/e2e/screenshots/
 ```
 
-Screenshots of the redesigned dashboard (replay of the fake-LLM golden run): `docs/screenshots/`, shown in README.md.
+Screenshots of the Jalan Tol dashboard (scripted fake-LLM case): `docs/screenshots/`, shown in README.md.
 
 Dashboard modes (UI redesign): **Presenter** (default, projector) and **Planner** (dense view).
 Toggle with `P` or the header switch; `?mode=planner|presenter` overrides (the choice is
@@ -765,6 +766,54 @@ additive (no field removed).
   - Results: pytest 158 passed (1 live-Bedrock skipped); web smoke 8/8 (fake) and 7/7
     (replay); `make rehearse N=10` 10/10 on the fake LLM and 10/10 on replay;
     `make rehearse-fault N=3` 3/3.
+
+### "Jalan Tol" redesign (owner's brief `docs/redesign-prompt.md`, 28 Oct)
+
+Plan, data check, selector changes and results: `docs/redesign-plan.md`. Front end only; no
+backend change. It supersedes the colours and font of the UI redesign above (pacing, wow
+moments, drawer, error states and the washout check stay).
+
+- **Tokens** (`web/app/globals.css`): concrete, road-white, asphalt, curb, sign-green,
+  signal-yellow, stop-red, brand-teal, sea, land. Three brief values are darkened to pass
+  the washout check: asphalt-muted #36393E, sign-green #005A33, stop-red #B00D28. The old
+  token names (`brand`, `risk`, `human`, `ok`, `ink`…) map onto the new palette, so older
+  components follow. Yellow always carries asphalt text.
+- **Fonts:** Overpass and Overpass Mono, bundled in `web/app/fonts/` (OFL,
+  `@fontsource-variable` 5.3.0) via `next/font/local`; no download at build or run time.
+  The bundled Overpass subset has a zero-width middle dot, so U+00B7 comes from Overpass Mono
+  through a `unicode-range` face ("Overpass Dot").
+- **Logo:** `web/public/brand/siaga-wordmark-white.svg` on asphalt in every header (only the
+  white file was supplied).
+- **Sign components** (`components/signs.tsx`): GantrySign, RouteShield, WarningPlate,
+  StatusPlate, KmPost, RoadLine, LaneDivider, TierPlate, AgentWritten ("Written by the
+  agent"), SolverLabel.
+- **Lane map** (`components/LaneMap.tsx`, `lib/laneModel.ts`, `lib/laneLayout.ts`):
+  schematic SVG roads with HTML sign plates; positions come from a layout config keyed by
+  SAP location code (no coordinates in the data), with an automatic slot for unknown codes.
+  Road states: blocked (hatched), faded, candidate, chosen, pending (yellow dashes),
+  verified, rejected, failed (late or missing in SAP, judged per action from
+  `verification.checks`). Legend strip under the map; the roads in words for screen
+  readers; a mini variant on the Simulate cards; scrolls inside its frame below 768 px.
+  Gallery: `/design/map` (fixtures in `app/design/fixtures.json`).
+- **Planner** (`components/PlannerView.tsx`, `components/planner/`): Inbox / Cases / Audit
+  trail. The inbox is built from `GET /cases` + `GET /cases/{id}` (max 25, every 2 s,
+  `lib/useInbox.ts`), grouped Needs you (sorted by approve-by) / Reopened / Escalated /
+  Running / Resolved. The case file shows one stage sheet at a time: it follows the case
+  until the planner picks a KM post; approving pins it to Act. Margin: impact sign with
+  exact rupiah, Critic plate, confidence, audit chain.
+- **Approval sign** (`components/ApprovalSign.tsx`, both modes): pending yellow plate with
+  countdown + approve-by, what, cost, if rejected, why (agent summary labelled), other
+  options, the binding note; approved = green sign with the SAP document; rejected or
+  expired = white with a red border. Test ids per mode (`approve` / `presenter-approve`…).
+- **Presenter:** asphalt header (logo, case title, model label, yellow "Signal to verified"
+  clock), KM-post rail, impact gantry sign, asphalt footer with the keys and the pacing
+  hints (held, jump to live, next). Every step fits 1280×720.
+- **e2e changes:** the Planner tests click the KM post of the stage they check; the reject
+  path opens the reason with `reject-open`; case status is read from `data-status`; rule
+  ids show as words ("rejected: safety stock").
+- Results: pytest 305 passed (2 skipped); web smoke 9/9 (+4 skipped), replay 8/8 (+4),
+  multi 10/10 (+3), WhatsApp in + reply 11/11 (+2), AWS stand-in 10/10 (+3); rehearse 3/3,
+  rehearse-fault 1/1; replay with the network cut 1/1 and its smoke 8/8.
 
 ### Native Windows support
 

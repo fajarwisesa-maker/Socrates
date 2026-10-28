@@ -29,19 +29,19 @@ export function Panel({
 
 // Tone names kept for the callers; colours are the design tokens (status colours = status).
 const TONES = {
-  slate: "bg-surface-2 text-ink-2 ring-line",
-  sky: "bg-brand-soft text-brand-ink ring-brand/30",
-  emerald: "bg-ok-soft text-ok-ink ring-ok/40",
-  amber: "bg-human-soft text-human-ink ring-human/40",
-  red: "bg-risk-soft text-risk-ink ring-risk/40",
-  violet: "bg-surface-2 text-ink-2 ring-line",
+  slate: "bg-road-white text-asphalt ring-asphalt",
+  sky: "bg-road-white text-sign-green ring-sign-green",
+  emerald: "bg-sign-green text-white ring-sign-green",
+  amber: "bg-signal-yellow text-asphalt ring-asphalt",
+  red: "bg-stop-red text-white ring-stop-red",
+  violet: "bg-road-white text-asphalt ring-asphalt",
 } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "slate", children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${TONES[tone]}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-xs font-extrabold tracking-[0.04em] ring-2 ring-inset ${TONES[tone]}`}
     >
       {children}
     </span>

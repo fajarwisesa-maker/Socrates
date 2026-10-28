@@ -9,7 +9,7 @@ import type { CaseEvent, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { LaneMap } from "@/components/LaneMap";
 import { laneModel } from "@/lib/laneModel";
-import { GantrySign } from "@/components/signs";
+import { GantrySign, StatusPlate } from "@/components/signs";
 import { Frame } from "./Frame";
 
 export function VerifyCanvas({ record, events, round }: { record: CaseRecord; events: CaseEvent[]; round: number }) {
@@ -41,6 +41,12 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
       <div className="flex h-full flex-col gap-3">
         {laneModel(record, { kind: "verify" }) && (
           <LaneMap model={laneModel(record, { kind: "verify" })!} size="sm" className="mx-auto w-[88%]" />
+        )}
+        {failed && (
+          <div className="flex items-start gap-3 rounded-[12px] border-4 border-stop-red bg-road-white px-4 py-2.5" data-testid="reopened-plate">
+            <StatusPlate tone="rejected">Reopened</StatusPlate>
+            <p className="text-lg font-bold">SIAGA handed the case back: a planner needs to look at it. Everything done so far stays in SAP and in the audit trail.</p>
+          </div>
         )}
         {v && !verified && (
           <p className={failed ? "text-xl font-semibold text-risk-ink" : "text-xl text-ink"} data-testid="coverage">
