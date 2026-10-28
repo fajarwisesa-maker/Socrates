@@ -30,9 +30,9 @@ export function StartCanvas({ onStarted }: { onStarted: (caseId: string) => void
 
   return (
     <div className="flex h-full flex-col" data-testid="start-canvas">
-      <p className="text-xl font-medium text-brand-ink">New disruption signal</p>
-      <h1 className="mt-1 text-[2.5rem] leading-tight font-bold tracking-tight">Waiting for a signal</h1>
-      <p className="mt-2 text-xl text-ink-2">A driver’s WhatsApp and the forwarder’s notice just came in.</p>
+      <p className="sign-label font-mono text-sm text-asphalt-muted">New disruption signal</p>
+      <h1 className="mt-1 text-3xl leading-tight font-black">Waiting for a signal</h1>
+      <p className="mt-2 text-xl">A driver’s WhatsApp and the forwarder’s notice just came in.</p>
 
       <div className="mt-8 grid grid-cols-2 gap-4">
         <SourceButton
@@ -82,13 +82,13 @@ function SourceButton({
       onClick={onClick}
       data-testid={testId}
       className={
-        "flex items-center gap-4 rounded-[var(--radius-card)] border-2 p-5 text-left text-xl font-semibold transition-colors [&_svg]:size-8 " +
-        (loaded ? "border-brand bg-brand-soft text-brand-ink" : "border-line bg-surface text-ink hover:bg-surface-2")
+        "flex items-center gap-4 rounded-[12px] border-[3px] p-5 text-left text-xl font-black [&_svg]:size-8 " +
+        (loaded ? "border-sign-green bg-sign-green text-white" : "border-asphalt bg-road-white text-asphalt hover:bg-surface-2")
       }
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {loaded ? <Check className="text-brand" aria-label="loaded" /> : <span className="text-lg text-ink-2">Load</span>}
+      {loaded ? <Check aria-label="loaded" strokeWidth={3} /> : <span className="sign-label text-sm">Load</span>}
     </button>
   );
 }

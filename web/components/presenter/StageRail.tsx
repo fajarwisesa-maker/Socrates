@@ -1,11 +1,12 @@
 "use client";
 
-import { AlertTriangle, Check, RotateCcw, X } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { STAGE_LABEL, STAGES, stageInfo, type StageState } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
+import { KmPost } from "../signs";
 
 /**
  * Vertical stepper of the seven stages. Done = check, current = pulsing dot, not yet = hollow.
@@ -89,16 +90,30 @@ export function StageRail({
               {i < STAGES.length - 1 && (
                 <span
                   aria-hidden
-                  className={cn("absolute top-[2.5rem] left-[2.825rem] w-[2px]", lineDone ? "bg-brand" : "bg-line")}
-                  style={{ height: `${ROW - 2.5}rem` }}
+                  className={cn("absolute top-[2.75rem] left-[2.8125rem] w-1.5", lineDone ? "road-v" : "bg-curb")}
+                  style={{ height: `${ROW - 2.75}rem` }}
                 />
               )}
-              <Indicator state={state} human={human} resolved={resolved} />
+              <KmPost
+                n={i + 1}
+                state={
+                  state === "done"
+                    ? resolved
+                      ? "verified"
+                      : "done"
+                    : state === "escalated" || state === "failed"
+                      ? "flagged"
+                      : state === "running" || state === "waiting"
+                        ? "current"
+                        : "pending"
+                }
+                className={cn((state === "running" || state === "waiting") && "siaga-pulse", human && "text-asphalt")}
+              />
               <button
                 type="button"
                 onClick={() => onSelect?.(stage)}
                 disabled={state === "pending"}
-                className="pt-[0.2rem] text-left disabled:cursor-default"
+                className="pt-[0.35rem] text-left disabled:cursor-default"
                 aria-current={isFocus ? "step" : undefined}
               >
                 <div
@@ -131,33 +146,6 @@ export function StageRail({
   );
 }
 
-function Indicator({ state, human, resolved }: { state: StageState; human: boolean; resolved: boolean }) {
-  const base = "relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full";
-  if (state === "done")
-    return (
-      <span className={cn(base, resolved ? "bg-ok" : "bg-brand")}>
-        <Check className="size-5 text-white" strokeWidth={3} aria-hidden />
-      </span>
-    );
-  if (state === "escalated" || state === "failed")
-    return (
-      <span className={cn(base, "bg-risk")}>
-        {state === "failed" ? (
-          <X className="size-5 text-white" strokeWidth={3} aria-hidden />
-        ) : (
-          <AlertTriangle className="size-5 text-white" strokeWidth={2.5} aria-hidden />
-        )}
-      </span>
-    );
-  if (state === "running" || state === "waiting")
-    return (
-      <span className={cn(base, "siaga-pulse", human ? "bg-human text-human" : "bg-brand text-brand")}>
-        <span className="size-3 rounded-full bg-white" />
-      </span>
-    );
-  return <span className={cn(base, "border-2 border-line bg-surface")} />;
-}
-
 function SubLabel({
   stage,
   state,
@@ -173,7 +161,7 @@ function SubLabel({
   let tone = "text-ink-2";
   if (stage === "ACT" && state === "waiting") {
     text = "Needs you";
-    tone = "text-human-ink";
+    tone = "font-bold text-asphalt";
   } else if (stage === "VERIFY" && state === "waiting" && record?.verify_due_at && now) {
     const s = Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000));
     text = `SAP check in ${s} s`;

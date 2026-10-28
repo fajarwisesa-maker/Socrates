@@ -41,7 +41,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
           {record.signals.map((s, i) => {
             const spans = ev.filter((e) => e.signal === i + 1);
             return s.type === "pdf" ? (
-              <Card key={i} className="bg-surface-2 p-4" testId="signal-pdf">
+              <Card key={i} className="p-4" testId="signal-pdf">
                 <div className="mb-2 flex items-center gap-2 text-lg font-semibold text-ink-2">
                   <FileText className="size-5" aria-hidden /> Forwarder notice · PDF
                 </div>
@@ -56,8 +56,8 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                       data-evidence={`${e.signal}:${e.start}`}
                       className={
                         glossed
-                          ? "mr-1.5 inline-block rounded-md bg-brand-soft px-1.5 font-semibold whitespace-nowrap text-brand-ink"
-                          : "rounded-md bg-brand-soft px-1.5 text-xl font-semibold text-brand-ink"
+                          ? "mr-1.5 inline-block rounded-md bg-signal-yellow px-1.5 font-bold whitespace-nowrap text-asphalt"
+                          : "rounded-md bg-signal-yellow px-1.5 text-xl font-bold text-asphalt"
                       }
                     >
                       {e.text.replace(/\s+/g, " ")}

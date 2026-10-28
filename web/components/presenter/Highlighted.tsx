@@ -28,14 +28,14 @@ export function Highlighted({ text, spans, stagger = 0.25 }: { text: string; spa
             ? "inline-flex flex-col rounded-md px-0.5 align-top leading-[1.2] font-semibold not-italic"
             : "rounded-md px-0.5 font-semibold not-italic [box-decoration-break:clone]"
         }
-        initial={reduce ? false : { backgroundColor: "rgba(227,241,239,0)", color: "#0f172a" }}
-        animate={{ backgroundColor: "#e3f1ef", color: "#0a4f4a" }}
+        initial={reduce ? false : { backgroundColor: "rgba(255,194,14,0)", color: "#1e2124" }}
+        animate={{ backgroundColor: "#ffc20e", color: "#1e2124" }}
         transition={{ delay: reduce ? 0 : 0.2 + i * stagger, duration: 0.35 }}
       >
         {gloss ? (
           <>
             <span>{text.slice(s.start, s.end)}</span>
-            <span lang="en" data-testid="gloss" className="text-lg leading-[1.05] font-medium text-ink-2">
+            <span lang="en" data-testid="gloss" className="text-lg leading-[1.05] font-medium text-asphalt">
               {gloss}
             </span>
           </>

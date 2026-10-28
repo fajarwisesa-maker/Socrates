@@ -30,40 +30,40 @@ export function AssessCanvas({ record, round }: { record: CaseRecord; round: num
         </>
       }
     >
-      <div className="flex h-full flex-col gap-5">
+      <div className="flex h-full flex-col gap-3">
         {laneModel(record, { kind: "assess" }) && <LaneMap model={laneModel(record, { kind: "assess" })!} size="sm" />}
         <div className="grid grid-cols-2 gap-4" data-testid="orders-at-risk">
           {atRisk.slice(0, 2).map((o) => (
             // the order cards turn red as the risk function reports 100 %
             <motion.div
               key={o.order}
-              className="rounded-[var(--radius-card)] border-2 px-4 py-3"
-              initial={reduce ? false : { backgroundColor: "#eceeeb", borderColor: "#eceeeb" }}
-              animate={{ backgroundColor: "#fdecec", borderColor: "#dc2626" }}
+              className="rounded-[12px] border-[3px] px-4 py-2.5"
+              initial={reduce ? false : { backgroundColor: "#ffffff", borderColor: "#c9cac4" }}
+              animate={{ backgroundColor: "#f8e1e4", borderColor: "#b00d28" }}
               transition={{ delay: reduce ? 0 : 0.6, duration: 0.6 }}
             >
-              <div className="text-xl font-semibold text-ink">{customer(o.order)}</div>
-              <div className="mt-1 flex items-end justify-between gap-2">
-                <span className="text-xl text-ink-2">
-                  {thousands(o.quantity)} ctn
-                  <br />
-                  {juta(o.penalty)} penalty
+              <div className="flex items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block truncate text-xl font-black">{customer(o.order)}</span>
+                  <span className="block text-base">
+                    {thousands(o.quantity)} ctn · {juta(o.penalty)} if missed
+                  </span>
                 </span>
-                <span className="text-right">
-                  <span className="block text-[2.5rem] leading-none font-bold text-risk-ink">
+                <span className="text-right text-stop-red">
+                  <span className="block text-[2.25rem] leading-none font-black">
                     <CountUp value={o.stockout_probability} format={pct} duration={1.2} />
                   </span>
-                  <span className="text-lg text-risk-ink">stockout risk</span>
+                  <span className="sign-label text-xs text-risk-ink">stockout</span>
                 </span>
               </div>
             </motion.div>
           ))}
         </div>
-        <p className="text-xl text-ink-2">
-          Short <b className="text-ink">{thousands(risk.shortfall)} cartons</b>
+        <p className="text-lg">
+          Short <b>{thousands(risk.shortfall)} cartons</b>
           {risk.deadline && (
             <>
-              {" "}by the loading cutoff <b className="text-ink">{dayShort(record.day0, risk.deadline)}</b>
+              {" "}by the loading cutoff <b>{dayShort(record.day0, risk.deadline)}</b>
             </>
           )}
         </p>

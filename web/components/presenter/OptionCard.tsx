@@ -41,10 +41,10 @@ export function OptionCard({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: reduce ? 0 : 0.3, duration: 0.5, ease: "easeOut" }}
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border-2 p-5",
-        state === "rejected" && "border-risk bg-surface transition-colors",
-        state === "chosen" && "border-brand bg-surface shadow-[var(--shadow-card)]",
-        state === "plain" && "border-transparent bg-surface-2",
+        "relative flex flex-col overflow-hidden rounded-[12px] border-[3px] p-5",
+        state === "rejected" && "border-stop-red bg-road-white transition-colors",
+        state === "chosen" && "border-sign-green bg-road-white shadow-[var(--shadow-card)]",
+        state === "plain" && "border-asphalt bg-road-white",
       )}
     >
       <div className="text-xl font-semibold text-ink">
@@ -56,10 +56,10 @@ export function OptionCard({
         <span className="font-normal text-ink-2">· {option.option_id}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <span className="relative text-[2.75rem] leading-none font-semibold tracking-tight whitespace-nowrap text-ink">
+        <span className="relative text-[2.75rem] leading-none font-black whitespace-nowrap text-ink">
           <motion.span
-            initial={play === "reject" && !reduce ? { color: "#0f172a" } : false}
-            animate={{ color: state === "rejected" ? "#334155" : "#0f172a" }}
+            initial={play === "reject" && !reduce ? { color: "#1e2124" } : false}
+            animate={{ color: state === "rejected" ? "#36393e" : "#1e2124" }}
             transition={t(stampAt)}
           >
             {feasible ? juta(r.total_cost) : "Not feasible"}
@@ -67,7 +67,7 @@ export function OptionCard({
           {state === "rejected" && (
             <motion.span
               aria-hidden
-              className="absolute top-1/2 left-0 h-[4px] w-full origin-left rounded bg-risk"
+              className="absolute top-1/2 left-0 h-[4px] w-full origin-left rounded bg-stop-red"
               initial={play === "reject" && !reduce ? { scaleX: 0 } : false}
               animate={{ scaleX: 1 }}
               transition={t(stampAt)}
@@ -77,7 +77,7 @@ export function OptionCard({
         {state === "rejected" && (
           <motion.span
             data-testid="rejected-stamp"
-            className="rounded-lg border-[3px] border-risk-ink px-2 py-0.5 text-xl font-black tracking-widest text-risk-ink uppercase"
+            className="rounded-[6px] bg-stop-red px-3 py-1 text-xl font-black tracking-[0.12em] text-white uppercase shadow-[inset_0_0_0_2px_var(--stop-red),inset_0_0_0_4px_#fff]"
             initial={play === "reject" && !reduce ? { opacity: 0, scale: 2.2, rotate: -20 } : false}
             animate={{ opacity: 1, scale: 1, rotate: -8 }}
             transition={{ delay: stampAt, type: reduce ? false : "spring", stiffness: 500, damping: 22 }}
@@ -86,7 +86,7 @@ export function OptionCard({
           </motion.span>
         )}
         {state === "chosen" && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand-ink px-3 py-1 text-lg font-semibold text-white">
+          <span className="inline-flex items-center gap-1 rounded-[6px] bg-sign-green px-3 py-1 text-lg font-black tracking-[0.08em] text-white uppercase">
             <Check className="size-5" aria-hidden /> Chosen
           </span>
         )}

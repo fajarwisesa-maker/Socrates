@@ -3,6 +3,7 @@
 import { dayShort, juta } from "@/lib/format";
 import type { CaseEvent, CaseRecord, Risk, Summary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { GantrySign, SolverLabel } from "../signs";
 import { CountUp } from "./CountUp";
 
 /**
@@ -31,11 +32,13 @@ export function ImpactMeter({
   const orders = risk?.orders.filter((o) => o.stockout_probability > 0).length ?? 0;
 
   return (
-    <section
-      aria-label="Impact"
-      data-testid="impact-meter"
-      className="flex h-full flex-col gap-6 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]"
+    <GantrySign
+      as="section"
+      label="Impact"
+      testId="impact-meter"
+      className="flex h-full flex-col gap-5 px-5 py-5"
     >
+      <div className="sign-label text-sm">Impact</div>
       <Metric
         label="At risk"
         value={risk ? risk.max_exposure : null}
@@ -79,7 +82,8 @@ export function ImpactMeter({
         }
         testId="meter-protected"
       />
-    </section>
+      <SolverLabel className="mt-auto text-white" />
+    </GantrySign>
   );
 }
 
@@ -101,18 +105,19 @@ function Metric({
   testId: string;
 }) {
   return (
-    <div data-testid={testId}>
-      <div className="text-xl font-medium text-ink-2">{label}</div>
+    <div data-testid={testId} className={hero ? undefined : "border-t-2 border-white/60 pt-3"}>
+      <div className="text-lg font-bold">{label}</div>
       <div
         className={cn(
-          "leading-[1.05] font-semibold tracking-tight tabular-nums",
-          hero && value !== null ? "text-[4rem]" : "text-[2.75rem]",
-          value === null || tone === "muted" ? "text-ink-2" : tone === "risk" ? "text-risk-ink" : tone === "ok" ? "text-ok-ink" : "text-ink",
+          "leading-[1.05] font-black tabular-nums",
+          hero && value !== null ? "text-5xl" : "text-[2.25rem]",
+          tone === "ok" && value !== null ? "text-signal-yellow" : "text-white",
+          tone === "muted" && "line-through decoration-2",
         )}
       >
         {value === null ? "—" : <CountUp value={value} format={juta} />}
       </div>
-      <div className="mt-1 text-xl leading-snug text-ink-2">{value === null ? pending : note}</div>
+      <div className="mt-1 text-base leading-snug">{value === null ? pending : note}</div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import type { CaseEvent, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { LaneMap } from "@/components/LaneMap";
 import { laneModel } from "@/lib/laneModel";
+import { GantrySign } from "@/components/signs";
 import { Frame } from "./Frame";
 
 export function VerifyCanvas({ record, events, round }: { record: CaseRecord; events: CaseEvent[]; round: number }) {
@@ -37,8 +38,10 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
 
   return (
     <Frame stage="VERIFY" round={round} headline={headline} tone={failed ? "risk" : verified ? "ok" : "ink"}>
-      <div className="flex h-full flex-col gap-4">
-        {laneModel(record, { kind: "verify" }) && <LaneMap model={laneModel(record, { kind: "verify" })!} size="sm" />}
+      <div className="flex h-full flex-col gap-3">
+        {laneModel(record, { kind: "verify" }) && (
+          <LaneMap model={laneModel(record, { kind: "verify" })!} size="sm" className="mx-auto w-[88%]" />
+        )}
         {v && !verified && (
           <p className={failed ? "text-xl font-semibold text-risk-ink" : "text-xl text-ink"} data-testid="coverage">
             {thousands(v.projected_supply)} of {thousands(v.demand)} cartons {v.covered ? "covered" : "projected"} by the
@@ -48,39 +51,44 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
         )}
         {verified && summary && (
           // wow moment 4: the clock has stopped; the result lands in two beats
-          <div className="flex flex-col gap-1">
+          <GantrySign className="flex flex-col gap-1 px-5 py-2.5">
             <motion.p
-              className="text-[1.75rem] leading-tight font-bold text-ink"
+              className="text-[1.75rem] leading-tight font-black"
               data-testid="final-line"
               initial={reduce ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduce ? 0 : 0.4, duration: 0.5 }}
             >
-              <span className="text-ok-ink">{juta(summary.exposure_avoided)} protected</span> for{" "}
+              <span className="text-signal-yellow">{juta(summary.exposure_avoided)} protected</span> for{" "}
               {juta(summary.case_cost ?? summary.chosen_cost)}
             </motion.p>
             {clock.stoppedBy === "resolved" && (
               <motion.p
-                className="flex items-center gap-2 text-[1.75rem] leading-tight font-bold text-ink"
+                className="flex items-center gap-2 text-[1.75rem] leading-tight font-black"
                 data-testid="time-line"
                 initial={reduce ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: reduce ? 0 : 1.2, duration: 0.5 }}
               >
-                <Timer className="size-7 text-ok-ink" aria-hidden />
-                <span className="text-ink-2">3 days</span> → <span className="text-ok-ink">{minutesSeconds(clock.seconds)}</span>
+                <Timer className="size-7" aria-hidden />
+                <span>3 days</span> → <span className="text-signal-yellow">{minutesSeconds(clock.seconds)}</span>
               </motion.p>
             )}
-          </div>
+            {whatsappReply(events) && (
+              <p className="flex items-center gap-2 text-base font-bold" data-testid="whatsapp-reply">
+                <MessageCircle className="size-4" aria-hidden /> {whatsappReply(events)}
+              </p>
+            )}
+          </GantrySign>
         )}
-        {whatsappReply(events) && (
+        {whatsappReply(events) && !(verified && summary) && (
           // WhatsApp option B: the outcome went back to the person who sent the message
-          <p className="flex items-center gap-2 text-xl font-medium text-brand-ink" data-testid="whatsapp-reply">
+          <p className="flex items-center gap-2 text-lg font-bold" data-testid="whatsapp-reply">
             <MessageCircle className="size-5" aria-hidden /> {whatsappReply(events)}
           </p>
         )}
         {inbound && !failed && (
-          <p className="mt-auto flex gap-2 text-xl text-ink-2" data-testid="tier0-note">
+          <p className="mt-auto flex gap-2 text-base" data-testid="tier0-note">
             <Info className="mt-1 size-5 shrink-0" aria-hidden />
             <span>
               PO {inbound.ref} still arrives{" "}

@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { notices } from "@/lib/notices";
 import { stageRounds } from "@/lib/present";
-import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
+import type { Approval, CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { ActCanvas } from "./canvases/Act";
 import { AssessCanvas } from "./canvases/Assess";
 import { PerceiveCanvas } from "./canvases/Perceive";
@@ -19,6 +19,7 @@ export function StageCanvas({
   round,
   events,
   record,
+  approvals,
   onDecided,
   live = true,
 }: {
@@ -26,6 +27,7 @@ export function StageCanvas({
   round: number;
   events: CaseEvent[];
   record: CaseRecord;
+  approvals: Approval[];
   onDecided: () => void;
   /** the shown step is the agent's current one (a retry note only makes sense live) */
   live?: boolean;
@@ -48,7 +50,7 @@ export function StageCanvas({
       case "REFLECT":
         return <ReflectCanvas record={record} events={events} round={round} />;
       case "ACT":
-        return <ActCanvas record={record} round={round} onDecided={onDecided} />;
+        return <ActCanvas record={record} approvals={approvals} round={round} onDecided={onDecided} />;
       case "VERIFY":
         return <VerifyCanvas record={record} events={events} round={round} />;
     }

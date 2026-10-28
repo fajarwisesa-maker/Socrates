@@ -27,7 +27,7 @@ export function PlanCanvas({ record, events, round }: { record: CaseRecord; even
       <div className="flex h-full flex-col gap-5">
         <div className="grid grid-cols-2 gap-4" data-testid="candidates">
           {candidates.map((c) => (
-            <Card key={c.option_id} className="bg-surface-2">
+            <Card key={c.option_id}>
               <div className="text-xl font-semibold text-ink">{c.label}</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {c.strategies.map((s) => (

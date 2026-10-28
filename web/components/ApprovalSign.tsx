@@ -100,7 +100,8 @@ export function ApprovalSign({
             <span className="font-black">{juta(c.cost)}</span>
             {action?.sap_ref ? (
               <span data-testid={ids.sapRef} className="inline-flex items-center gap-1.5">
-                SAP document{" "}
+                {presenter ? <Check className="size-5" strokeWidth={3} aria-hidden /> : null}
+                {presenter ? "SAP" : "SAP document"}{" "}
                 <motion.b
                   className="font-mono text-xl"
                   initial={wasPending && !reduce ? { opacity: 0, scale: 0.6 } : false}
@@ -109,7 +110,7 @@ export function ApprovalSign({
                 >
                   {action.sap_ref}
                 </motion.b>
-                <span className="font-mono text-sm">· {action.status.replace("_", " ").toLowerCase()}</span>
+                {!presenter && <span className="font-mono text-sm">· {action.status.replace("_", " ").toLowerCase()}</span>}
               </span>
             ) : (
               <span className="inline-flex items-center gap-2">
@@ -160,7 +161,8 @@ export function ApprovalSign({
             <span
               data-testid="approve-by"
               className={cn(
-                "rounded-[6px] px-2.5 py-1 font-mono text-sm font-bold whitespace-nowrap",
+                "rounded-[6px] px-2.5 py-1 font-mono text-sm font-bold",
+                presenter ? "w-full" : "whitespace-nowrap",
                 left?.expired ? "bg-stop-red text-white" : "bg-asphalt text-signal-yellow",
               )}
             >
@@ -173,8 +175,8 @@ export function ApprovalSign({
         <div className={cn("grid gap-4", presenter ? "grid-cols-1" : "sm:grid-cols-2")}>
           <div>
             <div className="sign-label text-xs">Cost</div>
-            <div className={cn("font-black", presenter ? "text-2xl" : "text-4xl")}>{juta(c.cost)}</div>
-            <div className="text-sm">
+            <div className={cn("font-black", presenter ? "text-[2.25rem] leading-none" : "text-4xl")}>{juta(c.cost)}</div>
+            <div className={cn("text-sm", presenter && "mt-1")}>
               {c.cost_display} · part of a plan totalling {c.plan_total_display}
             </div>
           </div>
@@ -245,23 +247,23 @@ export function ApprovalSign({
         {presenter && <p className="sr-only">{c.what}</p>}
 
         {!rejecting ? (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className={cn("flex gap-3", presenter ? "mt-auto flex-col" : "flex-wrap items-center")}>
             <Button
               size={presenter ? "lg" : "lg"}
               variant="approve"
               disabled={!!busy}
               onClick={() => decide("approve")}
               data-testid={ids.approve}
-              className={presenter ? "flex-1" : undefined}
+              className={presenter ? "w-full px-3 text-lg" : undefined}
             >
               {busy === "approve" ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Check aria-hidden />}
               {busy === "approve" ? `Creating the ${object} in SAP` : `Approve ${object}`}
             </Button>
             {!busy && (
               <Button
-                size="lg"
                 variant="outline"
-                className="border-asphalt bg-transparent hover:bg-[#ffe6a3]"
+                size={presenter ? "md" : "lg"}
+                className={cn("border-asphalt bg-transparent hover:bg-[#ffe6a3]", presenter && "self-start")}
                 onClick={() => setRejecting(true)}
                 data-testid={ids.rejectOpen}
               >
