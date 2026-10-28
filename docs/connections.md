@@ -23,7 +23,7 @@ and `scripts/put-sap-secret.sh` (AWS Secrets Manager).
 | AI Core | the AI Core service key of the owner's subaccount; deployment of `sap-rpt-1.6` | values not visible to the build session |
 | Laptop env files | `.env.local`, `.env.replay`, `.env.v1`, `.env.aws` (git-ignored, mode 600); `.env` = the active one | templates committed as `.env.*.example`; written by `scripts/fill-env.sh` |
 | Claude on SAP AI Core | Generative AI Hub model `anthropic--claude-4.6-sonnet`, scenario `foundation-models`, resource group `default` | needs a RUNNING deployment of that model in the subaccount |
-| WhatsApp (optional) | Meta app: app secret (inbound), access token + phone number ID (replies); in `.env.local` only, written by `scripts/fill-whatsapp.sh` | not tried with a real Meta app yet (`docs/whatsapp-inbound.md`) |
+| WhatsApp (optional) | Meta app: app secret (inbound), access token + phone number ID (replies), written by `scripts/fill-whatsapp.sh`; or Twilio: account SID + auth token + sandbox number, written by `scripts/fill-twilio.sh`. In `.env.local` only | not tried with a real Meta app yet (`docs/whatsapp-inbound.md`) |
 
 ## Who needs what
 

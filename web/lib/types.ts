@@ -202,6 +202,8 @@ export interface Config {
   whatsapp_inbound?: boolean;
   /** WHATSAPP_NOTIFY: a finished WhatsApp case replies to its sender with the outcome */
   whatsapp_notify?: boolean;
+  /** "meta" (Cloud API) or "twilio" (sandbox) */
+  whatsapp_provider?: "meta" | "twilio";
 }
 
 export interface DelayPrediction {

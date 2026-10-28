@@ -13,6 +13,11 @@ WhatsApp ends, the sender gets one message with the outcome, as a reply to their
   (pywa `api.py` `send_message`, Meta's `whatsapp` npm SDK `messages.ts`); latest Graph API
   version there: 26.0 (WHATSAPP_GRAPH_VERSION). A free-form text is allowed because the
   sender wrote to the number minutes earlier (inside the 24-hour customer service window).
+- WHATSAPP_PROVIDER=twilio: `TwilioSender`, `POST {api}/2010-04-01/Accounts/{sid}/Messages.json`
+  (form `To=whatsapp:+<digits>`, `From=TWILIO_WHATSAPP_FROM`, `Body`; HTTP basic auth with the
+  account SID and auth token), from Twilio's SDK source (twilio 9.12.0
+  `rest/api/v2010/account/message`). Twilio has no reply threading, so the message ID is
+  not used. Sandbox replies reach only phones that joined the sandbox.
 - A failed send never changes the case: it is audited (`notification_failed`, HTTP status
   only) and shown as an event.
 """
@@ -137,10 +142,69 @@ class CloudApiSender:
         return ((r.json().get("messages") or [{}])[0]).get("id", "")
 
 
+class TwilioSender:
+    def __init__(self, s: Settings, transport: httpx.BaseTransport | None = None):
+        if not s.twilio_account_sid or not s.twilio_auth_token:
+            raise RuntimeError(
+                "WHATSAPP_NOTIFY=1 with Twilio needs TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN"
+            )
+        self.account_url = (
+            f"{s.twilio_api_url.rstrip('/')}/2010-04-01/Accounts/{s.twilio_account_sid}"
+        )
+        self.from_ = s.twilio_whatsapp_from
+        self.http = httpx.Client(
+            timeout=10,
+            transport=transport,
+            auth=(s.twilio_account_sid, s.twilio_auth_token.get_secret_value()),
+            headers={"Accept": "application/json"},
+        )
+
+    @staticmethod
+    def _raise_for(r: httpx.Response, what: str) -> None:
+        if r.status_code >= 400:
+            # Twilio's error body: {code, message, more_info, status}; no secret in it
+            err = r.json() if "json" in r.headers.get("content-type", "") else {}
+            detail = ""
+            if "code" in err:
+                detail = f"{err.get('message', '')} (Twilio error {err['code']})"
+            raise NotifyError(f"{what}: HTTP {r.status_code} {detail}".strip(), r.status_code)
+
+    def check(self) -> str:
+        """Account SID and auth token, without sending anything."""
+        try:
+            r = self.http.get(f"{self.account_url}.json")
+        except httpx.HTTPError as e:
+            raise NotifyError(f"Twilio check failed: {type(e).__name__}") from e
+        self._raise_for(r, "Twilio check")
+        d = r.json()
+        return f"{self.from_.removeprefix('whatsapp:')} (account {d.get('status', '?')})"
+
+    def send(self, sender: str, text: str, reply_to: str | None) -> str:
+        digits = sender.lstrip("+")
+        if not digits.isdigit():
+            raise NotifyError("Twilio send: the sender has no phone number")
+        try:
+            r = self.http.post(
+                f"{self.account_url}/Messages.json",
+                data={"To": f"whatsapp:+{digits}", "From": self.from_, "Body": text},
+            )
+        except httpx.HTTPError as e:
+            raise NotifyError(f"Twilio send failed: {type(e).__name__}") from e
+        self._raise_for(r, "Twilio send")
+        return r.json().get("sid", "")
+
+
+Sender = CloudApiSender | TwilioSender
+
+
+def make_sender(s: Settings) -> Sender:
+    return TwilioSender(s) if s.whatsapp_provider == "twilio" else CloudApiSender(s)
+
+
 class OutcomeNotifier:
     """Called by the Case API after every agent job (under the case's lock)."""
 
-    def __init__(self, sender: CloudApiSender):
+    def __init__(self, sender: Sender):
         self.sender = sender
 
     def after_job(self, rt: Any, case_id: str) -> None:

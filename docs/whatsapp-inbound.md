@@ -1,5 +1,9 @@
 # WhatsApp inbound (option A): a message on stage opens the case
 
+Two providers, same behaviour: **Meta** (a Meta app with its WhatsApp test number, sections
+1–3 below) or **Twilio** (Twilio's WhatsApp sandbox, no Meta app; section T at the end).
+`WHATSAPP_PROVIDER=meta|twilio` picks one.
+
 With `WHATSAPP_INBOUND=1`, a WhatsApp message from an allowed phone to the team's WhatsApp
 test number opens a case. It works the same way as "Load demo WhatsApp" followed by "Start
 case":
@@ -139,3 +143,74 @@ The reply is a free-form text, so it must be sent within 24 hours of the sender'
 this always holds. The Graph API version is `WHATSAPP_GRAPH_VERSION` (default `26.0`).
 
 To turn replies off, set `WHATSAPP_NOTIFY=0` in `.env.local`. Receiving keeps working.
+
+## T. Twilio instead of a Meta app (`WHATSAPP_PROVIDER=twilio`)
+
+Twilio's WhatsApp **sandbox** needs only a free Twilio account. The case, the masking, the
+dashboard and the reply text are the same as with Meta. The differences:
+
+- The demo message goes to **Twilio's sandbox number** (the console shows it, usually
+  +1 415 523 8886).
+- **Each phone joins the sandbox first**: it sends `join <your-code>` to that number. The
+  console shows your code. The join lasts **72 hours**, so join again on Demo Day morning.
+- The webhook is `POST /webhooks/twilio` on the same `make whatsapp` app. Every call is checked
+  with Twilio's `X-Twilio-Signature`, which is signed with your auth token. There is no
+  verification handshake and no verify token.
+- Replies (`WHATSAPP_NOTIFY=1`) go out through Twilio's Messages API. They are not threaded
+  under the message, and they reach only phones that joined the sandbox.
+
+### Once: Twilio (in your browser)
+
+1. Sign up at twilio.com (a free trial is enough). On the console home page, note the
+   **Account SID** (starts with `AC`) and the **Auth Token** (Show).
+2. Open **Messaging → Try it out → Send a WhatsApp message**. It shows the sandbox number and
+   your `join <code>` phrase. From each phone that will send the demo message, send that phrase
+   to the sandbox number on WhatsApp, and wait for Twilio's confirmation.
+
+### Once: the laptop
+
+```bash
+scripts/fill-twilio.sh   # Account SID (shown), Auth Token (hidden), sandbox number (Enter =
+                         # whatsapp:+14155238886), allowed senders, reply y/N
+make use-local
+make env-check           # TWILIO_* and WHATSAPP_ALLOWED_SENDERS: set
+```
+
+### Each time: run it
+
+```bash
+make dev                 # 1: restart it after fill-twilio.sh so it reads the new .env
+make whatsapp            # 2: the webhook on 127.0.0.1:8010
+make tunnel              # 3: prints https://<random>.trycloudflare.com
+```
+
+In the Twilio console, open **Messaging → Try it out → Send a WhatsApp message → Sandbox
+settings**:
+
+- **When a message comes in** = `https://<random>.trycloudflare.com/webhooks/twilio`, method
+  **POST**;
+- **Save**.
+
+Update this URL after every `make tunnel`, because a quick tunnel gets a new one each time.
+
+Then `make preflight` shows:
+
+- `WhatsApp webhook :8010 (Twilio) — running, signatures checked, 1 allowed sender(s)`;
+- with replies on, `WhatsApp replies (Twilio) — token ok, replies come from +14155238886`. This
+  check only reads your account; it sends nothing.
+
+Send the demo text from a joined, allowed phone to the sandbox number. The dashboard
+switches to the case within about 2 seconds.
+
+### If something goes wrong (Twilio)
+
+| What you see | Likely cause |
+| --- | --- |
+| Terminal 2 logs `refused a Twilio call ... wrong signature (checked https://…)` | The URL in the Twilio console differs from the one checked: a typo, `http` instead of `https`, or an old tunnel URL. If the tunnel hides the public host, set `TWILIO_WEBHOOK_URL=` to the exact console URL in `.env.local`, then run `make use-local` and restart `make whatsapp` |
+| Twilio's console debugger shows error 11200 | The webhook did not answer: `make whatsapp` or `make tunnel` is not running |
+| `sender not allowed` in terminal 2 | `WHATSAPP_ALLOWED_SENDERS` needs `62…` without the leading 0 |
+| No reply; the case shows "WhatsApp reply not sent" | The phone's sandbox join expired (send `join <code>` again), or the auth token changed |
+| Twilio answers your message with its own text | The webhook URL is empty, so the sandbox's default reply runs. Set it as above |
+
+Twilio does not redeliver a message the webhook could not take (for example, a 503 while
+`make dev` was down). Send it again.

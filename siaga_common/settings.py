@@ -116,6 +116,16 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = Field(None, alias="WHATSAPP_PHONE_NUMBER_ID")
     whatsapp_graph_version: str = Field("26.0", alias="WHATSAPP_GRAPH_VERSION")
     whatsapp_graph_url: str = Field("https://graph.facebook.com", alias="WHATSAPP_GRAPH_URL")
+    # Which WhatsApp provider the webhook and the replies use: Meta's Cloud API (a Meta app and
+    # test number) or Twilio (its WhatsApp sandbox; no Meta app). docs/whatsapp-inbound.md
+    whatsapp_provider: Literal["meta", "twilio"] = Field("meta", alias="WHATSAPP_PROVIDER")
+    twilio_account_sid: str | None = Field(None, alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: SecretStr | None = Field(None, alias="TWILIO_AUTH_TOKEN")
+    # the sandbox's shared number, or your own Twilio WhatsApp sender
+    twilio_whatsapp_from: str = Field("whatsapp:+14155238886", alias="TWILIO_WHATSAPP_FROM")
+    # the exact URL set in the Twilio console, when the tunnel does not pass the public host
+    twilio_webhook_url: str | None = Field(None, alias="TWILIO_WEBHOOK_URL")
+    twilio_api_url: str = Field("https://api.twilio.com", alias="TWILIO_API_URL")
 
     # step 4 (not built): Tier 3 approvals from the SAP Joule capability
     joule_approvals: bool = Field(False, alias="JOULE_APPROVALS")

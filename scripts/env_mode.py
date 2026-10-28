@@ -21,6 +21,7 @@ from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parent.parent
 PLACEHOLDER = "<set-me>"
+DEFAULTS = {"WHATSAPP_PROVIDER": "meta"}  # as in siaga_common/settings.py
 
 MODES: dict[str, dict] = {
     "local": {
@@ -36,15 +37,23 @@ MODES: dict[str, dict] = {
             "SAP_MOCK_API_KEY",
             "CASE_API_URL",
         ],
-        # (variable, value, then also required)
+        # ({variable: value, ...} all true, then also required)
         "required_if": [
-            ("LLM_PROVIDER", "bedrock", ["AWS_PROFILE", "BEDROCK_MODEL_ID"]),
+            ({"LLM_PROVIDER": "bedrock"}, ["AWS_PROFILE", "BEDROCK_MODEL_ID"]),
+            ({"WHATSAPP_INBOUND": "1"}, ["WHATSAPP_ALLOWED_SENDERS"]),
             (
-                "WHATSAPP_INBOUND",
-                "1",
-                ["WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_ALLOWED_SENDERS"],
+                {"WHATSAPP_INBOUND": "1", "WHATSAPP_PROVIDER": "meta"},
+                ["WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"],
             ),
-            ("WHATSAPP_NOTIFY", "1", ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]),
+            (
+                {"WHATSAPP_NOTIFY": "1", "WHATSAPP_PROVIDER": "meta"},
+                ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"],
+            ),
+            ({"WHATSAPP_INBOUND": "1", "WHATSAPP_PROVIDER": "twilio"}, ["TWILIO_AUTH_TOKEN"]),
+            (
+                {"WHATSAPP_NOTIFY": "1", "WHATSAPP_PROVIDER": "twilio"},
+                ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM"],
+            ),
         ],
         "forbidden": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"],
     },
@@ -116,9 +125,13 @@ def check(env_file: Path | None = None, out=print) -> tuple[str | None, list[str
     out(f"mode: {mode} — {spec['about']}")
     problems = []
     required = list(spec["required"])
-    for var, value, more in spec.get("required_if", []):
-        if (os.environ.get(var) or values.get(var)) == value:
-            required += more
+
+    def current(var: str) -> str | None:
+        return os.environ.get(var) or values.get(var) or DEFAULTS.get(var)
+
+    for when, more in spec.get("required_if", []):
+        if all(current(var) == value for var, value in when.items()):
+            required += [m for m in more if m not in required]
     for name in required:
         # a variable already in the shell wins over .env (same as the settings)
         ok = _is_set(os.environ.get(name)) or _is_set(values.get(name))

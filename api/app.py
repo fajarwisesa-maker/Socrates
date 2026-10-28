@@ -48,7 +48,7 @@ from agent.providers.base import LLMProvider
 from agent.runtime import Runtime, build_runtime
 from agent.signals import build_signals
 from api.connections import check_connections
-from api.whatsapp_notify import CloudApiSender, OutcomeNotifier
+from api.whatsapp_notify import OutcomeNotifier, make_sender
 from siaga_common.settings import REPO_ROOT, Settings, get_settings
 from siaga_common.sources import (
     CASE_FLAGS,
@@ -245,6 +245,7 @@ def create_app(
     notifier: OutcomeNotifier | None = None,
 ) -> FastAPI:
     s = with_secrets(settings or get_settings())  # SECRETS_SOURCE=aws: siaga/sap, once
+    whatsapp_provider = s.whatsapp_provider
     whatsapp_inbound = s.whatsapp_inbound  # a process setting (the webhook app), not a case flag
     if runtime is None:
         if s.embedded_sap and not s.sap_mock_on_btp:  # the BTP flag wins
@@ -266,7 +267,7 @@ def create_app(
         reset_sap = _http_reset(runtime.sap)  # type: ignore[arg-type]
     flags = SsmFlags(s.aws_region) if s.flags_source == "ssm" else None
     if notifier is None and s.whatsapp_notify:
-        notifier = OutcomeNotifier(CloudApiSender(s))
+        notifier = OutcomeNotifier(make_sender(s))
     service = CaseService(
         runtime, llm or make_provider(s), reset_sap, flags=flags, notifier=notifier
     )
@@ -348,6 +349,7 @@ def create_app(
             # WhatsApp inbound: the dashboard then follows cases it did not start itself
             "whatsapp_inbound": whatsapp_inbound,
             "whatsapp_notify": notifier is not None,
+            "whatsapp_provider": whatsapp_provider,
             "sap": _sap_info(s),
             "backends": {
                 "case_store": s.case_store,

@@ -28,6 +28,7 @@ and the decisions made. **Update it every phase.**
 | Laptop live (Demo Day default) | `make use-local`, preflight for mode local, `LLM_PROVIDER=sap_genai` (Claude on SAP AI Core) and `LLM_FALLBACK=sap_genai` built and tested against a simulated AI Core; **live runs, the real v2 golden recording and `make rehearse N=3` wait for credentials** (none of the AWS / AI Core / BTP values work in this session) |
 | WhatsApp inbound (option A, owner 28 Oct) | built behind `WHATSAPP_INBOUND` (off by default): webhook app on :8010 (`make whatsapp`, `make tunnel`), dashboard follows the case; tested with signed payloads and Playwright; **not yet tried with a real Meta app** (docs/whatsapp-inbound.md) |
 | WhatsApp reply (option B, owner 28 Oct) | built behind `WHATSAPP_NOTIFY` (off by default): one reply with the outcome when a WhatsApp case ends; tested against a stand-in Cloud API; **not yet tried with a real token** |
+| WhatsApp via Twilio (owner 28 Oct) | built behind `WHATSAPP_PROVIDER=twilio`: sandbox webhook + replies, no Meta app (`scripts/fill-twilio.sh`); tested with signed form posts and a stand-in Twilio API; **not yet tried with a real Twilio account** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 
@@ -125,6 +126,7 @@ WhatsApp inbound (`docs/whatsapp-inbound.md`; off unless `WHATSAPP_INBOUND=1`):
 
 ```bash
 scripts/fill-whatsapp.sh          # owner: verify token (shown), app secret (hidden), allowed senders
+scripts/fill-twilio.sh            # or Twilio's sandbox instead of a Meta app (WHATSAPP_PROVIDER=twilio)
 make whatsapp                     # webhook on 127.0.0.1:8010, next to make dev
 make tunnel                       # cloudflared quick tunnel to :8010 -> Meta webhook callback URL
 ```
@@ -202,6 +204,7 @@ See `.env.example` for the full list.
 | `SIAGA_MODE` | unset | `local` \| `aws` \| `replay` \| `v1`: the laptop mode (`make use-*`); drives `make preflight` and `make demo-reset` |
 | `WHATSAPP_INBOUND` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` / `WHATSAPP_ALLOWED_SENDERS` / `WHATSAPP_PORT` / `WHATSAPP_MAX_AGE_SECONDS` | `0` / – / – / – / `8010` / `600` | WhatsApp inbound webhook (`make whatsapp`); docs/whatsapp-inbound.md |
 | `WHATSAPP_NOTIFY` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_GRAPH_VERSION` / `WHATSAPP_GRAPH_URL` | `0` / – / – / `26.0` / `https://graph.facebook.com` | option B: reply to the sender with the outcome (Case API, outbound) |
+| `WHATSAPP_PROVIDER` / `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` / `TWILIO_WEBHOOK_URL` / `TWILIO_API_URL` | `meta` / – / – / `whatsapp:+14155238886` / – / `https://api.twilio.com` | `twilio`: Twilio's WhatsApp sandbox for the webhook and the replies |
 | `FLAGS_SOURCE` | `env` | `ssm`: flags from `/siaga/flags/*`, read at the start of every case |
 | `SECRETS_SOURCE` / `SAP_SECRET_ID` | `env` / `siaga/sap` | `aws`: SAP values from Secrets Manager, read once per process |
 | `CASE_API_KEY` | unset | when set, the Case API requires `X-API-Key`; dashboard proxy, preflight, rehearse send it |
@@ -1204,6 +1207,45 @@ additive (no field removed).
   WHATSAPP_NOTIFY=1 against a local Graph stand-in, multi, fake delay, PII 12/12; v1 9/9
   (+3 skipped).
 
+### WhatsApp through Twilio (owner's decision 28 Oct, `WHATSAPP_PROVIDER=twilio`)
+
+- **Why:** a real-WhatsApp route without a Meta app. Twilio's sandbox needs a Twilio account
+  only; each phone sends `join <code>` to the sandbox number (valid 72 hours).
+- **Contract from SDK source** (twilio.com is blocked here): Python `twilio` 9.12.0
+  (`request_validator.py`, `rest/api/v2010/account/message`) and npm `twilio` 5.13.1
+  (`lib/webhooks/webhooks.js`). The inbound field names (`MessageSid`, `From` =
+  `whatsapp:+…`, `WaId`, `Body`, `NumMedia`, `ProfileName`) were checked by web search and
+  Twilio's changelog.
+  - Signature: base64 HMAC-SHA1(auth token, URL + each parameter name and value, sorted by
+    name); the URL is checked with and without its port, as the SDK does. A test pins a
+    vector computed with the SDK.
+  - Send: `POST {api}/2010-04-01/Accounts/{sid}/Messages.json`, a form with `To`, `From` and
+    `Body`, HTTP basic auth (SID, token). Preflight reads `Accounts/{sid}.json`.
+- **Same app, same rules:** `api/whatsapp.py` serves `POST /webhooks/twilio` instead of the
+  Meta routes. The allowlist, dedupe by `MessageSid`, text-only and forwarding to
+  `POST /cases` run through one shared `accept()` for both providers. Twilio sends no
+  timestamp and does not redeliver, so there is no age check. The answer is an empty TwiML
+  `<Response>` (no automatic reply). SMS (a `From` without `whatsapp:`) is ignored.
+- **The signed URL behind the tunnel** is rebuilt from `X-Forwarded-Proto` / `Host` (or
+  `X-Forwarded-Host`), falling back to the URL the app saw; `TWILIO_WEBHOOK_URL` pins it
+  when a tunnel hides the public host. A refused call logs the URLs it checked. This was
+  verified against a real uvicorn with tunnel-style headers.
+- **Replies:** `api/whatsapp_notify.TwilioSender` (`make_sender` picks it). There is no
+  threading, and a business-scoped user ID cannot be sent to. Twilio error bodies become
+  "HTTP 401 Authenticate (Twilio error 20003)"; the token is never echoed.
+- **Setup:** `scripts/fill-twilio.sh` (SID shown and format-checked, token hidden, sandbox
+  number with a default, allowed senders, reply y/N). `env-check` conditions are now sets
+  of variables, so Meta values are required only with `WHATSAPP_PROVIDER=meta` and Twilio
+  values only with `twilio`. Preflight: an unsigned POST must get 401 (the app runs and
+  checks signatures), plus the read-only account check for replies. `/config` has
+  `whatsapp_provider`.
+- Tests (`tests/test_whatsapp_twilio.py`, 15): the SDK vector and both port forms;
+  acceptance and dedupe; signature required (none, wrong, wrong URL); ignored sender,
+  media, SMS, blank text; `TWILIO_WEBHOOK_URL`; 503 and resend; settings; the send request
+  shape and the check; errors without the token; a sandbox message through the Case API,
+  approved and verified, with exactly one reply ("Rp 340 jt protected for Rp 11,4 jt");
+  env-check; the fill script.
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -1225,7 +1267,7 @@ additive (no field removed).
   `LLM_PROVIDER=sap_genai make record-golden` (real `data/golden/v2/`; the "(fake)"
   replay label goes away with it), and `make rehearse N=3` with per-stage timings.
 - WhatsApp inbound and the reply (option B) have not been tried with a real Meta app,
-  token and tunnel yet (owner's setup:
+  token and tunnel, nor with a real Twilio sandbox, yet (owner's setup:
   docs/whatsapp-inbound.md).
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

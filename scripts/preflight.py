@@ -216,6 +216,9 @@ def whatsapp_line(s: Settings) -> None:
     from api.whatsapp import allowed_set
 
     what = f"WhatsApp webhook :{s.whatsapp_port}"
+    if s.whatsapp_provider == "twilio":
+        twilio_line(s, what)
+        return
     if not s.whatsapp_verify_token or not s.whatsapp_app_secret:
         line(RED, what, "WHATSAPP_VERIFY_TOKEN / WHATSAPP_APP_SECRET missing (fill-whatsapp.sh)")
         return
@@ -241,17 +244,48 @@ def whatsapp_line(s: Settings) -> None:
         )
 
 
+def twilio_line(s: Settings, what: str) -> None:
+    """Twilio has no verification handshake: an unsigned POST must be refused (401), which
+    shows the webhook runs and checks signatures. Twilio and the tunnel are not checked."""
+    from api.whatsapp import TWILIO_PATH, allowed_set
+
+    what += " (Twilio)"
+    if not s.twilio_auth_token:
+        line(RED, what, "TWILIO_AUTH_TOKEN missing (fill-twilio.sh)")
+        return
+    if not allowed_set(s.whatsapp_allowed_senders):
+        line(RED, what, "WHATSAPP_ALLOWED_SENDERS is empty: every message would be ignored")
+        return
+    try:
+        r = httpx.post(f"http://127.0.0.1:{s.whatsapp_port}{TWILIO_PATH}", data={}, timeout=3)
+    except httpx.HTTPError:
+        line(RED, what, "not running (make whatsapp), and expose it with make tunnel")
+        return
+    if r.status_code != 401:
+        line(RED, what, f"an unsigned call answered HTTP {r.status_code}, expected 401")
+    else:
+        n = len(allowed_set(s.whatsapp_allowed_senders))
+        line(GREEN, what, f"running, signatures checked, {n} allowed sender(s); set "
+             f"https://<tunnel>{TWILIO_PATH} in the Twilio sandbox settings")  # fmt: skip
+
+
 def whatsapp_notify_line(s: Settings) -> None:
     """Option B: the access token and phone number ID are valid (a read; nothing is sent)."""
-    from api.whatsapp_notify import CloudApiSender, NotifyError
+    from api.whatsapp_notify import NotifyError, make_sender
 
-    what = "WhatsApp replies"
+    what = "WhatsApp replies" + (" (Twilio)" if s.whatsapp_provider == "twilio" else "")
     try:
-        number = CloudApiSender(s).check()
+        number = make_sender(s).check()
     except RuntimeError as e:
-        line(RED, what, str(e) + " (fill-whatsapp.sh)")
+        script = "fill-twilio.sh" if s.whatsapp_provider == "twilio" else "fill-whatsapp.sh"
+        line(RED, what, f"{e} ({script})")
     except NotifyError as e:
-        line(RED, what, f"{e} (a temporary access token expires after about a day)")
+        hint = (
+            "check the account SID and auth token"
+            if s.whatsapp_provider == "twilio"
+            else "a temporary access token expires after about a day"
+        )
+        line(RED, what, f"{e} ({hint})")
     else:
         line(GREEN, what, f"token ok, replies come from {number}")
 

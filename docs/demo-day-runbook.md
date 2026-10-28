@@ -50,7 +50,9 @@ With `WHATSAPP_INBOUND=1` (docs/whatsapp-inbound.md), also run `make whatsapp` a
 `make tunnel`, and paste the tunnel URL into the Meta app's webhook. Then a message from an
 allowed phone opens the case by itself. The buttons below stay the fallback. With
 `WHATSAPP_NOTIFY=1` the phone also gets one reply with the outcome once the case is verified
-(generate a fresh access token that morning unless it is a system-user token).
+(generate a fresh access token that morning unless it is a system-user token). With
+`WHATSAPP_PROVIDER=twilio` the phone sends `join <code>` to the sandbox again that morning
+(the join lasts 72 hours) and the tunnel URL goes into the Twilio sandbox settings.
 
 ## On stage
 
