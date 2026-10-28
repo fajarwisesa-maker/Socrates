@@ -4,10 +4,11 @@ import { Info, MessageCircle, Timer } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { caseClock } from "@/lib/caseClock";
 import { dayShort, juta, minutesSeconds, thousands } from "@/lib/format";
-import { plantName, supplierName, whatsappReply } from "@/lib/present";
-import type { CaseAction, CaseEvent, CaseRecord, Labels } from "@/lib/types";
+import { plantName, whatsappReply } from "@/lib/present";
+import type { CaseEvent, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
-import { LaneMap, type Flow } from "../LaneMap";
+import { LaneMap } from "@/components/LaneMap";
+import { laneModel } from "@/lib/laneModel";
 import { Frame } from "./Frame";
 
 export function VerifyCanvas({ record, events, round }: { record: CaseRecord; events: CaseEvent[]; round: number }) {
@@ -21,16 +22,9 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
   const summary = record.summary;
   const failed = record.status === "REOPENED";
   const verified = record.status === "RESOLVED" && v?.covered;
-  const lane = labels?.lanes?.[a?.purchase_orders[0]?.YY1_TransportLane ?? record.disruption?.lane ?? ""];
   const dest = plantName(labels, a?.plant ?? "");
   const due = record.verify_due_at && now ? Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000)) : null;
 
-  const live = record.actions.filter((x) => x.status === "EXECUTED" || x.status === "PENDING_APPROVAL");
-  const flows: Flow[] = live.map((x) => ({
-    from: source(x, labels),
-    label: `${thousands(x.quantity)} ctn · ${x.eta ? dayShort(record.day0, x.eta) : "—"}`,
-    tone: x.status === "PENDING_APPROVAL" ? "human" : verified ? "ok" : failed ? "plain" : "ok",
-  }));
   const inbound = risk?.inbound[0];
 
   const headline = failed
@@ -44,14 +38,7 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
   return (
     <Frame stage="VERIFY" round={round} headline={headline} tone={failed ? "risk" : verified ? "ok" : "ink"}>
       <div className="flex h-full flex-col gap-4">
-        <LaneMap
-          origin={lane?.from ?? "Supplier"}
-          blockedAt={record.disruption?.location?.split(",").at(-1)?.trim().replace("-", "–") ?? null}
-          dest={dest}
-          flows={flows}
-          cutoff={risk?.deadline ? `Cutoff ${dayShort(record.day0, risk.deadline)}` : undefined}
-          dimBlocked
-        />
+        {laneModel(record, { kind: "verify" }) && <LaneMap model={laneModel(record, { kind: "verify" })!} size="sm" />}
         {v && !verified && (
           <p className={failed ? "text-xl font-semibold text-risk-ink" : "text-xl text-ink"} data-testid="coverage">
             {thousands(v.projected_supply)} of {thousands(v.demand)} cartons {v.covered ? "covered" : "projected"} by the
@@ -107,12 +94,4 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
       </div>
     </Frame>
   );
-}
-
-function source(x: CaseAction, labels: Labels | undefined) {
-  const ref = x.planned?.reference ?? "";
-  if (x.kind === "stock_transfer") return plantName(labels, ref);
-  if (x.kind === "alternate_supplier") return supplierName(labels, ref);
-  if (x.kind === "spot_air") return "Air charter";
-  return ref;
 }
