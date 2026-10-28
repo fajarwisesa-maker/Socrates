@@ -10,7 +10,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { notices } from "@/lib/notices";
 import type { Step } from "@/lib/pacing";
-import { modelLabel, period, TOOL } from "@/lib/present";
+import { COMPUTED_ON, modelLabel, period, TOOL } from "@/lib/present";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Config, Precedent } from "@/lib/types";
 
@@ -107,6 +107,8 @@ interface ToolData {
   tier?: number;
   denial?: { message?: string; policies?: string[] } | null;
   error?: string | null;
+  /** SOLVER_BACKEND=lambda: where this call's solver work ran */
+  computed_on?: string | null;
 }
 
 function StepEvents({ events }: { events: CaseEvent[] }) {
@@ -135,6 +137,11 @@ function StepEvents({ events }: { events: CaseEvent[] }) {
                   {e.status === "tool" ? `tool · ${d.status}` : e.status}
                 </Badge>
                 {typeof d.tier === "number" && e.status === "tool" && <TierBadge tier={d.tier} />}
+                {e.status === "tool" && typeof d.computed_on === "string" && (
+                  <span className="text-xs font-medium text-ink-2" data-testid="computed-on">
+                    on {COMPUTED_ON[d.computed_on] ?? d.computed_on}
+                  </span>
+                )}
                 {e.agent && <span className="text-xs font-medium text-ink-2">{e.agent}</span>}
                 <span className="font-semibold text-ink">
                   {e.status === "tool" && d.tool ? (TOOL[d.tool] ?? d.tool) : e.title}

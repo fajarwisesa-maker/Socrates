@@ -207,3 +207,21 @@ export function whatsappReply(events: CaseEvent[]): string | null {
   const sent = events.find((e) => e.stage === "CASE" && e.title.startsWith("Outcome sent on WhatsApp"));
   return sent ? sent.title.replace("Outcome sent on WhatsApp", "Reply sent on WhatsApp") : null;
 }
+
+/** SOLVER_BACKEND=lambda: where the solver work of these tool events ran. Each tool call
+ *  carries `computed_on` from the backend, so the label is only "AWS Lambda" when it was. */
+export function solverLabel(events: CaseEvent[]): string {
+  const where = events
+    .filter((e) => e.status === "tool")
+    .map((e) => e.data.computed_on as string | undefined)
+    .filter(Boolean);
+  if (where.includes("in_process_fallback")) return "Calculated by the solver on this laptop (AWS Lambda unavailable), not AI";
+  if (where.includes("aws_lambda")) return "Calculated by the solver on AWS Lambda, not AI";
+  return "Calculated by the solver, not AI";
+}
+
+/** Short form for event lists. */
+export const COMPUTED_ON: Record<string, string> = {
+  aws_lambda: "AWS Lambda",
+  in_process_fallback: "local (Lambda unavailable)",
+};

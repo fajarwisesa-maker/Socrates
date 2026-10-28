@@ -17,6 +17,7 @@ and the decisions made. **Update it every phase.**
 | 5 Case API and dashboard | done |
 | 6 Replay mode and demo hardening | done with a **placeholder golden run from the fake LLM**; Bedrock recording + `make rehearse` on Bedrock blocked on AWS |
 | 7 AWS deployment | **dropped (owner, 25 Oct)**: no AWS stack. The secrets / SSM / `/health/connections` work stays as the production design |
+| AWS: S3 audit trail + Lambda solver (owner 28 Oct) | built behind `AUDIT_BACKEND=s3` / `SOLVER_BACKEND=lambda`, `make aws-setup` creates both; tested against a local S3/Lambda stand-in (real boto3 + HTTP, browser e2e); **not yet run against the real account** |
 | 8 | not started |
 | v2 step 0 (safety net, access check) | done except the SAP checks (SAP access pending); tag `v1-demo` on `7bccb9a` is local only (this session cannot push tags) |
 | v2 step 1 (S/4HANA mock on BTP) | waiting for SAP access |
@@ -107,6 +108,17 @@ DELAY_MODEL=rpt make dev              # SAP RPT-1.6 delay prediction in Assess (
 DELAY_MODEL=rpt make record-golden    # also records the RPT answers (rpt.jsonl) for replay
 ```
 
+AWS outside the model (`docs/aws-setup.md`; local stays the default and the fallback):
+
+```bash
+make aws-setup                    # S3 audit bucket (Object Lock) + Lambda solver, test solve, .env.local lines
+make aws-status                   # bucket retention + one CBC solve on Lambda
+make lambda-package               # build/lambda/solver.zip only (no Docker)
+make audit-verify CASE=case-…     # read a case's trail back from S3 and check the chain
+make audit-sync                   # upload local audit entries missing in S3
+SMOKE_AWS=1 make web-smoke        # e2e with both on, against tests/aws_standin.py
+```
+
 Laptop modes, secrets and flags (`docs/connections.md`, `docs/demo-day-runbook.md`; nothing
 here prints a secret):
 
@@ -192,10 +204,12 @@ See `.env.example` for the full list.
 | `REPLAY_SPEED` | `1.0` | 1.0 = recorded model latency (looks live), 0 = instant |
 | `LLM_RECORD_PATH` | unset | record every LLM call of a run (builds the golden run) |
 | `LLM_TEMPERATURE` | `0` | sent to Bedrock; dropped automatically if the model rejects it; `off` = never |
-| `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | switch to AWS impls in Phase 7 |
+| `CASE_STORE` / `AUDIT_BACKEND` / `KB_BACKEND` / `POLICY_BACKEND` | local impls | `AUDIT_BACKEND=s3` is built; the others stay local (Phase 7 dropped) |
+| `AUDIT_S3_BUCKET` / `AUDIT_S3_PREFIX` / `AUDIT_RETENTION_DAYS` | – / `audit/` / `1` | the Object Lock bucket (`make aws-setup`), key prefix, default retention it sets (governance) |
+| `SOLVER_LAMBDA_NAME` / `SOLVER_LAMBDA_FALLBACK` | `siaga-solver` / `1` | `SOLVER_BACKEND=lambda`: the function; 1 = solve in process when Lambda fails (labelled) |
 | `EMBEDDED_SAP` | `0` | Case API runs the mock S/4HANA in-process |
 | `SIAGA_API_URL` (web) | `http://127.0.0.1:8000` | where the dashboard's `/api/*` rewrite points |
-| `SOLVER_BACKEND` | `inprocess` | `inprocess` \| `http` (`SOLVER_URL`) \| `lambda` (Phase 7) |
+| `SOLVER_BACKEND` | `inprocess` | `inprocess` \| `http` (`SOLVER_URL`) \| `lambda` (`SOLVER_LAMBDA_NAME`) |
 | `SAP_MOCK_URL` / `SOLVER_URL` / `CASE_API_URL` | `127.0.0.1:8001/8002/8000` | local services |
 | `SQLITE_PATH` / `SAP_DB_PATH` / `AUDIT_DIR` | `var/…` | local state (git-ignored) |
 | `MAX_TOOL_CALLS` / `MAX_REPLANS` | `20` / `2` | enforced by the state machine |
@@ -1246,6 +1260,86 @@ additive (no field removed).
   approved and verified, with exactly one reply ("Rp 340 jt protected for Rp 11,4 jt");
   env-check; the fill script.
 
+### AWS: S3 audit trail and Lambda solver (owner's decision 28 Oct)
+
+- **Why:** AWS beyond the model (Bedrock is blocked on the account): the numbers and the
+  audit record run on AWS, the AI on Claude. Both sit behind the Phase 3 seams; local stays
+  the default and the fallback.
+- **S3 audit (`agent/audit.S3AuditWriter`):**
+  - The local JSONL stays the working copy, so the dashboard and `verify()` never wait on the
+    network.
+  - Each entry is also PUT as its own object, `{prefix}{case}/{seq:06d}.json`, by one
+    background thread, in order, with a SHA-256 checksum (an Object Lock bucket requires
+    one) and the hash and prev hash as metadata. Retries back off (0.5–10 s); a case never
+    sees an S3 error.
+  - The bucket's **default retention (governance, `AUDIT_RETENTION_DAYS`=1)** locks each
+    object; the writer never overwrites (`sync()` uploads only missing keys).
+  - `verify_remote()` reads the case back from S3 alone, checks the chain, compares
+    **whole entries** with the local copy and reads the lock on the last object. A test
+    caught that comparing only the hash fields missed an edited payload.
+  - API: `/cases/{id}/audit` adds `storage` (stored / pending / failed);
+    `GET /cases/{id}/audit/s3` runs the check (409 when local).
+- **Lambda solver (`agent/clients.LambdaSolver`):**
+  - It sends the handler's existing event `{"operation", "payload"}` (RequestResponse,
+    30 s read timeout, 2 tries).
+  - Any AWS or function error, or a refused request, raises `SolverBackendError`. With
+    `SOLVER_LAMBDA_FALLBACK=1` that call runs in process.
+  - Where each call ran is kept per thread. `ToolRegistry.invoke` copies it into
+    `ToolCallResult.computed_on` (`aws_lambda` | `in_process_fallback`), so events and audit
+    say where every solve ran.
+  - The Simulate canvas reads it (`solverLabel`): "Calculated by the solver on AWS Lambda,
+    not AI", or "on this laptop (AWS Lambda unavailable)". The drawer shows it per tool
+    call. `/config.backends.solver_lambda` carries the counts for the Architecture view.
+- **Package (`scripts/package_lambda.py`, no Docker):**
+  - `services/solver` (without the FastAPI app) and `siaga_common/timeline.py`.
+  - `uv pip install --python-platform x86_64-manylinux_2_28 --python-version 3.12
+    --only-binary :all:` of the locked pulp / pydantic versions, plus `tzdata==2025.2`:
+    zoneinfo needs a database and Lambda's image may have none. The isolated test runs with
+    the system database hidden.
+  - Only PuLP's linux/64 CBC is kept, with its +x bit kept in the zip (Lambda can't chmod).
+    That CBC needs glibc 2.4 and libstdc++ only.
+  - `pulp/tests` must stay: `pulp/__init__` imports it. The isolated run caught this.
+  - Size 7.6 MB, under the 50 MB direct upload limit.
+  - The handler gained `{"operation": "ping"}`: a tiny CBC solve that proves the binary
+    runs in the runtime.
+- **Setup (`scripts/aws_setup.py`, `make aws-setup`):**
+  - Bucket `siaga-audit-<account>-<region>`: created with `ObjectLockEnabledForBucket` (only
+    possible at creation; an existing bucket without it is refused with a message), public
+    access blocked, default retention set.
+  - Role `siaga-solver-lambda` (Lambda trust + AWSLambdaBasicExecutionRole only).
+  - Function: python3.12, x86_64, 1024 MB, 30 s. `create_function` is retried while a new
+    role is not yet assumable; the waiters are `function_active_v2` /
+    `function_updated_v2`.
+  - Then `ping`, then it writes `AUDIT_BACKEND`, `AUDIT_S3_BUCKET` and `SOLVER_BACKEND`
+    into `.env.local` in place.
+  - Minimum IAM: `infra/iam/siaga-laptop-aws.json`. Governance, not compliance mode, so an
+    admin can still clean up.
+- **Checks:**
+  - Preflight (local modes): the bucket's Object Lock rule, and one Lambda `ping` (also
+    warms it).
+  - `env-check` requires `AWS_PROFILE` (and `AUDIT_S3_BUCKET`) when either backend is on.
+- **Tests** (`tests/test_aws_backends.py`, 23):
+  - the demo on the Lambda path keeps every golden number and labels each solve;
+  - throttling falls back with the label;
+  - function errors, refused requests, and ping;
+  - S3: stored and verified from S3 alone; a tampered object is detected; outages never
+    reach the case, and `sync` fills the gap;
+  - the Case API's storage and `/audit/s3`;
+  - runtime wiring, env-check and preflight;
+  - `make aws-setup` (bucket, refusal, role + function with the IAM retry, `.env` writing;
+    AWS errors print one line with the fix, `status` reports instead of crashing);
+  - package stripping and the +x bit; the built zip run by an isolated interpreter;
+  - request shapes through botocore's Stubber (it validates against the AWS API models);
+  - the whole demo over **real boto3 and HTTP** against `tests/aws_standin.py`: a small
+    server speaking the Lambda Invoke and S3 object, list, head and object-lock protocols.
+    It needed HTTP/1.1, or every PUT waited 1 s for "100-continue".
+- e2e `web/e2e/aws.spec.ts` (`SMOKE_AWS=1`, which points boto3 at the stand-in through
+  `AWS_ENDPOINT_URL_S3` / `_LAMBDA`): the Simulate label, the drawer's "on AWS Lambda",
+  `37/37 stored`, Verify in S3 ("chain intact, same as local · governance lock until …"),
+  and the Architecture boxes.
+- Results: pytest 305 passed (2 skipped); web smoke with `SMOKE_AWS=1` 10/10 (+3 skipped),
+  local 9/9 (+4 skipped).
+
 ## Open items
 
 - AWS credentials in the build container are proxy placeholders; STS returns
@@ -1269,5 +1363,7 @@ additive (no field removed).
 - WhatsApp inbound and the reply (option B) have not been tried with a real Meta app,
   token and tunnel, nor with a real Twilio sandbox, yet (owner's setup:
   docs/whatsapp-inbound.md).
+- The S3 audit trail and the Lambda solver have not run against a real AWS account yet:
+  `make aws-setup` on the laptop (needs a working `AWS_PROFILE`), then `make preflight`.
 - `BEDROCK_MODEL_ID` not chosen yet (owner will send the model list; not blocking
   before the end of Phase 4).

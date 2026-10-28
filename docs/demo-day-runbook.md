@@ -12,6 +12,7 @@ scripts/fill-env.sh            # hidden input: writes .env.local / .env.replay /
 make use-local
 make env-check                 # every variable of mode local: set
 make demo-reset                # day 0 = today on the BTP mock
+make aws-setup                 # optional: S3 audit trail + Lambda solver (docs/aws-setup.md)
 make preflight                 # all green (see below)
 make record-golden             # a real run -> data/golden/v2/ (what make use-replay plays)
 make rehearse N=3              # stage timings in var/rehearse/
@@ -39,7 +40,8 @@ After switching: stop `make dev` (Ctrl-C), `make use-<mode>`, `make dev`,
 3. LLM: one tool call to Bedrock and, separately, to the fallback Claude via SAP AI Core
 4. BTP mock: refuses a call without the key, accepts ours, day 0 = today
 5. AI Core token + one RPT-1.6 call on the demo case
-6. local stores (SQLite cases, audit files, KB)
+6. local stores (SQLite cases, audit files, KB), and with `make aws-setup`: the S3 audit
+   bucket's Object Lock and one CBC solve on the Lambda solver (which also warms it up)
 7. Case API and dashboard up (`make dev`), CBC solver, Cedar policies
 
 Red = blocker. Amber = read it (for example: day 0 is not today, so run `make demo-reset`).

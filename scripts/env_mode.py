@@ -40,6 +40,8 @@ MODES: dict[str, dict] = {
         # ({variable: value, ...} all true, then also required)
         "required_if": [
             ({"LLM_PROVIDER": "bedrock"}, ["AWS_PROFILE", "BEDROCK_MODEL_ID"]),
+            ({"AUDIT_BACKEND": "s3"}, ["AWS_PROFILE", "AUDIT_S3_BUCKET"]),
+            ({"SOLVER_BACKEND": "lambda"}, ["AWS_PROFILE"]),
             ({"WHATSAPP_INBOUND": "1"}, ["WHATSAPP_ALLOWED_SENDERS"]),
             (
                 {"WHATSAPP_INBOUND": "1", "WHATSAPP_PROVIDER": "meta"},

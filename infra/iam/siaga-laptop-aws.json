@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RunTimeAuditTrail",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetObjectRetention", "s3:ListBucket",
+                 "s3:GetBucketObjectLockConfiguration"],
+      "Resource": ["arn:aws:s3:::siaga-audit-*", "arn:aws:s3:::siaga-audit-*/*"]
+    },
+    {
+      "Sid": "RunTimeSolver",
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction"],
+      "Resource": "arn:aws:lambda:*:*:function:siaga-solver"
+    },
+    {
+      "Sid": "SetupOnly",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity", "s3:CreateBucket", "s3:PutBucketVersioning",
+                 "s3:PutBucketObjectLockConfiguration", "s3:PutBucketPublicAccessBlock",
+                 "lambda:GetFunction", "lambda:CreateFunction", "lambda:UpdateFunctionCode",
+                 "lambda:UpdateFunctionConfiguration", "iam:GetRole", "iam:CreateRole",
+                 "iam:AttachRolePolicy", "iam:PassRole"],
+      "Resource": "*"
+    }
+  ]
+}

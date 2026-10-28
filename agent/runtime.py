@@ -1,4 +1,4 @@
-"""Wire the agent's dependencies from settings (local now; AWS backends in Phase 7)."""
+"""Wire the agent's dependencies from settings (local, or AWS: S3 audit, Lambda solver)."""
 
 from __future__ import annotations
 
@@ -6,15 +6,22 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from agent.audit import AuditWriter, LocalAuditWriter
+from agent.audit import AuditWriter, LocalAuditWriter, S3AuditWriter
 from agent.case_store import CaseStore, SqliteCaseStore
-from agent.clients import HttpSapClient, HttpSolver, InProcessSolver, SapClient, SolverClient
+from agent.clients import (
+    HttpSapClient,
+    HttpSolver,
+    InProcessSolver,
+    LambdaSolver,
+    SapClient,
+    SolverClient,
+)
 from agent.delay_model import DelayPredictor, make_delay_model
 from agent.kb import LocalBM25KB, PrecedentKB
 from agent.policy import LocalCedarPolicyEngine, PolicyEngine
 from agent.tools.base import ToolContext, ToolRegistry
 from agent.tools.catalog import build_registry
-from siaga_common.settings import Settings, get_settings
+from siaga_common.settings import Settings, export_aws_env, get_settings
 
 
 def _phase7(what: str):
@@ -76,7 +83,12 @@ def build_runtime(
         elif s.solver_backend == "http":
             solver = HttpSolver(s.solver_url)
         else:
-            _phase7("Lambda solver")
+            export_aws_env()  # AWS_PROFILE etc. from .env reach boto3
+            solver = LambdaSolver(
+                s.solver_lambda_name,
+                region=s.aws_region,
+                fallback=InProcessSolver() if s.solver_lambda_fallback else None,
+            )
     if store is None:
         store = (
             SqliteCaseStore(s.sqlite_path, clock)
@@ -84,11 +96,13 @@ def build_runtime(
             else _phase7("DynamoDB case store")
         )
     if audit is None:
-        audit = (
-            LocalAuditWriter(s.audit_dir, clock)
-            if s.audit_backend == "local"
-            else _phase7("S3 audit")
-        )
+        audit = LocalAuditWriter(s.audit_dir, clock)
+        if s.audit_backend == "s3":
+            if not s.audit_s3_bucket:
+                raise RuntimeError("AUDIT_BACKEND=s3 needs AUDIT_S3_BUCKET (make aws-setup)")
+            export_aws_env()
+            audit = S3AuditWriter(audit, s.audit_s3_bucket, s.audit_s3_prefix,
+                                  region=s.aws_region)  # fmt: skip
     if policy is None:
         policy = (
             LocalCedarPolicyEngine(registry.names())

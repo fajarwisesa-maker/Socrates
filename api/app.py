@@ -357,6 +357,23 @@ def create_app(
                 "kb": s.kb_backend,
                 "policy": s.policy_backend,
                 "solver": s.solver_backend,
+                # AWS details for the Architecture view (no secrets): where, and how it went
+                **(
+                    {"audit_s3": {"bucket": s.audit_s3_bucket, "region": s.aws_region}}
+                    if s.audit_backend == "s3"
+                    else {}
+                ),
+                **(
+                    {
+                        "solver_lambda": {
+                            "function": s.solver_lambda_name,
+                            "region": s.aws_region,
+                            **getattr(runtime.solver, "stats", {}),
+                        }
+                    }
+                    if s.solver_backend == "lambda"
+                    else {}
+                ),
             },
         }
 
@@ -435,10 +452,24 @@ def create_app(
     @app.get("/cases/{case_id}/audit")
     def audit(case_id: str) -> dict[str, Any]:
         get_case_or_404(case_id)
-        return {
+        out = {
             "entries": [e.model_dump(mode="json") for e in runtime.audit.read(case_id)],
             "verification": runtime.audit.verify(case_id).model_dump(),
         }
+        if hasattr(runtime.audit, "storage"):  # AUDIT_BACKEND=s3: what reached the bucket
+            out["storage"] = runtime.audit.storage(case_id)
+        return out
+
+    @app.get("/cases/{case_id}/audit/s3")
+    def audit_s3(case_id: str) -> dict[str, Any]:
+        """Read the case's audit trail back from S3 alone and check it (on demand)."""
+        get_case_or_404(case_id)
+        if not hasattr(runtime.audit, "verify_remote"):
+            raise HTTPException(409, "AUDIT_BACKEND is local: nothing is stored in S3")
+        try:
+            return runtime.audit.verify_remote(case_id)
+        except Exception as e:  # noqa: BLE001 - AWS errors become a readable 502
+            raise HTTPException(502, f"S3 check failed: {type(e).__name__}: {e}") from e
 
     @app.post("/cases/{case_id}/approvals/{approval_id}", status_code=202)
     def decide(case_id: str, approval_id: str, body: ApprovalDecision) -> dict[str, Any]:

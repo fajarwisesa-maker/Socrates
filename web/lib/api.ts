@@ -1,4 +1,12 @@
-import type { Approval, AuditEntry, CaseEvent, CaseRecord, Config } from "./types";
+import type {
+  Approval,
+  AuditEntry,
+  AuditRemoteCheck,
+  AuditStorage,
+  CaseEvent,
+  CaseRecord,
+  Config,
+} from "./types";
 
 const BASE = "/api";
 
@@ -35,8 +43,11 @@ export const api = {
       json<{
         entries: AuditEntry[];
         verification: { ok: boolean; entries: number; broken_at: number | null; reason: string | null };
+        storage?: AuditStorage;
       }>,
     ),
+  auditS3: (id: string) =>
+    fetch(`${BASE}/cases/${id}/audit/s3`, { cache: "no-store" }).then(json<AuditRemoteCheck>),
   decide: (id: string, approvalId: string, decision: "approve" | "reject", reason?: string) =>
     fetch(`${BASE}/cases/${id}/approvals/${approvalId}`, {
       method: "POST",

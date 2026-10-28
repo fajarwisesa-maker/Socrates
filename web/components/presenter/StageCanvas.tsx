@@ -44,7 +44,7 @@ export function StageCanvas({
       case "PLAN":
         return <PlanCanvas record={record} events={events} round={round} />;
       case "SIMULATE":
-        return <SimulateCanvas record={record} round={round} />;
+        return <SimulateCanvas record={record} round={round} events={evs} />;
       case "REFLECT":
         return <ReflectCanvas record={record} events={events} round={round} />;
       case "ACT":

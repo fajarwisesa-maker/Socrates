@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay whatsapp tunnel use-v1 env-check flags-v2 flags-v1 flags-show
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay whatsapp tunnel use-v1 env-check flags-v2 flags-v1 flags-show aws-setup aws-status lambda-package audit-verify audit-sync
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -29,6 +29,21 @@ aws-check: ## Show AWS identity and ACTIVE Claude models in AWS_REGION
 
 aws-probe: ## Also prove tool use with a tiny Converse call per Sonnet model
 	$(UV) python scripts/aws_check.py --probe
+
+aws-setup: ## AWS: S3 audit bucket (Object Lock) + Lambda solver, test solve, switch .env.local
+	$(UV) python scripts/aws_setup.py all
+
+aws-status: ## AWS: audit bucket retention + one CBC solve on the Lambda solver
+	$(UV) python scripts/aws_setup.py status
+
+lambda-package: ## AWS: build the solver's Lambda zip -> build/lambda/solver.zip
+	$(UV) python scripts/package_lambda.py
+
+audit-verify: ## AWS: read a case's audit trail back from S3 and check it (CASE=case-...)
+	$(UV) python scripts/aws_setup.py verify-audit $(CASE)
+
+audit-sync: ## AWS: upload local audit entries missing in S3 (after being offline)
+	$(UV) python scripts/aws_setup.py sync-audit
 
 agentcore-check: ## Which AgentCore features (Runtime, Gateway, Policy, Evaluations…) answer in AWS_REGION
 	$(UV) python scripts/aws_check.py --agentcore

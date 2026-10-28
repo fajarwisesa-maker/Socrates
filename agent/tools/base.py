@@ -146,6 +146,9 @@ class ToolCallResult(BaseModel):
     error: str | None = None
     approval_id: str | None = None
     duration_ms: float = 0.0
+    # SOLVER_BACKEND=lambda: where this call's solver work ran ("aws_lambda", or
+    # "in_process_fallback" when Lambda failed); None when the tool used no remote solver
+    computed_on: str | None = None
 
 
 class BudgetExceeded(Exception):
@@ -170,9 +173,16 @@ class ToolRegistry:
     ) -> ToolCallResult:
         t0 = time.perf_counter()
         by = {"agent": agent} if agent else {}  # v2: which specialist made the call
+        tracked = hasattr(ctx.solver, "begin")  # LambdaSolver: where did the solve run?
+        if tracked:
+            ctx.solver.begin()
 
         def done(result: ToolCallResult) -> ToolCallResult:
             result.duration_ms = round((time.perf_counter() - t0) * 1000, 1)
+            if tracked and (used := ctx.solver.used()):
+                result.computed_on = (
+                    "in_process_fallback" if "in_process_fallback" in used else "aws_lambda"
+                )
             ctx.audit.append(
                 ctx.case_id,
                 "tool_call",

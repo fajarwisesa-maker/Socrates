@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     solver_backend: Literal["inprocess", "http", "lambda"] = Field(
         "inprocess", alias="SOLVER_BACKEND"
     )
+    # AUDIT_BACKEND=s3: each audit entry is also stored as its own object in this bucket
+    # (created with Object Lock by `make aws-setup`; default retention, governance mode)
+    audit_s3_bucket: str | None = Field(None, alias="AUDIT_S3_BUCKET")
+    audit_s3_prefix: str = Field("audit/", alias="AUDIT_S3_PREFIX")
+    audit_retention_days: int = Field(1, ge=1, alias="AUDIT_RETENTION_DAYS")
+    # SOLVER_BACKEND=lambda: the function `make aws-setup` deploys (services/solver)
+    solver_lambda_name: str = Field("siaga-solver", alias="SOLVER_LAMBDA_NAME")
+    # on a Lambda error or timeout, solve in process (each tool call says where it ran)
+    solver_lambda_fallback: bool = Field(True, alias="SOLVER_LAMBDA_FALLBACK")
 
     # --- Local service endpoints and paths ---
     sap_mock_url: str = Field("http://127.0.0.1:8001", alias="SAP_MOCK_URL")

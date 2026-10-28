@@ -86,7 +86,16 @@ function boxes(config: Config | null, record: CaseRecord | null) {
     {
       id: "solver",
       title: "Solver (PuLP / CBC)",
-      now: b?.solver === "lambda" ? "AWS Lambda" : b?.solver === "http" ? "HTTP service" : "in process",
+      now:
+        b?.solver === "lambda"
+          ? `AWS Lambda ${b.solver_lambda?.function ?? ""} (${b.solver_lambda?.region ?? ""})` +
+            (b.solver_lambda
+              ? ` · ${b.solver_lambda.lambda} call(s)` +
+                (b.solver_lambda.fallback ? `, ${b.solver_lambda.fallback} solved locally` : "")
+              : "")
+          : b?.solver === "http"
+            ? "HTTP service"
+            : "in process",
       target: "AWS Lambda",
       live: true,
     },
@@ -100,7 +109,10 @@ function boxes(config: Config | null, record: CaseRecord | null) {
     {
       id: "audit",
       title: "Audit writer",
-      now: b?.audit === "s3" ? "S3 Object Lock" : "hash-chained JSONL, local",
+      now:
+        b?.audit === "s3"
+          ? `hash-chained JSONL, local + S3 Object Lock (${b.audit_s3?.bucket ?? "bucket"})`
+          : "hash-chained JSONL, local",
       target: "S3 Object Lock",
       live: true,
     },

@@ -312,11 +312,58 @@ def local_stores(s: Settings) -> None:
         LocalBM25KB().search("Pantura flood", 1)
     except Exception as e:  # noqa: BLE001
         problems.append(f"KB: {e}")
-    backends = (s.case_store, s.audit_backend, s.kb_backend, s.policy_backend, s.solver_backend)
-    if backends != ("sqlite", "local", "local", "local", "inprocess"):
-        problems.append(f"backends {backends} are not all local")
+    # S3 audit and the Lambda solver are allowed here (aws_lines checks them)
+    backends = (s.case_store, s.kb_backend, s.policy_backend)
+    if backends != ("sqlite", "local", "local") or s.solver_backend == "http":
+        problems.append(f"backends {backends + (s.solver_backend,)} are not supported here")
     line(RED if problems else GREEN, "local stores (SQLite cases, audit files, KB)",
          "; ".join(problems) or f"{s.sqlite_path.name}, {s.audit_dir.name}/, BM25 KB")  # fmt: skip
+    aws_lines(s)
+
+
+def aws_lines(s: Settings, clients: dict | None = None) -> None:
+    """AUDIT_BACKEND=s3 / SOLVER_BACKEND=lambda: the bucket's Object Lock and one CBC solve on
+    Lambda (which also warms it up before the demo). Nothing is written to the bucket."""
+    clients = clients or {}
+
+    def client(name: str):
+        if name not in clients:
+            import boto3
+
+            clients[name] = boto3.client(name, region_name=s.aws_region)
+        return clients[name]
+
+    if s.audit_backend == "s3":
+        what = "S3 audit trail"
+        if not s.audit_s3_bucket:
+            line(RED, what, "AUDIT_S3_BUCKET missing (make aws-setup)")
+        else:
+            try:
+                cfg = client("s3").get_object_lock_configuration(Bucket=s.audit_s3_bucket)
+                rule = cfg["ObjectLockConfiguration"].get("Rule", {}).get("DefaultRetention", {})
+                if rule.get("Mode"):
+                    line(GREEN, what, f"{s.audit_s3_bucket}: Object Lock {rule['Mode']} "
+                         f"{rule.get('Days') or rule.get('Years')} day(s)")  # fmt: skip
+                else:
+                    line(RED, what, f"{s.audit_s3_bucket}: no default retention (make aws-setup)")
+            except Exception as e:  # noqa: BLE001
+                line(RED, what, f"{s.audit_s3_bucket}: {type(e).__name__}: {str(e)[:160]}")
+    if s.solver_backend == "lambda":
+        from agent.clients import LambdaSolver
+
+        what = f"Lambda solver {s.solver_lambda_name}"
+        fallback = " (cases would solve in process)" if s.solver_lambda_fallback else ""
+        try:
+            t0 = time.perf_counter()
+            r = LambdaSolver(s.solver_lambda_name, client=client("lambda")).ping()
+            ms = round((time.perf_counter() - t0) * 1000)
+            if r.get("ok"):
+                line(GREEN, what, f"CBC solve ok on Lambda ({r.get('solve_ms')} ms; round "
+                     f"trip {ms} ms, now warm)")  # fmt: skip
+            else:
+                line(RED, what, f"ping answered {r}{fallback}")
+        except Exception as e:  # noqa: BLE001
+            line(RED, what, f"{str(e)[:200]}{fallback}")
 
 
 def main() -> int:

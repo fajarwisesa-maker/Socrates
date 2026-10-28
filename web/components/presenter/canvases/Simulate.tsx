@@ -1,9 +1,19 @@
 import { Calculator } from "lucide-react";
-import type { CaseRecord } from "@/lib/types";
+import { solverLabel } from "@/lib/present";
+import type { CaseEvent, CaseRecord } from "@/lib/types";
 import { OptionCard } from "../OptionCard";
 import { Frame } from "./Frame";
 
-export function SimulateCanvas({ record, round }: { record: CaseRecord; round: number }) {
+export function SimulateCanvas({
+  record,
+  round,
+  events = [],
+}: {
+  record: CaseRecord;
+  round: number;
+  /** this step's events: say where the solver ran (computed_on) */
+  events?: CaseEvent[];
+}) {
   const options = record.solver_results.filter((o) => o.round === round);
   const constrained = options.some((o) => o.constraints.some((c) => c.type === "safety_stock"));
   return (
@@ -30,7 +40,7 @@ export function SimulateCanvas({ record, round }: { record: CaseRecord; round: n
         {options.length > 0 && (
           <p className="mt-auto flex items-center gap-2 text-xl font-medium text-ink-2" data-testid="solver-label">
             <Calculator className="size-6 text-brand" aria-hidden />
-            Calculated by the solver, not AI
+            {solverLabel(events)}
           </p>
         )}
       </div>

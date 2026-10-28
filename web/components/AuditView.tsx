@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { AuditEntry } from "@/lib/types";
+import type { AuditEntry, AuditRemoteCheck } from "@/lib/types";
 import { Badge, Empty, Panel } from "./ui";
 
 function summary(e: AuditEntry): string {
@@ -46,6 +46,23 @@ export default function AuditView({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.audit>> | null>(null);
+  const [remote, setRemote] = useState<AuditRemoteCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+
+  async function verifyInS3() {
+    if (!caseId) return;
+    setChecking(true);
+    setRemoteError(null);
+    try {
+      setRemote(await api.auditS3(caseId));
+    } catch (e) {
+      setRemote(null);
+      setRemoteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   useEffect(() => {
     if (!caseId) return;
@@ -79,6 +96,44 @@ export default function AuditView({
         <Empty>Every stage transition, tool call, policy decision and approval is recorded here.</Empty>
       ) : (
         <>
+          {data.storage && (
+            // AUDIT_BACKEND=s3: each entry is also an object in an Object Lock bucket
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs" data-testid="audit-s3">
+              <Badge tone={data.storage.failed ? "red" : data.storage.pending ? "amber" : "emerald"}>
+                S3 Object Lock · {data.storage.stored}/{data.entries.length} stored
+                {data.storage.pending ? ` · ${data.storage.pending} uploading` : ""}
+                {data.storage.failed ? ` · ${data.storage.failed} failed (make audit-sync)` : ""}
+              </Badge>
+              <span className="font-mono text-ink-2">
+                s3://{data.storage.bucket}/{data.storage.prefix}
+              </span>
+              <button
+                onClick={verifyInS3}
+                disabled={checking}
+                className="font-medium text-brand-ink hover:underline disabled:opacity-60"
+                data-testid="audit-s3-verify"
+              >
+                {checking ? "Reading back from S3…" : "Verify in S3"}
+              </button>
+              {remote && (
+                <span data-testid="audit-s3-result">
+                  {remote.chain.ok && remote.matches_local ? (
+                    <Badge tone="emerald">
+                      read back from S3: {remote.entries} entries, chain intact, same as local
+                      {remote.object_lock?.mode
+                        ? ` · ${remote.object_lock.mode.toLowerCase()} lock until ${remote.object_lock.retain_until?.slice(0, 16).replace("T", " ")} UTC`
+                        : ""}
+                    </Badge>
+                  ) : (
+                    <Badge tone="red">
+                      S3 copy differs: {remote.chain.ok ? "not the same as local" : `chain broken at #${remote.chain.broken_at}`}
+                    </Badge>
+                  )}
+                </span>
+              )}
+              {remoteError && <span className="text-risk-ink">S3 check failed: {remoteError}</span>}
+            </div>
+          )}
           <button onClick={() => setOpen(!open)} className="text-xs font-medium text-brand-ink hover:underline">
             {open ? "Hide entries" : `Show ${data.entries.length} entries`}
           </button>

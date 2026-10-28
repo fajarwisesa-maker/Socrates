@@ -195,7 +195,24 @@ export interface Config {
   pii_masking?: "off" | "local";
   joule_approvals?: boolean;
   sap?: { mode: "local" | "embedded" | "btp"; host: string | null };
-  backends?: { case_store: string; audit: string; kb: string; policy: string; solver: string };
+  backends?: {
+    case_store: string;
+    audit: string;
+    kb: string;
+    policy: string;
+    solver: string;
+    /** AUDIT_BACKEND=s3 */
+    audit_s3?: { bucket: string; region: string };
+    /** SOLVER_BACKEND=lambda: the function and how its calls went in this process */
+    solver_lambda?: {
+      function: string;
+      region: string;
+      lambda: number;
+      fallback: number;
+      last_ms: number | null;
+      last_error: string | null;
+    };
+  };
   /** LLM_FALLBACK: a case may move to Claude via SAP AI Core when Bedrock refuses it */
   llm_fallback?: { provider: string; model: string } | null;
   /** WHATSAPP_INBOUND: cases can open from a WhatsApp message; the dashboard follows them */
@@ -376,4 +393,26 @@ export interface AuditPayload {
   delay_for_risk_hours?: [number, number];
   used?: string;
   agent?: string;
+}
+
+/** AUDIT_BACKEND=s3: what this API process stored in the bucket for a case */
+export interface AuditStorage {
+  backend: "s3";
+  bucket: string;
+  prefix: string;
+  stored: number;
+  pending: number;
+  failed?: number;
+  last_error: string | null;
+}
+
+/** GET /cases/{id}/audit/s3: the trail read back from S3 alone */
+export interface AuditRemoteCheck {
+  bucket: string;
+  prefix: string;
+  entries: number;
+  local_entries: number;
+  chain: { ok: boolean; entries: number; broken_at: number | null; reason: string | null };
+  matches_local: boolean;
+  object_lock: { mode: string | null; retain_until: string | null } | null;
 }
