@@ -5,7 +5,7 @@ informal disruption signals, maps them to POs, SKUs and customer orders, costs m
 options with a deterministic solver, auto-executes low-risk actions and escalates the rest
 to a human planner.
 
-See [CLAUDE.md](CLAUDE.md) for how to run, configuration, architecture and decisions.
+See [docs/siaga-overview.md](docs/siaga-overview.md) for a full description of the agent and its workflow, and [CLAUDE.md](CLAUDE.md) for how to run, configuration, architecture and decisions.
 
 ```bash
 uv sync && make test
