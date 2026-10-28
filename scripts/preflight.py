@@ -35,10 +35,13 @@ def line(mark: str, what: str, detail: str = "") -> None:
 
 
 def get(
-    url: str, timeout: float = 3, headers: dict[str, str] | None = None
+    url: str,
+    timeout: float = 3,
+    headers: dict[str, str] | None = None,
+    params: dict[str, str] | None = None,
 ) -> httpx.Response | None:
     try:
-        r = httpx.get(url, timeout=timeout, headers=headers)
+        r = httpx.get(url, timeout=timeout, headers=headers, params=params)
         return r if r.status_code < 500 else None
     except httpx.HTTPError:
         return None
@@ -199,6 +202,38 @@ def local_preflight(s: Settings) -> None:
         line(AMBER, "DELAY_MODEL", f"{s.delay_model}: the demo would not use RPT-1.6")
     # --- local stores
     local_stores(s)
+    if s.whatsapp_inbound:
+        whatsapp_line(s)
+
+
+def whatsapp_line(s: Settings) -> None:
+    """The webhook answers Meta's verification locally (the tunnel and Meta are not checked)."""
+    from api.whatsapp import allowed_set
+
+    what = f"WhatsApp webhook :{s.whatsapp_port}"
+    if not s.whatsapp_verify_token or not s.whatsapp_app_secret:
+        line(RED, what, "WHATSAPP_VERIFY_TOKEN / WHATSAPP_APP_SECRET missing (fill-whatsapp.sh)")
+        return
+    if not allowed_set(s.whatsapp_allowed_senders):
+        line(RED, what, "WHATSAPP_ALLOWED_SENDERS is empty: every message would be ignored")
+        return
+    r = get(
+        f"http://127.0.0.1:{s.whatsapp_port}/webhooks/whatsapp",
+        params={
+            "hub.mode": "subscribe",
+            "hub.verify_token": s.whatsapp_verify_token.get_secret_value(),
+            "hub.challenge": "preflight",
+        },
+    )
+    if r is None:
+        line(RED, what, "not running (make whatsapp), and expose it with make tunnel")
+    elif r.status_code != 200 or r.text != "preflight":
+        line(RED, what, f"verification answered HTTP {r.status_code}")
+    else:
+        n = len(allowed_set(s.whatsapp_allowed_senders))
+        line(
+            GREEN, what, f"verification ok, {n} allowed sender(s); Meta must call it via the tunnel"
+        )
 
 
 def local_stores(s: Settings) -> None:

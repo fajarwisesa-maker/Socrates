@@ -50,7 +50,8 @@ wait_for "http://127.0.0.1:$WEB_PORT/"
 
 cd web
 # The reject path leaves the recorded run, so replay mode runs the golden-path test only.
-GREP=(); [ "$SMOKE_LLM" = replay ] && GREP=(--grep "verified|presenter|drawer|states|projector|multi-agent|v2:")  # golden path only: replay cannot reject
+GREP=(); [ "$SMOKE_LLM" = replay ] && GREP=(--grep "verified|presenter|drawer|states|projector|multi-agent|v2:|whatsapp:")  # golden path only: replay cannot reject
+[ -n "${SMOKE_GREP:-}" ] && GREP=(--grep "$SMOKE_GREP")  # run a subset, e.g. SMOKE_GREP=whatsapp
 SIAGA_WEB_URL="http://127.0.0.1:$WEB_PORT" npx playwright test "${GREP[@]}" || {
   echo "--- api log"; tail -40 "$TMP/api.log"; echo "--- web log"; tail -40 "$TMP/web.log"; exit 1
 }

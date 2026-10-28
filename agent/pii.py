@@ -75,3 +75,14 @@ def mask_signals(
         total += counts
     report = {"mode": "local", "masked": sum(total.values()), "kinds": dict(sorted(total.items()))}
     return masked, report, [dict(s) for s in signals]
+
+
+def mask_sender_id(sender: str | None) -> str | None:
+    """A WhatsApp sender for display: "+62 ••• 7890" for a phone number, the first and last
+    characters of a business-scoped user ID otherwise. The full value is audited only."""
+    if not sender:
+        return None
+    digits = "".join(ch for ch in sender if ch.isdigit())
+    if digits == sender.lstrip("+") and len(digits) >= 8:
+        return f"+{digits[:2]} ••• {digits[-4:]}"
+    return f"{sender[:2]}•••{sender[-4:]}" if len(sender) > 6 else "•••"

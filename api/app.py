@@ -42,6 +42,7 @@ from agent.case_store import NotFound
 from agent.clients import HttpSapClient, SapError
 from agent.factory import make_agent
 from agent.machine import Agent, CaseStateError
+from agent.pii import mask_sender_id
 from agent.providers import make_provider
 from agent.providers.base import LLMProvider
 from agent.runtime import Runtime, build_runtime
@@ -235,6 +236,7 @@ def create_app(
     background: bool = True,
 ) -> FastAPI:
     s = with_secrets(settings or get_settings())  # SECRETS_SOURCE=aws: siaga/sap, once
+    whatsapp_inbound = s.whatsapp_inbound  # a process setting (the webhook app), not a case flag
     if runtime is None:
         if s.embedded_sap and not s.sap_mock_on_btp:  # the BTP flag wins
             from services.sap_mock.embedded import embedded_sap
@@ -330,6 +332,8 @@ def create_app(
             "pii_masking": s.pii_masking,
             "joule_approvals": False,  # v2 step 4 not built (JOULE_APPROVALS is ignored)
             "flags_source": s.flags_source,
+            # WhatsApp inbound: the dashboard then follows cases it did not start itself
+            "whatsapp_inbound": whatsapp_inbound,
             "sap": _sap_info(s),
             "backends": {
                 "case_store": s.case_store,
@@ -344,6 +348,11 @@ def create_app(
     async def start_case(
         whatsapp: Annotated[str | None, Form()] = None,
         pdf: Annotated[UploadFile | None, File()] = None,
+        # set by the WhatsApp webhook (api/whatsapp.py); absent for the dashboard buttons
+        source_channel: Annotated[str | None, Form()] = None,
+        source_ref: Annotated[str | None, Form()] = None,
+        source_sender: Annotated[str | None, Form()] = None,
+        source_received_at: Annotated[str | None, Form()] = None,
     ) -> dict[str, Any]:
         pdf_bytes = await pdf.read() if pdf is not None else None
         if not (whatsapp and whatsapp.strip()) and not pdf_bytes:
@@ -354,10 +363,30 @@ def create_app(
             )
         except Exception as e:  # noqa: BLE001 - unreadable PDF
             raise HTTPException(422, f"could not read the PDF: {e}") from e
+        if source_channel == "whatsapp_api":
+            # the case and the UI get the masked sender; the full one is audited below
+            for sig in signals:
+                if sig["type"] == "whatsapp":
+                    sig |= {
+                        "via": source_channel,
+                        "sender": mask_sender_id(source_sender),
+                        "received_at": source_received_at,
+                    }
         agent, warning = service.current_agent()
         case = agent.start_case(signals)
         if warning:
             agent.rt.audit.append(case.case_id, "flags_warning", {"warning": warning})
+        if source_channel:
+            agent.rt.audit.append(
+                case.case_id,
+                "signal_received",
+                {
+                    "channel": source_channel,
+                    "message_id": source_ref,
+                    "sender": source_sender,
+                    "received_at": source_received_at,
+                },
+            )
         service.submit(case.case_id, lambda: agent.run(case.case_id))
         return {"case_id": case.case_id, "status": case.status}
 

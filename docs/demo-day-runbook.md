@@ -44,6 +44,12 @@ After switching: stop `make dev` (Ctrl-C), `make use-<mode>`, `make dev`,
 
 Red = blocker. Amber = read it (for example: day 0 is not today, so run `make demo-reset`).
 
+## Optional: the message comes in live on WhatsApp
+
+With `WHATSAPP_INBOUND=1` (docs/whatsapp-inbound.md), also run `make whatsapp` and
+`make tunnel`, and paste the tunnel URL into the Meta app's webhook. Then a message from an
+allowed phone opens the case by itself. The buttons below stay the fallback.
+
 ## On stage
 
 - Start: dashboard at http://localhost:3000, Presenter mode, **Reset demo** in the `D` drawer.

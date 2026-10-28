@@ -69,6 +69,11 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
               <div key={i} data-testid="signal-whatsapp" className="rounded-[var(--radius-card)] rounded-tl-sm bg-surface-2 px-4 py-3">
                 <div className="mb-1 flex items-center gap-2 text-lg font-semibold text-ink-2">
                   <MessageCircle className="size-5" aria-hidden /> Driver · WhatsApp
+                  {s.via === "whatsapp_api" && (
+                    <span data-testid="whatsapp-live" className="text-base font-medium text-brand-ink">
+                      · received live{s.sender ? ` from ${s.sender}` : ""}
+                    </span>
+                  )}
                 </div>
                 <p lang="id" className={cn("text-xl text-ink italic", glossed ? "leading-[1.35]" : "leading-[1.45]")}>
                   <Highlighted text={s.text} spans={spans} />

@@ -37,7 +37,14 @@ MODES: dict[str, dict] = {
             "CASE_API_URL",
         ],
         # (variable, value, then also required)
-        "required_if": [("LLM_PROVIDER", "bedrock", ["AWS_PROFILE", "BEDROCK_MODEL_ID"])],
+        "required_if": [
+            ("LLM_PROVIDER", "bedrock", ["AWS_PROFILE", "BEDROCK_MODEL_ID"]),
+            (
+                "WHATSAPP_INBOUND",
+                "1",
+                ["WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_ALLOWED_SENDERS"],
+            ),
+        ],
         "forbidden": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"],
     },
     "aws": {

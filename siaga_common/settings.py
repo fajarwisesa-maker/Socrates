@@ -98,6 +98,18 @@ class Settings(BaseSettings):
     aicore_resource_group: str = Field("default", alias="AICORE_RESOURCE_GROUP")
     aicore_rpt_deployment_id: str | None = Field(None, alias="AICORE_RPT_DEPLOYMENT_ID")
 
+    # WhatsApp inbound (option A, 28 Oct): a message to the team's WhatsApp test number opens
+    # a case. A separate webhook app (api/whatsapp.py) on WHATSAPP_PORT is the only thing the
+    # public tunnel exposes; it forwards allowed, signed messages to POST /cases.
+    whatsapp_inbound: bool = Field(False, alias="WHATSAPP_INBOUND")
+    whatsapp_verify_token: SecretStr | None = Field(None, alias="WHATSAPP_VERIFY_TOKEN")
+    whatsapp_app_secret: SecretStr | None = Field(None, alias="WHATSAPP_APP_SECRET")
+    # comma-separated: phone numbers in international format (wa_id) and/or user IDs
+    whatsapp_allowed_senders: str = Field("", alias="WHATSAPP_ALLOWED_SENDERS")
+    whatsapp_port: int = Field(8010, alias="WHATSAPP_PORT")
+    # older messages are ignored (Meta retries undelivered webhooks for a long time)
+    whatsapp_max_age_seconds: int = Field(600, alias="WHATSAPP_MAX_AGE_SECONDS")
+
     # step 4 (not built): Tier 3 approvals from the SAP Joule capability
     joule_approvals: bool = Field(False, alias="JOULE_APPROVALS")
 

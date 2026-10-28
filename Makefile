@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV := uv run
 N ?= 10
 
-.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay use-v1 env-check flags-v2 flags-v1 flags-show
+.PHONY: help install dev api web web-check web-smoke web-smoke-replay test lint fmt aws-check aws-probe agentcore-check sap-check predict-demo btp-package sap-latency seed sap-mock solver solver-demo policy-demo demo-inputs demo demo-fake eval-perceive demo-reset replay replay-cli record-golden rehearse rehearse-fault preflight destroy use-local use-aws use-replay whatsapp tunnel use-v1 env-check flags-v2 flags-v1 flags-show
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -122,6 +122,14 @@ rehearse-fault: ## Same, but inject a delayed transfer: passes only if VERIFY re
 
 preflight: ## Demo-day checklist: one line per connection for the active .env mode
 	$(UV) python scripts/preflight.py
+
+# ---- WhatsApp inbound (WHATSAPP_INBOUND=1; docs/whatsapp-inbound.md) ----
+WA_PORT ?= 8010
+whatsapp: ## WhatsApp webhook on :8010 (next to make dev): signed, allowed messages open a case
+	$(UV) uvicorn --factory api.whatsapp:create_app --host 127.0.0.1 --port $(WA_PORT)
+
+tunnel: ## Public HTTPS URL for the WhatsApp webhook only (cloudflared quick tunnel to :8010)
+	cloudflared tunnel --url http://127.0.0.1:$(WA_PORT)
 
 # ---- Laptop env modes (docs/connections.md); make the files with scripts/fill-env.sh ----
 use-local: ## Mode local (Demo Day, laptop live): .env.local -> .env; live LLM, BTP mock, RPT-1.6

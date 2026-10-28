@@ -27,6 +27,12 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
   const dwell = useDwell();
   const pacing = usePacing(record?.case_id ?? null, events, dwell);
   const { step, viewEvents } = pacing;
+  // a case opened from WhatsApp plays from its first step, like one started here
+  const [playedIncoming, setPlayedIncoming] = useState<string | null>(null);
+  if (state.incomingId && state.incomingId !== playedIncoming) {
+    setPlayedIncoming(state.incomingId);
+    pacing.fromStart(state.incomingId);
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

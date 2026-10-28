@@ -145,7 +145,15 @@ export interface CaseRecord {
   created_at: string;
   updated_at: string;
   day0: string | null;
-  signals: { type: string; text: string; filename?: string }[];
+  signals: {
+    type: string;
+    text: string;
+    filename?: string;
+    /** WhatsApp inbound: "whatsapp_api" when the message came in live; sender is masked */
+    via?: string;
+    sender?: string | null;
+    received_at?: string | null;
+  }[];
   disruption: Disruption | null;
   affected: Affected | null;
   risk: Risk | null;
@@ -190,6 +198,8 @@ export interface Config {
   backends?: { case_store: string; audit: string; kb: string; policy: string; solver: string };
   /** LLM_FALLBACK: a case may move to Claude via SAP AI Core when Bedrock refuses it */
   llm_fallback?: { provider: string; model: string } | null;
+  /** WHATSAPP_INBOUND: cases can open from a WhatsApp message; the dashboard follows them */
+  whatsapp_inbound?: boolean;
 }
 
 export interface DelayPrediction {

@@ -19,6 +19,8 @@ export interface CaseState {
   /** true while the agent works (not waiting for a human, not finished) */
   running: boolean;
   follow: (id: string) => void;
+  /** WhatsApp inbound: the case the dashboard switched to by itself (play it from the start) */
+  incomingId: string | null;
   reset: () => Promise<void>;
   refresh: () => void;
 }
@@ -33,6 +35,7 @@ export function useCase(): CaseState {
   const [tick, setTick] = useState(0);
   const lastSeq = useRef(-1);
   const done = useRef(false);
+  const [incomingId, setIncomingId] = useState<string | null>(null);
 
   function follow(id: string) {
     lastSeq.current = -1;
@@ -81,6 +84,30 @@ export function useCase(): CaseState {
     };
   }, [caseId, tick]);
 
+  // WhatsApp inbound: a message can open a case at any time. When nothing is in progress
+  // (no case, or the followed one is finished), switch to the newest case by itself.
+  const idle = !record || finished(record);
+  useEffect(() => {
+    if (!config?.whatsapp_inbound || !idle) return;
+    let alive = true;
+    const t = setInterval(() => {
+      api
+        .listCases()
+        .then(({ cases }) => {
+          const newest = cases[0];
+          if (alive && newest && newest.case_id !== caseId && !finished({ status: newest.status } as CaseRecord)) {
+            setIncomingId(newest.case_id);
+            follow(newest.case_id);
+          }
+        })
+        .catch(() => {});
+    }, 2 * POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [config?.whatsapp_inbound, idle, caseId]);
+
   async function reset() {
     await api.reset();
     done.current = true;
@@ -98,5 +125,5 @@ export function useCase(): CaseState {
   }
 
   const running = !!record && !finished(record) && record.status !== "AWAITING_APPROVAL";
-  return { config, caseId, record, approvals, events, apiDown, running, follow, reset, refresh };
+  return { config, caseId, record, approvals, events, apiDown, running, follow, incomingId, reset, refresh };
 }
