@@ -1,41 +1,67 @@
 @import "tailwindcss";
 
 /*
- * SIAGA visual system (redesign step 2; darkened in step 6 for the projector check: every
- * text pair keeps >= 4.5:1 and white icons on fills >= 3:1 after a 30% contrast washout,
- * see web/e2e/projector.spec.ts).
- * Colour means something: brand teal = SIAGA; red = money at risk / rejected;
- * amber = waiting for a human; green = resolved / executed. Status colours are never
- * decorative. Text never lighter than ink-2 (#334155). Text-on-tint uses the *-ink shades
- * (>= 4.5:1 on white and on their soft tint); the base hues are for fills, icons and
- * large numbers.
+ * SIAGA "Jalan Tol" visual system (docs/redesign-prompt.md): the language of Indonesian
+ * toll-road signs. Green = route, done, verified, primary action. Yellow = needs a person
+ * (always asphalt text on it). Red = blocked, rejected, reopened, at risk. Asphalt =
+ * structure. Teal = the logo, the focus ring and "Written by the agent" labels.
+ *
+ * Brief values adjusted only to pass WCAG AA and the projector washout check (contrast
+ * reduced 30%, web/e2e/projector.spec.ts): asphalt-muted #50545A -> #36393E,
+ * sign-green #00653A -> #005A33, stop-red #C8102E -> #B00D28 (white text on both stays
+ * >= 4.5:1 washed out), and teal text uses brand-teal-ink #0A4F4A.
  */
 :root {
-  --canvas: #f4f5f3; /* off-white page: less projector glare than pure white */
-  --surface: #ffffff;
-  --surface-2: #eceeeb; /* filled areas instead of hairline borders */
-  --line: #cbd2d9; /* 2px borders only */
-  --ink: #0f172a;
-  --ink-2: #334155;
+  --concrete: #edede8; /* page background */
+  --road-white: #ffffff; /* plates, tables, cards */
+  --asphalt: #1e2124; /* header, text, sign borders */
+  --asphalt-muted: #36393e; /* secondary text */
+  --curb: #c9cac4; /* dividers, table rules */
+  --sign-green: #005a33; /* route, done, verified, primary action */
+  --sign-green-tint: #cfe6d9; /* tint and rules on green signs (text on green is white) */
+  --signal-yellow: #ffc20e; /* needs you, approval, deadline: asphalt text + border */
+  --stop-red: #b00d28; /* blocked, rejected, reopened, at risk */
+  --brand-teal: #0f766e; /* logo, focus ring */
+  --brand-teal-ink: #0a4f4a; /* "Written by the agent" labels */
+  --sea: #cfdde2; /* lane map only */
+  --land: #e4e4dc; /* lane map only */
 
-  --brand: #0f766e;
-  --brand-ink: #0a4f4a;
-  --brand-soft: #e3f1ef;
-
-  --risk: #dc2626;
-  --risk-ink: #991b1b;
-  --risk-soft: #fdecec;
-
-  --human: #b45309;
-  --human-ink: #78350f;
-  --human-soft: #fdf3e2;
-
-  --ok: #15803d;
-  --ok-ink: #14532d;
-  --ok-soft: #e8f6ec;
+  /* Older token names, mapped onto the palette so every component follows it. */
+  --canvas: var(--concrete);
+  --surface: var(--road-white);
+  --surface-2: #e4e4de;
+  --line: var(--curb);
+  --ink: var(--asphalt);
+  --ink-2: var(--asphalt-muted);
+  --brand: var(--sign-green);
+  --brand-ink: #004a2a;
+  --brand-soft: #dcede3;
+  --risk: var(--stop-red);
+  --risk-ink: #8e0a20;
+  --risk-soft: #f8e1e4;
+  --human: var(--signal-yellow);
+  --human-ink: var(--asphalt);
+  --human-soft: #fff0c2;
+  --ok: var(--sign-green);
+  --ok-ink: #004a2a;
+  --ok-soft: #dcede3;
 }
 
 @theme inline {
+  --color-concrete: var(--concrete);
+  --color-road-white: var(--road-white);
+  --color-asphalt: var(--asphalt);
+  --color-asphalt-muted: var(--asphalt-muted);
+  --color-curb: var(--curb);
+  --color-sign-green: var(--sign-green);
+  --color-sign-green-tint: var(--sign-green-tint);
+  --color-signal-yellow: var(--signal-yellow);
+  --color-stop-red: var(--stop-red);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-ink: var(--brand-teal-ink);
+  --color-sea: var(--sea);
+  --color-land: var(--land);
+
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -55,19 +81,40 @@
   --color-ok-ink: var(--ok-ink);
   --color-ok-soft: var(--ok-soft);
 
-  /* Geist via next/font/local (bundled with the app: works offline on the demo laptop) */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Overpass (highway-sign letterforms) and Overpass Mono, bundled with next/font/local */
+  --font-sans: var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-overpass-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --radius-card: 16px;
-  --radius-control: 12px;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px rgb(15 23 42 / 0.06);
+  /* The type scale: 12 / 14 / 16 / 20 / 30 / 44 px (1rem = 16px; Presenter scales rem). */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.4;
+  --text-base: 1rem;
+  --text-base--line-height: 1.45;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.45;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.35;
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 1.15;
+  --text-4xl: 2.75rem;
+  --text-4xl--line-height: 1.05;
+  --text-5xl: 2.75rem;
+  --text-5xl--line-height: 1.05;
+
+  --radius-card: 12px;
+  --radius-control: 10px;
+  /* signs sit flat: at most a 2px flat offset, no blur */
+  --shadow-card: 2px 2px 0 rgb(30 33 36 / 0.18);
+  --shadow-sign: 2px 2px 0 rgb(30 33 36 / 0.35);
 }
 
 /*
  * Presenter mode scales the whole UI with the viewport: 1rem = 16px at 1280x720 and
- * 24px at 1920x1080 (same 16:9 layout, bigger type). Body text is text-xl (20px at 1280),
- * stage titles >= 2.5rem, hero numbers >= 4rem.
+ * 24px at 1920x1080 (same 16:9 layout, bigger type).
  */
 html.presenter {
   font-size: clamp(14px, min(1.25vw, 2.2222vh), 32px);
@@ -79,6 +126,31 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1; /* tabular figures everywhere */
   font-variant-numeric: tabular-nums;
+}
+
+/* Focus: 3px teal ring with a 3px offset, everywhere */
+:focus-visible {
+  outline: 3px solid var(--brand-teal);
+  outline-offset: 3px;
+}
+
+/* Sign labels: uppercase with open tracking */
+.sign-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+}
+
+/* Road strip with a dashed white centre line (RoadLine, lane dividers) */
+.road-v {
+  background:
+    repeating-linear-gradient(to bottom, #fff 0 6px, transparent 6px 12px) center / 2px 100% no-repeat,
+    var(--asphalt);
+}
+.road-h {
+  background:
+    repeating-linear-gradient(to right, #fff 0 10px, transparent 10px 18px) center / 100% 2px no-repeat,
+    var(--asphalt);
 }
 
 @keyframes siaga-pulse {

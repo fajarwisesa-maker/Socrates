@@ -1,23 +1,35 @@
-// Style tile for the SIAGA visual system (redesign step 2). Not linked from the dashboard.
-import { Check, RotateCcw } from "lucide-react";
+// Sign tile of the "Jalan Tol" visual system (docs/redesign-prompt.md). Not linked from the dashboard.
+import { Check } from "lucide-react";
+import {
+  AgentWritten,
+  GantrySign,
+  KmPost,
+  LaneDivider,
+  Logo,
+  RoadLine,
+  RouteShield,
+  SolverLabel,
+  StatusPlate,
+  TierPlate,
+  WarningPlate,
+} from "@/components/signs";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Wordmark } from "@/components/presenter/Wordmark";
 
 const TOKENS: [string, string, string][] = [
-  ["canvas", "#f4f5f3", "page background (off-white, less glare)"],
-  ["surface", "#ffffff", "cards"],
-  ["surface-2", "#eceeeb", "filled areas instead of hairlines"],
-  ["line", "#cbd2d9", "2px borders only"],
-  ["ink", "#0f172a", "text"],
-  ["ink-2", "#334155", "secondary text (never lighter)"],
-  ["brand", "#0f766e", "SIAGA: progress, current stage, primary action"],
-  ["risk", "#dc2626", "money at risk, rejected (fills / big numbers)"],
-  ["risk-ink", "#991b1b", "risk text"],
-  ["human", "#b45309", "waiting for a human (fills)"],
-  ["human-ink", "#78350f", "human text"],
-  ["ok", "#15803d", "resolved / executed (fills)"],
-  ["ok-ink", "#14532d", "resolved text"],
+  ["concrete", "#edede8", "page background"],
+  ["road-white", "#ffffff", "plates, tables, cards"],
+  ["asphalt", "#1e2124", "header, text, sign borders"],
+  ["asphalt-muted", "#36393e", "secondary text (brief #50545A, darkened for the washout check)"],
+  ["curb", "#c9cac4", "dividers, table rules"],
+  ["sign-green", "#005a33", "route, done, verified, primary action (brief #00653A, darkened)"],
+  ["sign-green-tint", "#cfe6d9", "tints and rules on green signs"],
+  ["signal-yellow", "#ffc20e", "needs you, approval, deadline (asphalt text and border)"],
+  ["stop-red", "#b00d28", "blocked, rejected, reopened, at risk (brief #C8102E, darkened)"],
+  ["brand-teal", "#0f766e", "logo, focus ring"],
+  ["brand-teal-ink", "#0a4f4a", "Written by the agent labels"],
+  ["sea", "#cfdde2", "lane map only"],
+  ["land", "#e4e4dc", "lane map only"],
 ];
 
 function lum(hex: string) {
@@ -33,72 +45,99 @@ function contrast(a: string, b: string) {
 export default function DesignPage() {
   return (
     <main className="mx-auto max-w-6xl space-y-10 p-10 text-ink">
-      <div className="flex items-center justify-between">
-        <Wordmark />
-        <span className="text-lg text-ink-2">Visual system · redesign step 2</span>
+      <div className="flex items-center justify-between rounded-[12px] bg-asphalt px-6 py-4">
+        <Logo />
+        <span className="sign-label text-sm text-white">Jalan Tol · sign tile</span>
       </div>
 
       <section>
-        <h2 className="mb-4 text-2xl font-bold">Colour tokens · contrast on white / on canvas</h2>
+        <h2 className="mb-4 text-2xl font-black">Colour tokens · contrast on white / on concrete</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {TOKENS.map(([name, hex, use]) => (
-            <div key={name} className="flex items-center gap-4 rounded-2xl bg-surface p-3 shadow-[var(--shadow-card)]">
-              <span className="size-14 shrink-0 rounded-xl border-2 border-line" style={{ background: hex }} />
+            <div key={name} className="flex items-center gap-4 rounded-[12px] bg-surface p-3 shadow-[var(--shadow-card)]">
+              <span className="size-14 shrink-0 rounded-[8px] border-2 border-line" style={{ background: hex }} />
               <div className="text-sm">
                 <div className="font-mono font-semibold">
                   {name} {hex}
                 </div>
                 <div className="text-ink-2">{use}</div>
                 <div className="font-mono text-ink-2">
-                  {contrast(hex, "#ffffff").toFixed(1)}:1 · {contrast(hex, "#f4f5f3").toFixed(1)}:1
+                  {contrast(hex, "#ffffff").toFixed(1)}:1 · {contrast(hex, "#edede8").toFixed(1)}:1
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-base text-ink-2">
-          Status colours carry meaning only: red = money at risk / rejected, amber = waiting for a human,
-          green = resolved / executed. Text uses the *-ink shades (≥ 4.5:1); the base hues are for fills,
-          icons and numbers ≥ 24px bold (≥ 3:1).
-        </p>
       </section>
 
       <section>
-        <h2 className="mb-4 text-2xl font-bold">Type · Geist, tabular figures (Presenter sizes at 1280×720)</h2>
-        <div className="space-y-3 rounded-2xl bg-surface p-6 shadow-[var(--shadow-card)]">
-          <div className="text-[4rem] leading-none font-semibold tracking-tight text-risk-ink">Rp 340 jt</div>
-          <div className="text-sm text-ink-2">Hero number · 64px semibold</div>
-          <div className="text-[2.75rem] leading-none font-semibold">Rp 11,4 jt</div>
-          <div className="text-sm text-ink-2">Meter number · 44px</div>
-          <div className="text-[2.5rem] leading-tight font-bold tracking-tight">Critic rejected the cheapest plan</div>
-          <div className="text-sm text-ink-2">Stage title · 40px bold</div>
+        <h2 className="mb-4 text-2xl font-black">Type · Overpass and Overpass Mono · 12 / 14 / 16 / 20 / 30 / 44</h2>
+        <div className="space-y-2 rounded-[12px] bg-surface p-6 shadow-[var(--shadow-card)]">
+          <div className="text-4xl font-black text-stop-red">Rp 340 jt</div>
+          <div className="text-2xl font-black">Assess: what the flood puts at risk</div>
           <div className="text-xl">Bandung DC would drop to 50 cartons, below its safety stock of 400.</div>
-          <div className="text-sm text-ink-2">Body · 20px (minimum for Presenter content)</div>
-          <div className="text-xl italic" lang="id">
-            “Bos, lalin Pantura <mark className="rounded bg-human-soft px-1 not-italic text-human-ink">macet total</mark> dr subuh…”
+          <div className="text-base">Body copy stays sentence case.</div>
+          <div className="sign-label text-sm">Sign label · uppercase, open tracking</div>
+          <div className="font-mono text-xs">PO 4500018231 · 7 h 42 m · 3f9a1c2e</div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-2xl font-black">Signs</h2>
+        <GantrySign>
+          <div className="flex items-center gap-4">
+            <RouteShield code="SMG-JKT" />
+            <span className="text-2xl font-black">Flood near Brebes blocks the Pantura corridor</span>
           </div>
-          <div className="text-sm text-ink-2">Original Bahasa kept, italic; highlights use the tinted surface</div>
+        </GantrySign>
+        <div className="flex flex-wrap items-center gap-3">
+          <WarningPlate size="sm">
+            <span className="sign-label text-xs">Banjir · Brebes</span>
+          </WarningPlate>
+          <StatusPlate tone="needs" count={1}>Needs you</StatusPlate>
+          <StatusPlate tone="done">Done automatically</StatusPlate>
+          <StatusPlate tone="rejected">Rejected</StatusPlate>
+          <StatusPlate tone="verified" icon={<Check className="size-3.5" strokeWidth={3} aria-hidden />}>
+            Verified
+          </StatusPlate>
+          <StatusPlate tone="running">Running</StatusPlate>
+          <StatusPlate tone="escalated">Escalated</StatusPlate>
+        </div>
+        <div className="flex items-end gap-6">
+          {(["done", "current", "flagged", "pending"] as const).map((s, i) => (
+            <div key={s} className="flex flex-col items-center gap-1">
+              <KmPost n={i + 1} state={s} />
+              <span className="text-xs text-ink-2">{s}</span>
+            </div>
+          ))}
+          <RoadLine vertical className="h-16" />
+          <RoadLine className="w-40" />
+        </div>
+        <LaneDivider label="Needs you" />
+        <div className="grid gap-2">
+          {[0, 1, 2, 3].map((t) => (
+            <TierPlate key={t} tier={t} meaning="long" />
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <AgentWritten />
+          <SolverLabel />
         </div>
       </section>
 
       <section>
-        <h2 className="mb-4 text-2xl font-bold">Controls · 8px grid · radius 12 (controls) / 16 (cards)</h2>
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-surface p-6 shadow-[var(--shadow-card)]">
+        <h2 className="mb-4 text-2xl font-black">Controls</h2>
+        <div className="flex flex-wrap items-center gap-4 rounded-[12px] bg-surface p-6 shadow-[var(--shadow-card)]">
           <Button size="xl">Start case</Button>
           <Button size="xl" variant="approve">
-            <Check /> Approve
+            <Check /> Approve purchase order
           </Button>
           <Button size="lg" variant="danger">
-            Reject
+            Reject purchase order
           </Button>
           <Button size="lg" variant="outline">
             Details <Kbd>D</Kbd>
           </Button>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-risk-soft px-3 py-1 text-lg font-semibold text-risk-ink">
-            <RotateCcw className="size-5" /> 1 replan
-          </span>
-          <span className="rounded-full bg-human-soft px-3 py-1 text-lg font-semibold text-human-ink">Needs you</span>
-          <span className="rounded-full bg-ok-soft px-3 py-1 text-lg font-semibold text-ok-ink">Executed</span>
         </div>
       </section>
     </main>
