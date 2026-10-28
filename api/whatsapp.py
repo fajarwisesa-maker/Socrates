@@ -63,6 +63,19 @@ from agent.pii import mask_sender_id
 from siaga_common.settings import REPO_ROOT, Settings, get_settings
 
 log = logging.getLogger("siaga.whatsapp")
+
+
+def _show_info_logs() -> None:
+    """Uvicorn sets up only its own loggers, so ours would print warnings only and every
+    "ignored a message ... because ..." line would be lost. Print INFO in terminal 2."""
+    if not log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     whatsapp: %(message)s"))
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+        log.propagate = False
+
+
 PATH = "/webhooks/whatsapp"
 TWILIO_PATH = "/webhooks/twilio"
 EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
@@ -238,6 +251,7 @@ def create_app(
     seen: SeenIds | None = None,
     clock: Callable[[], float] = time.time,
 ) -> FastAPI:
+    _show_info_logs()
     s = settings or get_settings()
     if not s.whatsapp_inbound:
         raise RuntimeError("WHATSAPP_INBOUND is off; set WHATSAPP_INBOUND=1 to run the webhook")
