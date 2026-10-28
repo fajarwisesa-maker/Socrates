@@ -32,7 +32,7 @@ and the decisions made. **Update it every phase.**
 | WhatsApp via Twilio (owner 28 Oct) | built behind `WHATSAPP_PROVIDER=twilio`: sandbox webhook + replies, no Meta app (`scripts/fill-twilio.sh`); tested with signed form posts and a stand-in Twilio API; **not yet tried with a real Twilio account** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
-| "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters (added 28 Oct); skipped: a new Plan layout |
+| "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters and the Plan stage restyle (added 28 Oct) |
 
 ## How to run
 
@@ -814,6 +814,16 @@ moments, drawer, error states and the washout check stay).
   policy decisions and approvals carry no stage in the backend, so each entry gets the stage
   of the last `stage_transition` before it (entries before the first one are "Case"). The
   hash chain status always covers every entry; the line under the filters says so.
+- **Plan stage** (`components/plan.tsx`, `lib/planView.ts`, both modes): each candidate is a
+  green direction sign (option id, label, strategy plates with icons, an arrow on to
+  Simulate); a replan round opens with a red-bordered plate saying what changed (New rule /
+  Excluded / Rejected by you / Too late, from the Reflect or Act event before it); cited
+  precedents are information plates labelled "Synthetic precedent" with their **Lesson**,
+  read from the `search_precedents` output in the events (knowledge-base text, not
+  model-written), filtered to the ids the PLAN `completed` event cites. Planner adds each
+  candidate's rationale and the search query (both labelled "Written by the agent") and the
+  strategies a precedent shares with this case; Presenter shows the top precedent with the
+  lesson's first sentence and "+N more in details (D)". Both rounds fit 1280×720.
 - **e2e changes:** the Planner tests click the KM post of the stage they check; the reject
   path opens the reason with `reject-open`; case status is read from `data-status`; rule
   ids show as words ("rejected: safety stock").

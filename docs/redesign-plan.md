@@ -99,7 +99,9 @@ May be skipped: Simulate mini maps, audit filters, the Plan stage restyle.
 
 - ~~Audit trail filters~~: added afterwards (28 Oct): stage and event type, in the case file,
   the Audit trail page and the drawer; e2e-checked in the golden-path test.
-- Plan stage: restyled through the shared tokens and cards only, no new layout.
+- ~~Plan stage~~: restyled afterwards (28 Oct): candidates as direction signs with strategy
+  plates, a plate for why a replan happened, precedents as synthetic-labelled information
+  plates with their lessons.
 - (Simulate mini maps were built.)
 
 **Checks**

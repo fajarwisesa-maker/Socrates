@@ -5,6 +5,7 @@
 // model-written text carries a "Written by the agent" label.
 import { Check, FileText, Info, MessageCircle, Truck, X } from "lucide-react";
 import { ApprovalSign } from "@/components/ApprovalSign";
+import { CandidateSign, PrecedentPlate, ReplanPlate, SearchQuery } from "@/components/plan";
 import { LaneMap } from "@/components/LaneMap";
 import { StateNotices } from "@/components/StateNotices";
 import {
@@ -20,6 +21,7 @@ import { caseClock } from "@/lib/caseClock";
 import { SHEET_TITLE, sheetKicker } from "@/lib/caseView";
 import { dayShort, juta, minutesSeconds, pct, thousands } from "@/lib/format";
 import { laneModel } from "@/lib/laneModel";
+import { precedentHits, precedentQuery, replanReason } from "@/lib/planView";
 import { notices } from "@/lib/notices";
 import {
   actionLine,
@@ -28,14 +30,12 @@ import {
   delay,
   FIELD,
   glossFor,
-  period,
   plantName,
   solverLabel,
-  STRATEGY,
   supplierName,
   whatsappReply,
 } from "@/lib/present";
-import type { Approval, CaseEvent, CaseRecord, DelayPrediction, Evidence, Precedent, Stage } from "@/lib/types";
+import type { Approval, CaseEvent, CaseRecord, DelayPrediction, Evidence, Stage } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,8 @@ interface SheetProps {
   record: CaseRecord;
   /** this stage's events (every round) */
   events: CaseEvent[];
+  /** every event of the case (a replan's reason lives in Reflect or Act) */
+  allEvents: CaseEvent[];
   approvals: Approval[];
   live: boolean;
   onDecided: () => void;
@@ -312,43 +314,49 @@ function DelayDetails({ p }: { p: DelayPrediction }) {
 
 // ------------------------------------------------------------------ Plan
 
-function PlanSheet({ record, events }: SheetProps) {
-  const precedents = events
-    .filter((e) => e.status === "completed")
-    .flatMap((e) => (e.data.precedents as Precedent[] | undefined) ?? []);
-  const unique = [...new Map(precedents.map((p) => [p.id, p])).values()];
+function PlanSheet({ record, events, allEvents }: SheetProps) {
   if (!record.candidates.length) return <Waiting>Choosing strategies.</Waiting>;
+  const hits = precedentHits(events);
+  const query = precedentQuery(events);
+  const rounds = [...new Set(record.candidates.map((c) => c.round))];
+  const strategies = [...new Set(record.candidates.flatMap((c) => c.strategies))];
   return (
-    <div className="space-y-5">
-      <ul className="space-y-3">
-        {record.candidates.map((c) => (
-          <li key={c.option_id} className="rounded-[12px] border-2 border-asphalt bg-road-white px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono font-bold">{c.option_id}</span>
-              <span className="font-black">{c.label}</span>
-              {c.strategies.map((s) => (
-                <StatusPlate key={s} tone="running">
-                  {STRATEGY[s] ?? s}
-                </StatusPlate>
-              ))}
-              {c.round > 1 && <StatusPlate tone="muted">Replan {c.round - 1}</StatusPlate>}
-            </div>
-            <p className="mt-1 text-base">{c.rationale}</p>
-            <AgentWritten />
-          </li>
-        ))}
-      </ul>
-      {unique.length > 0 && (
-        <div data-testid="planner-precedents">
-          <SignHeading className="mb-2">Precedents cited</SignHeading>
-          <ul className="space-y-1 text-base">
-            {unique.map((p) => (
-              <li key={p.id}>
-                {p.synthetic && <StatusPlate tone="muted">Synthetic precedent</StatusPlate>} <b>{p.id}</b> {p.title}
-                {p.period && <span className="text-ink-2"> · {period(p.period)}</span>}
-              </li>
+    <div className="space-y-6">
+      <p className="text-base">
+        The agent picks which strategies to try and writes why. It sets no quantities or prices: the solver
+        prices every candidate in Simulate.
+      </p>
+      {rounds.map((r) => {
+        const reason = r > 1 ? replanReason(record, allEvents, r) : null;
+        return (
+          <div key={r} className="space-y-3" data-testid={`plan-round-${r}`}>
+            <SignHeading>{r === 1 ? "First round" : `Replan ${r - 1}`}</SignHeading>
+            {reason && <ReplanPlate reason={reason} />}
+            <ul className="grid gap-4 md:grid-cols-2">
+              {record.candidates
+                .filter((c) => c.round === r)
+                .map((c) => (
+                  <li key={c.option_id} className="space-y-2">
+                    <CandidateSign candidate={c} />
+                    <div className="px-1">
+                      <p className="text-base">{c.rationale}</p>
+                      <AgentWritten />
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        );
+      })}
+      {hits.length > 0 && (
+        <div className="space-y-3" data-testid="planner-precedents">
+          <SignHeading>Precedents cited</SignHeading>
+          {query && <SearchQuery query={query} />}
+          <div className="grid items-start gap-4 md:grid-cols-2">
+            {hits.map((h) => (
+              <PrecedentPlate key={h.id} hit={h} strategies={strategies} />
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>

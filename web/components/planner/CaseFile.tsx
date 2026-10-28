@@ -105,6 +105,7 @@ export function CaseFile({
             agent={agents[shown]}
             record={record}
             events={stageEvents}
+            allEvents={events}
             approvals={approvals}
             live={shown === live}
             onDecided={() => {
