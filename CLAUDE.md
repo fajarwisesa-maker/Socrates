@@ -32,7 +32,7 @@ and the decisions made. **Update it every phase.**
 | WhatsApp via Twilio (owner 28 Oct) | built behind `WHATSAPP_PROVIDER=twilio`: sandbox webhook + replies, no Meta app (`scripts/fill-twilio.sh`); tested with signed form posts and a stand-in Twilio API; **not yet tried with a real Twilio account** |
 | Env + secrets setup (`SIAGA_env_setup_prompt.md`) | sections 1–6 built and tested locally (leak check clean); **checkpoint**: owner runs `fill-env.sh`, `put-sap-secret.sh`, `make use-aws`, `make preflight`. Preflight lines 4–8 cannot pass until Phase 7 is deployed |
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
-| "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components; skipped: audit filters, a new Plan layout |
+| "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters (added 28 Oct); skipped: a new Plan layout |
 
 ## How to run
 
@@ -808,6 +808,12 @@ moments, drawer, error states and the washout check stay).
 - **Presenter:** asphalt header (logo, case title, model label, yellow "Signal to verified"
   clock), KM-post rail, impact gantry sign, asphalt footer with the keys and the pacing
   hints (held, jump to live, next). Every step fits 1280×720.
+- **Audit trail filters** (`components/AuditView.tsx`, case file tab, Audit trail page and
+  drawer): filter by stage and by event type (stage changes, tool calls, policy decisions,
+  model calls, approvals, other), one choice each, only the values the case has. Tool calls,
+  policy decisions and approvals carry no stage in the backend, so each entry gets the stage
+  of the last `stage_transition` before it (entries before the first one are "Case"). The
+  hash chain status always covers every entry; the line under the filters says so.
 - **e2e changes:** the Planner tests click the KM post of the stage they check; the reject
   path opens the reason with `reject-open`; case status is read from `data-status`; rule
   ids show as words ("rejected: safety stock").

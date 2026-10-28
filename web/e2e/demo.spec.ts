@@ -43,6 +43,20 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await page.getByTestId("stage-VERIFY").getByRole("button").click();
   await page.getByRole("button", { name: /Show \d+ entries/ }).click();
   await page.screenshot(shots(process.env.SIAGA_EXPECT_REPLAY ? "5-replay-verified" : "3-verified"));
+
+  // Audit filters: by stage (derived from the chain order), then by event type.
+  const rows = page.getByTestId("audit-table").locator("tbody tr");
+  const total = await rows.count();
+  await page.getByTestId("audit-filter-stage-ACT").click();
+  await expect(page.getByTestId("audit-shown")).toContainText(`of ${total} entries`);
+  await expect(rows.and(page.locator(':not([data-stage="ACT"])'))).toHaveCount(0);
+  await page.getByTestId("audit-filter-type-approval").click();
+  await expect(rows.first()).toHaveAttribute("data-type", "approval");
+  await expect(rows.and(page.locator(':not([data-type="approval"])'))).toHaveCount(0);
+  await page.getByTestId("audit-filter-type-policy").click();
+  await expect(rows.first()).toContainText("ALLOW");
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(rows).toHaveCount(total);
 });
 
 test("rejecting the bridge PO replans the remaining shortfall to air", async ({ page, request }) => {

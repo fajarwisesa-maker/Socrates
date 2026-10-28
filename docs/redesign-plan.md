@@ -97,7 +97,8 @@ May be skipped: Simulate mini maps, audit filters, the Plan stage restyle.
 
 **Skipped (allowed by the owner's priority list)**
 
-- Audit trail filters. The audit table has the new columns but no filters.
+- ~~Audit trail filters~~: added afterwards (28 Oct): stage and event type, in the case file,
+  the Audit trail page and the drawer; e2e-checked in the golden-path test.
 - Plan stage: restyled through the shared tokens and cards only, no new layout.
 - (Simulate mini maps were built.)
 

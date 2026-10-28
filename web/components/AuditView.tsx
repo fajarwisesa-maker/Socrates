@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { STAGE_LABEL } from "@/lib/stages";
 import type { AuditEntry, AuditRemoteCheck } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Badge, Empty, Panel } from "./ui";
 
 function summary(e: AuditEntry): string {
@@ -35,10 +37,36 @@ function summary(e: AuditEntry): string {
   }
 }
 
-function stageOf(e: AuditEntry): string {
-  const p = e.payload as Record<string, unknown>;
-  return String(p.stage ?? (e.kind === "stage_transition" ? p.to : "") ?? "");
+/**
+ * The stage each entry belongs to. Tool calls, policy decisions and approvals carry no stage
+ * of their own, but the chain is in order: an entry belongs to the stage of the last
+ * transition before it. Entries before the first transition (case opened, PII check) are
+ * "CASE".
+ */
+function withStages(entries: AuditEntry[]): { entry: AuditEntry; stage: string }[] {
+  let current = "CASE";
+  return entries.map((e) => {
+    const p = e.payload as Record<string, unknown>;
+    if (e.kind === "stage_transition" && p.to) current = String(p.to);
+    return { entry: e, stage: typeof p.stage === "string" && p.stage ? p.stage : current };
+  });
 }
+
+/** Event types a planner asks about; every kind falls into exactly one. */
+const TYPES = [
+  { id: "stage", label: "Stage changes", kinds: ["stage_transition"] },
+  { id: "tool", label: "Tool calls", kinds: ["tool_call"] },
+  { id: "policy", label: "Policy decisions", kinds: ["policy_decision", "allowlist_violation"] },
+  { id: "model", label: "Model calls", kinds: ["llm_call", "llm_retry", "llm_fallback"] },
+  { id: "approval", label: "Approvals", kinds: ["approval"] },
+] as const;
+type TypeId = (typeof TYPES)[number]["id"] | "other";
+
+function typeOf(kind: string): TypeId {
+  return TYPES.find((t) => (t.kinds as readonly string[]).includes(kind))?.id ?? "other";
+}
+
+const STAGE_NAME: Record<string, string> = { CASE: "Case", ...STAGE_LABEL };
 
 function actorOf(e: AuditEntry): string {
   const p = e.payload as Record<string, unknown>;
@@ -63,6 +91,8 @@ export default function AuditView({
   const [remote, setRemote] = useState<AuditRemoteCheck | null>(null);
   const [checking, setChecking] = useState(false);
   const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeId | "all">("all");
 
   async function verifyInS3() {
     if (!caseId) return;
@@ -88,6 +118,17 @@ export default function AuditView({
   }, [caseId, version]);
 
   const v = data?.verification;
+  const rows = data ? withStages(data.entries) : [];
+  // only offer the stages and types this case has
+  const stages = [...new Set(rows.map((r) => r.stage))];
+  const types: { id: TypeId; label: string }[] = [
+    ...TYPES.filter((t) => rows.some((r) => typeOf(r.entry.kind) === t.id)),
+    ...(rows.some((r) => typeOf(r.entry.kind) === "other") ? [{ id: "other" as const, label: "Other" }] : []),
+  ];
+  const shown = rows.filter(
+    (r) => (stageFilter === "all" || r.stage === stageFilter) && (typeFilter === "all" || typeOf(r.entry.kind) === typeFilter),
+  );
+  const filtered = stageFilter !== "all" || typeFilter !== "all";
   return (
     <Panel
       title="Audit trail"
@@ -152,43 +193,119 @@ export default function AuditView({
             {open ? "Hide entries" : `Show ${data.entries.length} entries`}
           </button>
           {open && (
-            <div className={defaultOpen ? "mt-2 max-h-[70vh] overflow-auto" : "mt-2 max-h-80 overflow-auto"}>
-              <table className="w-full text-sm" data-testid="audit-table">
-                <thead className="sticky top-0 bg-road-white">
-                  <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
-                    <th className="py-1 pr-2">#</th>
-                    <th className="pr-2">Time</th>
-                    <th className="pr-2">Stage</th>
-                    <th className="pr-2">Actor</th>
-                    <th className="pr-2">Event</th>
-                    <th className="pr-2">Policy</th>
-                    <th>Hash</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.entries.map((e) => (
-                    <tr key={e.seq} className="border-b border-curb align-top">
-                      <td className="py-1 pr-2 font-mono text-xs text-ink-2">{e.seq}</td>
-                      <td className="pr-2 font-mono text-xs whitespace-nowrap">{e.ts.slice(11, 19)}</td>
-                      <td className="pr-2 text-xs">{stageOf(e)}</td>
-                      <td className="pr-2 text-xs">{actorOf(e)}</td>
-                      <td className="pr-2">
-                        <span className="font-mono text-xs font-bold">{e.kind}</span> <span className="text-xs">{summary(e)}</span>
-                      </td>
-                      <td className="pr-2 font-mono text-xs font-bold whitespace-nowrap">
-                        {e.kind === "policy_decision" ? `${e.payload.allowed ? "ALLOW" : "DENY"} · T${e.payload.tier}` : ""}
-                      </td>
-                      <td className="font-mono text-xs text-ink-2" title={`prev ${e.prev_hash}`}>
-                        {e.hash.slice(0, 8)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="mt-3 space-y-2" data-testid="audit-filters">
+                <FilterRow
+                  label="Stage"
+                  value={stageFilter}
+                  onChange={setStageFilter}
+                  options={[{ id: "all", label: "All" }, ...stages.map((st) => ({ id: st, label: STAGE_NAME[st] ?? st }))]}
+                  testId="audit-filter-stage"
+                />
+                <FilterRow
+                  label="Event"
+                  value={typeFilter}
+                  onChange={(id) => setTypeFilter(id as TypeId | "all")}
+                  options={[{ id: "all", label: "All" }, ...types]}
+                  testId="audit-filter-type"
+                />
+                <p className="text-xs" data-testid="audit-shown" aria-live="polite">
+                  {filtered ? `Showing ${shown.length} of ${rows.length} entries. ` : `${rows.length} entries. `}
+                  The hash chain is checked over every entry, whatever the filter.
+                  {filtered && (
+                    <>
+                      {" "}
+                      <button
+                        className="font-bold underline"
+                        onClick={() => {
+                          setStageFilter("all");
+                          setTypeFilter("all");
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className={defaultOpen ? "mt-2 max-h-[70vh] overflow-auto" : "mt-2 max-h-80 overflow-auto"}>
+                {shown.length === 0 ? (
+                  <p className="py-3 text-sm">No entries match these filters.</p>
+                ) : (
+                  <table className="w-full text-sm" data-testid="audit-table">
+                    <thead className="sticky top-0 bg-road-white">
+                      <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
+                        <th className="py-1 pr-2">#</th>
+                        <th className="pr-2">Time</th>
+                        <th className="pr-2">Stage</th>
+                        <th className="pr-2">Actor</th>
+                        <th className="pr-2">Event</th>
+                        <th className="pr-2">Policy</th>
+                        <th>Hash</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map(({ entry: e, stage }) => (
+                        <tr key={e.seq} className="border-b border-curb align-top" data-stage={stage} data-type={typeOf(e.kind)}>
+                          <td className="py-1 pr-2 font-mono text-xs text-ink-2">{e.seq}</td>
+                          <td className="pr-2 font-mono text-xs whitespace-nowrap">{e.ts.slice(11, 19)}</td>
+                          <td className="pr-2 text-xs">{STAGE_NAME[stage] ?? stage}</td>
+                          <td className="pr-2 text-xs">{actorOf(e)}</td>
+                          <td className="pr-2">
+                            <span className="font-mono text-xs font-bold">{e.kind}</span> <span className="text-xs">{summary(e)}</span>
+                          </td>
+                          <td className="pr-2 font-mono text-xs font-bold whitespace-nowrap">
+                            {e.kind === "policy_decision" ? `${e.payload.allowed ? "ALLOW" : "DENY"} · T${e.payload.tier}` : ""}
+                          </td>
+                          <td className="font-mono text-xs text-ink-2" title={`prev ${e.prev_hash}`}>
+                            {e.hash.slice(0, 8)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
           )}
         </>
       )}
     </Panel>
+  );
+}
+
+/** One row of filter chips (a radio group: one choice, "All" by default). */
+function FilterRow({
+  label,
+  value,
+  onChange,
+  options,
+  testId,
+}: {
+  label: string;
+  value: string;
+  onChange: (id: string) => void;
+  options: { id: string; label: string }[];
+  testId: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={`Filter by ${label.toLowerCase()}`} data-testid={testId}>
+      <span className="sign-label mr-1 w-14 text-xs">{label}</span>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          role="radio"
+          aria-checked={value === o.id}
+          onClick={() => onChange(o.id)}
+          data-testid={`${testId}-${o.id}`}
+          className={cn(
+            "min-h-11 rounded-[6px] border-2 border-asphalt px-3 text-xs font-bold",
+            value === o.id ? "bg-asphalt text-white" : "bg-road-white text-asphalt hover:bg-surface-2",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
