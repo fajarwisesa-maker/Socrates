@@ -1,14 +1,17 @@
 "use client";
 
-import { dayShort, juta } from "@/lib/format";
+import { juta } from "@/lib/format";
+import { useCountUp } from "@/lib/motion";
 import type { CaseEvent, CaseRecord, Risk, Summary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Figure } from "../Figure";
 import { GantrySign, SolverLabel } from "../signs";
-import { CountUp } from "./CountUp";
 
 /**
- * Always visible: money at risk, what the plan costs, and what it protects (net).
- * Every figure comes from the backend (risk function, solver); the UI only formats.
+ * Always visible: money at risk, what the plan costs, and what it protects (net). Three
+ * numbers and the solver label, nothing else. Each counts up the first time the narration
+ * reveals it (At risk at Assess, Plan cost and Protected at Reflect) and shows "Not yet"
+ * before. Every figure comes from the backend (risk function, solver); the UI only formats.
  */
 export function ImpactMeter({
   record,
@@ -28,58 +31,26 @@ export function ImpactMeter({
   const resolved = status === "RESOLVED";
   const escalated = status === "ESCALATED";
   const reopened = status === "REOPENED";
-  const chosen = summary ? record?.candidates.find((c) => c.option_id === summary.chosen) : null;
-  const orders = risk?.orders.filter((o) => o.stockout_probability > 0).length ?? 0;
+  const id = (k: string) => `presenter-${record?.case_id}-${k}`;
 
   return (
-    <GantrySign
-      as="section"
-      label="Impact"
-      testId="impact-meter"
-      className="flex h-full flex-col gap-5 px-5 py-5"
-    >
+    <GantrySign flat as="section" label="Impact" testId="impact-meter" className="flex h-full flex-col gap-6">
       <div className="sign-label text-sm">Impact</div>
-      <Metric
-        label="At risk"
-        value={risk ? risk.max_exposure : null}
-        pending="after Assess"
-        hero
-        tone="risk"
-        note={
-          risk
-            ? `${orders} customer order${orders === 1 ? "" : "s"}${risk.deadline ? ` · by ${dayShort(record?.day0, risk.deadline)}` : ""}`
-            : null
-        }
-        testId="meter-at-risk"
-      />
+      <Metric label="At risk" value={risk ? risk.max_exposure : null} hero id={id("at-risk")} testId="meter-at-risk" />
       <Metric
         label="Plan cost"
         value={summary && !escalated ? (summary.case_cost ?? summary.chosen_cost) : null}
-        pending={escalated ? "Handed to a human planner" : "after Reflect"}
-        tone="ink"
-        note={
-          chosen
-            ? summary && summary.already_spent > 0
-              ? `${chosen.label} + ${juta(summary.already_spent)} already executed`
-              : `${chosen.label} · option ${chosen.option_id}`
-            : null
-        }
+        empty={escalated ? "No plan" : undefined}
+        id={id("plan-cost")}
         testId="meter-plan-cost"
       />
       <Metric
         label="Protected (net)"
         value={summary && !escalated ? summary.net_protected : null}
-        pending={escalated ? "No verified plan" : "after Reflect"}
+        empty={escalated ? "No plan" : undefined}
         tone={resolved ? "ok" : reopened ? "muted" : "ink"}
-        note={
-          summary
-            ? resolved
-              ? "Verified in SAP"
-              : reopened
-                ? "Not confirmed: verification failed"
-                : "Once the plan is verified"
-            : null
-        }
+        status={resolved ? "verified in SAP" : reopened ? "not confirmed: verification failed" : "once the plan is verified"}
+        id={id("protected")}
         testId="meter-protected"
       />
       <SolverLabel className="mt-auto text-white" />
@@ -90,34 +61,42 @@ export function ImpactMeter({
 function Metric({
   label,
   value,
-  pending,
-  note,
+  empty = "Not yet",
   hero,
-  tone,
+  tone = "ink",
+  status,
+  id,
   testId,
 }: {
   label: string;
   value: number | null;
-  pending: string;
-  note?: string | null;
+  empty?: string;
   hero?: boolean;
-  tone: "risk" | "ink" | "ok" | "muted";
+  tone?: "ink" | "ok" | "muted";
+  /** said to screen readers only */
+  status?: string;
+  id: string;
   testId: string;
 }) {
+  const shown = useCountUp(value, juta, { id, delay: 150 });
   return (
-    <div data-testid={testId} className={hero ? undefined : "border-t-2 border-white/60 pt-3"}>
+    <div data-testid={testId} className={hero ? undefined : "border-t border-white/30 pt-4"}>
       <div className="text-lg font-bold">{label}</div>
-      <div
-        className={cn(
-          "leading-[1.05] font-black tabular-nums",
-          hero && value !== null ? "text-5xl" : "text-[2.25rem]",
-          tone === "ok" && value !== null ? "text-signal-yellow" : "text-white",
-          tone === "muted" && "line-through decoration-2",
-        )}
-      >
-        {value === null ? "—" : <CountUp value={value} format={juta} />}
-      </div>
-      <div className="mt-1 text-base leading-snug">{value === null ? pending : note}</div>
+      {value === null ? (
+        <div className="text-[2.25rem] leading-[1.05] font-black text-sign-green-tint">{empty}</div>
+      ) : (
+        <div
+          className={cn(
+            "leading-[1.05] font-black transition-colors duration-[var(--dur-base)]",
+            hero ? "text-5xl" : "text-[2.25rem]",
+            tone === "ok" ? "text-signal-yellow" : "text-white",
+            tone === "muted" && "line-through decoration-2",
+          )}
+        >
+          <Figure shown={shown ?? juta(value)} final={juta(value)} />
+          {status && <span className="sr-only">, {status}</span>}
+        </div>
+      )}
     </div>
   );
 }

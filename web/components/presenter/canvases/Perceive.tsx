@@ -1,7 +1,8 @@
 "use client";
 
 import { FileText, MessageCircle } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { useRef } from "react";
 import { CAUSE, delay, FIELD, glossFor } from "@/lib/present";
 import { cn } from "@/lib/utils";

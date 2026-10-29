@@ -25,6 +25,28 @@
   --brand-teal-ink: #0a4f4a; /* "Written by the agent" labels */
   --sea: #cfdde2; /* lane map only */
   --land: #e4e4dc; /* lane map only */
+  --hairline: #d8d9d3; /* the one 1px card line, drawn as an inset shadow */
+  --divider: #e4e4dc; /* table row dividers */
+
+  /* Spacing scale (docs/polish-prompt.md 3.1). Tailwind steps 1 / 2 / 4 / 6 / 8 / 12 / 16
+     are the same values at 1rem = 16px, so components use those steps only. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --space-7: 64px;
+
+  /* Motion (4.1): transform, opacity, colours and stroke-dashoffset only */
+  --dur-press: 120ms;
+  --dur-fast: 200ms;
+  --dur-base: 320ms;
+  --dur-slow: 800ms;
+  --dur-count: 900ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --rise: 8px;
 
   /* Older token names, mapped onto the palette so every component follows it. */
   --canvas: var(--concrete);
@@ -70,6 +92,8 @@
   --color-brand-teal-ink: var(--brand-teal-ink);
   --color-sea: var(--sea);
   --color-land: var(--land);
+  --color-hairline: var(--hairline);
+  --color-divider: var(--divider);
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -116,9 +140,9 @@
 
   --radius-card: 12px;
   --radius-control: 10px;
-  /* signs sit flat: at most a 2px flat offset, no blur */
-  --shadow-card: 2px 2px 0 rgb(30 33 36 / 0.18);
-  --shadow-sign: 2px 2px 0 rgb(30 33 36 / 0.35);
+  /* polish pass: cards and signs sit flat (one inset hairline, no drop shadow) */
+  --shadow-card: 0 0 #0000;
+  --shadow-sign: 0 0 #0000;
 }
 
 /*
@@ -127,6 +151,7 @@
  */
 html.presenter {
   font-size: clamp(14px, min(1.25vw, 2.2222vh), 32px);
+  --rise: 10px;
 }
 
 body {
@@ -170,4 +195,49 @@ body {
 .siaga-pulse { animation: siaga-pulse 1.6s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .siaga-pulse { animation: none; }
+}
+
+/*
+ * Motion classes (docs/polish-prompt.md 4.1, 5): entrance by rise (opacity + 8px, 10px in
+ * Presenter), fade, the evidence highlight and the REJECTED stamp. `--delay` staggers.
+ * Only transform, opacity and colours move; nothing changes an element's size.
+ */
+@keyframes siaga-rise {
+  from { opacity: 0; transform: translateY(var(--rise)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes siaga-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes siaga-highlight {
+  from { background-color: transparent; }
+  to { background-color: var(--signal-yellow); }
+}
+@keyframes siaga-stamp {
+  from { opacity: 0; transform: scale(1.3); }
+  to { opacity: 1; transform: scale(1); }
+}
+.rise { animation: siaga-rise var(--dur-base) var(--ease-out) var(--delay, 0ms) both; }
+.fade-in { animation: siaga-fade var(--dur-base) var(--ease-out) var(--delay, 0ms) both; }
+.highlight { animation: siaga-highlight var(--dur-base) var(--ease-standard) var(--delay, 0ms) both; }
+.stamp { animation: siaga-stamp 280ms var(--ease-out) var(--delay, 0ms) both; }
+
+/* Reduced motion (OS setting, or ?motion=off for tests): every animation and transition
+   ends at once, so the end state shows immediately. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
 }

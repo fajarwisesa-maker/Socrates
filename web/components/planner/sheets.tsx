@@ -7,9 +7,11 @@ import { Check, FileText, Info, MessageCircle, Truck, X } from "lucide-react";
 import { ApprovalSign } from "@/components/ApprovalSign";
 import { CandidateSign, PrecedentPlate, ReplanPlate, SearchQuery } from "@/components/plan";
 import { LaneMap } from "@/components/LaneMap";
+import { Reveal } from "@/components/Reveal";
 import { StateNotices } from "@/components/StateNotices";
 import {
   AgentWritten,
+  CARD,
   GantrySign,
   LaneDivider,
   SignHeading,
@@ -48,21 +50,35 @@ interface SheetProps {
   approvals: Approval[];
   live: boolean;
   onDecided: () => void;
+  /** after an approval: show Verify */
+  onNext?: () => void;
 }
+
+/** The lane map's view per stage. The map sits outside the stage content, so it stays
+ *  mounted from Act to Verify and morphs instead of reloading. */
+const MAP_VIEW: Partial<Record<Stage, "assess" | "act" | "verify">> = { ASSESS: "assess", ACT: "act", VERIFY: "verify" };
 
 export function StageSheet({ stage, agent, ...p }: SheetProps & { stage: Stage; agent?: string }) {
   const items = notices(p.events, p.record, p.live);
   const Body = SHEETS[stage];
+  const view = MAP_VIEW[stage];
+  const model = view ? laneModel(p.record, { kind: view }) : null;
   return (
-    <section className="min-w-0 space-y-5" data-testid="stage-sheet" data-stage={stage}>
-      <div>
+    <section className="flex min-w-0 flex-col gap-6" data-testid="stage-sheet" data-stage={stage}>
+      {/* keyed by stage: the heading and content rise in; the old ones leave at once */}
+      <Reveal key={`head-${stage}`} className="flex flex-col gap-1">
         <p className="font-mono text-xs font-bold tracking-[0.12em] text-ink-2 uppercase">{sheetKicker(stage, agent)}</p>
-        <h2 className="mt-1 text-2xl font-black text-asphalt" data-testid="sheet-title">
+        <h2 className="text-2xl font-black text-asphalt" data-testid="sheet-title">
           {SHEET_TITLE[stage]}
         </h2>
-      </div>
+      </Reveal>
       <StateNotices size="planner" items={items} />
-      <Body {...p} />
+      <div className="flex flex-col gap-6">
+        {model && <LaneMap key="map" model={model} className={stage === "ACT" ? "order-last" : "order-first"} />}
+        <Reveal key={stage} delay={60} className="min-w-0">
+          <Body {...p} />
+        </Reveal>
+      </div>
     </section>
   );
 }
@@ -115,14 +131,14 @@ function PerceiveSheet({ record, events }: SheetProps) {
   ];
   const agreeing = d.confidence_basis?.corroborated_fields ?? [];
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-      <div className="space-y-4">
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-4">
         {record.signals.map((s, i) => {
           const spans = ev.filter((e) => e.signal === i + 1);
           const pdf = s.type === "pdf";
           return (
-            <article key={i} className="rounded-[12px] border-2 border-asphalt bg-road-white" data-testid={pdf ? "sheet-pdf" : "sheet-whatsapp"}>
-              <header className="flex items-center gap-2 border-b-2 border-curb px-4 py-2 text-sm font-black tracking-[0.08em] uppercase">
+            <article key={i} className={cn(CARD, "flex flex-col gap-4 p-6")} data-testid={pdf ? "sheet-pdf" : "sheet-whatsapp"}>
+              <header className="flex items-center gap-2 text-sm font-black tracking-[0.08em] uppercase">
                 {pdf ? <FileText className="size-4" aria-hidden /> : <MessageCircle className="size-4" aria-hidden />}
                 {pdf ? `Forwarder notice · ${s.filename ?? "PDF"}` : "Driver · WhatsApp"}
                 {s.via === "whatsapp_api" && (
@@ -132,7 +148,7 @@ function PerceiveSheet({ record, events }: SheetProps) {
                 )}
               </header>
               {pdf ? (
-                <ul className="space-y-1 px-4 py-3 text-base">
+                <ul className="flex flex-col gap-1 text-base">
                   {spans.length === 0 && <li className="text-ink-2">No quote from this notice was used.</li>}
                   {[...spans]
                     .sort((a, b) => a.start - b.start)
@@ -146,7 +162,7 @@ function PerceiveSheet({ record, events }: SheetProps) {
                     ))}
                 </ul>
               ) : (
-                <p lang="id" className="px-4 py-3 text-base leading-relaxed italic">
+                <p lang="id" className="text-base leading-relaxed italic">
                   <Marked text={s.text} spans={spans} nums={nums} />
                 </p>
               )}
@@ -154,9 +170,9 @@ function PerceiveSheet({ record, events }: SheetProps) {
           );
         })}
         {glosses.length > 0 && (
-          <div className="rounded-[12px] bg-surface-2 px-4 py-3">
+          <div className="rounded-[12px] bg-surface-2 px-6 py-4">
             <AgentWritten />
-            <ul className="mt-1 space-y-0.5 text-sm">
+            <ul className="mt-1 flex flex-col gap-1 text-sm">
               {glosses.map((e) => (
                 <li key={`${e.signal}:${e.start}`}>
                   <span className="font-mono">{nums.get(`${e.signal}:${e.start}`)}</span>{" "}
@@ -172,35 +188,37 @@ function PerceiveSheet({ record, events }: SheetProps) {
           </p>
         )}
       </div>
-      <div className="space-y-4">
-        <table className="w-full overflow-hidden rounded-[12px] bg-road-white text-base" data-testid="disruption-fields">
-          <thead>
-            <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.08em] uppercase">
-              <th className="px-3 py-2">Field</th>
-              <th className="px-3 py-2">Value</th>
-              <th className="px-3 py-2 text-right">Quotes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([k, v, f]) => (
-              <tr key={k} className="border-b border-curb">
-                <td className="px-3 py-2 whitespace-nowrap text-ink-2">{k}</td>
-                <td className="px-3 py-2 font-bold">{v}</td>
-                <td className="px-3 py-2 text-right font-mono text-sm whitespace-nowrap">{cite(f).join(", ") || "none"}</td>
+      <div className="flex flex-col gap-6">
+        <div className={cn(CARD, "px-6 py-4")}>
+          <table className="w-full text-base" data-testid="disruption-fields">
+            <thead>
+              <tr className="border-b border-divider text-left text-xs font-black tracking-[0.08em] text-ink-2 uppercase">
+                <th className="py-2 pr-4">Field</th>
+                <th className="py-2 pr-4">Value</th>
+                <th className="py-2 text-right">Quotes</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div data-testid="sheet-confidence">
+            </thead>
+            <tbody>
+              {rows.map(([k, v, f]) => (
+                <tr key={k} className="border-b border-divider last:border-0">
+                  <td className="py-2 pr-4 whitespace-nowrap text-ink-2">{k}</td>
+                  <td className="py-2 pr-4 font-bold">{v}</td>
+                  <td className="py-2 text-right font-mono text-sm whitespace-nowrap">{cite(f).join(", ") || "none"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div data-testid="sheet-confidence" className="flex flex-col gap-1">
           <SignHeading>Confidence</SignHeading>
           <p className="text-2xl font-black">
             {progression.length > 1 ? progression.map((x) => x.label).join(" → ") : d.confidence}
           </p>
           <p className="text-sm text-ink-2">
             {d.confidence === "High" && agreeing.length
-              ? `The WhatsApp alone gave Medium. The forwarder notice agrees on ${agreeing.join(" and ")}.`
-              : "One informal source. A second source that agrees on lane and delay would raise it to High."}{" "}
-            Computed in code from the located quotes, never by the model.
+              ? `Medium from the WhatsApp alone; the forwarder notice agrees on ${agreeing.join(" and ")}.`
+              : "One informal source; a second that agrees on lane and delay raises it to High."}{" "}
+            Computed in code, never by the model.
           </p>
         </div>
       </div>
@@ -216,43 +234,41 @@ function AssessSheet({ record, events }: SheetProps) {
   const a = record.affected;
   const risk = record.risk;
   if (!a || !risk) return <Waiting>Reading SAP: stock, orders, inbound POs.</Waiting>;
-  const model = laneModel(record, { kind: "assess" });
   const dest = plantName(a.labels, a.plant);
   const note = events.find((e) => e.status === "completed")?.data.impact_note as string | undefined;
   const agent = events.find((e) => e.status === "started")?.agent ?? undefined;
   const so = (id: string) => a.sales_orders.find((s) => s.SalesOrder === id);
   const inbound = risk.inbound[0];
   return (
-    <div className="space-y-5">
-      {model && <LaneMap model={model} />}
-      <div className="overflow-x-auto rounded-[12px] border-2 border-asphalt bg-road-white" data-testid="orders-table">
-        <div className="sign-label border-b-2 border-asphalt px-4 py-2 text-sm">
+    <div className="flex flex-col gap-6">
+      <div className={cn(CARD, "overflow-x-auto px-6 py-4")} data-testid="orders-table">
+        <div className="sign-label text-sm">
           Orders loading at {dest}
           {risk.deadline ? ` by ${dayShort(record.day0, risk.deadline)}` : ""}
         </div>
-        <table className="w-full min-w-[560px] text-base">
+        <table className="mt-2 w-full min-w-[560px] text-base">
           <thead>
-            <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
-              <th className="px-4 py-2">Order</th>
-              <th className="px-4 py-2">Customer</th>
-              <th className="px-4 py-2 text-right">Cartons</th>
-              <th className="px-4 py-2 text-right whitespace-nowrap">Stockout chance</th>
-              <th className="px-4 py-2 text-right">If missed</th>
+            <tr className="border-b border-divider text-left text-xs font-black tracking-[0.06em] text-ink-2 uppercase">
+              <th className="py-2 pr-4">Order</th>
+              <th className="py-2 pr-4">Customer</th>
+              <th className="py-2 pr-4 text-right">Cartons</th>
+              <th className="py-2 pr-4 text-right whitespace-nowrap">Stockout chance</th>
+              <th className="py-2 text-right">If missed</th>
             </tr>
           </thead>
           <tbody>
             {risk.orders.map((o) => (
-              <tr key={o.order} className="border-b border-curb">
-                <td className="px-4 py-2 font-mono font-bold whitespace-nowrap">{o.order}</td>
-                <td className="px-4 py-2">
+              <tr key={o.order} className="border-b border-divider last:border-0">
+                <td className="py-2 pr-4 font-mono font-bold whitespace-nowrap">{o.order}</td>
+                <td className="py-2 pr-4">
                   {so(o.order)?.YY1_SoldToPartyName ?? o.order}
                   {so(o.order)?.YY1_Channel && <span className="text-ink-2"> ({so(o.order)!.YY1_Channel!.toLowerCase()})</span>}
                 </td>
-                <td className="px-4 py-2 text-right font-mono">{thousands(o.quantity)}</td>
-                <td className={cn("px-4 py-2 text-right font-mono font-bold", o.stockout_probability > 0 && "text-risk-ink")}>
+                <td className="py-2 pr-4 text-right font-mono">{thousands(o.quantity)}</td>
+                <td className={cn("py-2 pr-4 text-right font-mono font-bold", o.stockout_probability > 0 && "text-risk-ink")}>
                   {pct(o.stockout_probability)}
                 </td>
-                <td className="px-4 py-2 text-right font-mono font-bold whitespace-nowrap text-risk-ink">
+                <td className="py-2 text-right font-mono font-bold whitespace-nowrap text-risk-ink">
                   {PENALTY[so(o.order)?.YY1_PenaltyType ?? ""] ?? "Penalty"} {juta(o.penalty)}
                 </td>
               </tr>
@@ -275,8 +291,8 @@ function AssessSheet({ record, events }: SheetProps) {
       </p>
       {record.delay_prediction && <DelayDetails p={record.delay_prediction} />}
       {note && (
-        <div className="rounded-[12px] border-2 border-asphalt bg-road-white px-4 py-3" data-testid="impact-note">
-          <SignHeading className="mb-1">Impact note</SignHeading>
+        <div className={cn(CARD, "flex flex-col gap-1 p-6")} data-testid="impact-note">
+          <SignHeading>Impact note</SignHeading>
           <p className="text-base">{note}</p>
           <AgentWritten by={agent} />
         </div>
@@ -290,7 +306,7 @@ function DelayDetails({ p }: { p: DelayPrediction }) {
   const [lo, hi] = p.signal_range_hours;
   const used = p.delay_for_risk_hours;
   return (
-    <div className="rounded-[12px] bg-surface-2 px-4 py-3 text-base" data-testid="delay-details">
+    <div className="rounded-[12px] bg-surface-2 px-6 py-4 text-base" data-testid="delay-details">
       <div className="text-xs font-bold text-ink-2">
         {p.provider === "fake" ? "Offline stand-in, not SAP RPT-1.6 (median of similar rows)" : "SAP RPT-1.6 on SAP AI Core"} ·{" "}
         {p.history_rows ?? 0} past disruptions (synthetic history) · combined with the signal in code
@@ -321,24 +337,21 @@ function PlanSheet({ record, events, allEvents }: SheetProps) {
   const rounds = [...new Set(record.candidates.map((c) => c.round))];
   const strategies = [...new Set(record.candidates.flatMap((c) => c.strategies))];
   return (
-    <div className="space-y-6">
-      <p className="text-base">
-        The agent picks which strategies to try and writes why. It sets no quantities or prices: the solver
-        prices every candidate in Simulate.
-      </p>
+    <div className="flex flex-col gap-8">
+      <p className="text-base">The agent picks strategies and says why; the solver prices them in Simulate.</p>
       {rounds.map((r) => {
         const reason = r > 1 ? replanReason(record, allEvents, r) : null;
         return (
-          <div key={r} className="space-y-3" data-testid={`plan-round-${r}`}>
+          <div key={r} className="flex flex-col gap-4" data-testid={`plan-round-${r}`}>
             <SignHeading>{r === 1 ? "First round" : `Replan ${r - 1}`}</SignHeading>
             {reason && <ReplanPlate reason={reason} />}
             <ul className="grid gap-4 md:grid-cols-2">
               {record.candidates
                 .filter((c) => c.round === r)
                 .map((c) => (
-                  <li key={c.option_id} className="space-y-2">
+                  <li key={c.option_id} className="flex flex-col gap-2">
                     <CandidateSign candidate={c} />
-                    <div className="px-1">
+                    <div>
                       <p className="text-base">{c.rationale}</p>
                       <AgentWritten />
                     </div>
@@ -349,7 +362,7 @@ function PlanSheet({ record, events, allEvents }: SheetProps) {
         );
       })}
       {hits.length > 0 && (
-        <div className="space-y-3" data-testid="planner-precedents">
+        <div className="flex flex-col gap-4" data-testid="planner-precedents">
           <SignHeading>Precedents cited</SignHeading>
           {query && <SearchQuery query={query} />}
           <div className="grid items-start gap-4 md:grid-cols-2">
@@ -369,10 +382,10 @@ function SimulateSheet({ record, events }: SheetProps) {
   if (!record.solver_results.length) return <Waiting>Running the solver.</Waiting>;
   const rounds = [...new Set(record.solver_results.map((o) => o.round))];
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-8">
       <SolverLabel className="text-sm">{solverLabel(events)}</SolverLabel>
       {rounds.map((r) => (
-        <div key={r} className="space-y-2">
+        <div key={r} className="flex flex-col gap-4">
           <SignHeading>{r === 1 ? "First round" : `Replan ${r - 1}`}</SignHeading>
           <div className="grid gap-4 md:grid-cols-2">
             {record.solver_results
@@ -382,7 +395,7 @@ function SimulateSheet({ record, events }: SheetProps) {
                 const maxTier = tiers.length ? Math.max(...tiers.map((t) => t.tier)) : null;
                 const model = laneModel(record, { kind: "option", option: o });
                 return (
-                  <article key={o.option_id} className="space-y-2 rounded-[12px] border-2 border-asphalt bg-road-white p-4" data-testid={`sim-${o.option_id}`}>
+                  <article key={o.option_id} className={cn(CARD, "flex flex-col gap-2 p-6")} data-testid={`sim-${o.option_id}`}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-black">
                         <span className="font-mono">{o.option_id}</span> · {o.label}
@@ -429,16 +442,16 @@ function ReflectSheet({ record }: SheetProps) {
   const s = record.summary;
   const baseline = s?.baseline ? record.solver_results.find((o) => o.option_id === s.baseline) : null;
   return (
-    <div className="space-y-5">
-      <div className="overflow-x-auto rounded-[12px] border-2 border-asphalt bg-road-white" data-testid="options">
+    <div className="flex flex-col gap-8">
+      <div className={cn(CARD, "overflow-x-auto px-6 py-4")} data-testid="options">
         <table className="w-full min-w-[640px] text-base">
           <thead>
-            <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
-              <th className="px-3 py-2">Option</th>
-              <th className="px-3 py-2">Plan</th>
-              <th className="px-3 py-2 text-right">Cost</th>
-              <th className="px-3 py-2">Max tier</th>
-              <th className="px-3 py-2">Outcome</th>
+            <tr className="border-b border-divider text-left text-xs font-black tracking-[0.06em] text-ink-2 uppercase">
+              <th className="py-2 pr-4">Option</th>
+              <th className="py-2 pr-4">Plan</th>
+              <th className="py-2 pr-4 text-right">Cost</th>
+              <th className="py-2 pr-4">Max tier</th>
+              <th className="py-2">Outcome</th>
             </tr>
           </thead>
           <tbody>
@@ -447,12 +460,12 @@ function ReflectSheet({ record }: SheetProps) {
               const f = record.critic_findings.find((x) => x.option_id === o.option_id);
               const maxTier = f?.tiers.length ? Math.max(...f.tiers.map((t) => t.tier)) : null;
               return (
-                <tr key={o.option_id} data-testid={`option-${o.option_id}`} className="border-b border-curb align-top">
-                  <td className="px-3 py-2 font-mono font-bold">
+                <tr key={o.option_id} data-testid={`option-${o.option_id}`} className="border-b border-divider align-top last:border-0">
+                  <td className="py-2 pr-4 font-mono font-bold">
                     {o.option_id}
                     {o.round > 1 && <div className="text-xs font-normal">replan</div>}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="py-2 pr-4">
                     <div className="font-bold">{o.label}</div>
                     <div className="text-sm text-ink-2">{o.result.actions.map((a) => actionLine(a, record.affected?.labels)).join(" · ")}</div>
                     {o.constraints.length > 0 && (
@@ -469,11 +482,11 @@ function ReflectSheet({ record }: SheetProps) {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-bold whitespace-nowrap">
+                  <td className="py-2 pr-4 text-right font-mono font-bold whitespace-nowrap">
                     {o.result.status === "optimal" ? o.total_cost_display : "infeasible"}
                   </td>
-                  <td className="px-3 py-2">{maxTier !== null && <TierPlate tier={maxTier} />}</td>
-                  <td className="px-3 py-2">
+                  <td className="py-2 pr-4">{maxTier !== null && <TierPlate tier={maxTier} />}</td>
+                  <td className="py-2">
                     <StatusPlate tone={out.tone}>{out.text}</StatusPlate>
                     {f && !f.clean && (
                       <p className="mt-1 text-sm font-bold text-risk-ink">
@@ -486,7 +499,7 @@ function ReflectSheet({ record }: SheetProps) {
             })}
           </tbody>
         </table>
-        <div className="flex flex-wrap justify-between gap-2 border-t-2 border-asphalt px-3 py-2">
+        <div className="mt-2 flex flex-wrap justify-between gap-2 border-t border-divider pt-2">
           <SolverLabel>Prices, quantities and arrivals from the solver (PuLP / CBC), not the model</SolverLabel>
           {s?.saving_display && (s.saving_vs_baseline ?? 0) > 0 && baseline && (
             <span className="text-sm font-bold text-brand-ink">
@@ -495,15 +508,15 @@ function ReflectSheet({ record }: SheetProps) {
           )}
         </div>
       </div>
-      <div className="space-y-3" data-testid="critic-checks">
+      <div className="flex flex-col gap-4" data-testid="critic-checks">
         <SignHeading>The Critic&apos;s checks</SignHeading>
         {record.critic_findings.map((f) => (
-          <div key={f.option_id} className={cn("rounded-[12px] border-2 bg-road-white px-4 py-3", f.clean ? "border-sign-green" : "border-stop-red")}>
+          <div key={f.option_id} className={cn(CARD, "p-6")}>
             <div className="flex items-center gap-2">
               <span className="font-mono font-bold">{f.option_id}</span>
               <StatusPlate tone={f.clean ? "done" : "rejected"}>{f.clean ? "Passes" : "Rejected"}</StatusPlate>
             </div>
-            <ul className="mt-1 space-y-0.5 text-sm">
+            <ul className="mt-2 flex flex-col gap-1 text-sm">
               {f.checks.map((c, i) => (
                 <li key={i} className={cn("flex gap-2", !c.passed && "font-bold text-risk-ink")}>
                   {c.passed ? <Check className="mt-0.5 size-4 shrink-0" aria-hidden /> : <X className="mt-0.5 size-4 shrink-0" aria-hidden />}
@@ -522,7 +535,7 @@ function ReflectSheet({ record }: SheetProps) {
         ))}
       </div>
       {record.explanation && (
-        <div className="rounded-[12px] bg-surface-2 px-4 py-3" data-testid="explanation">
+        <div className="rounded-[12px] bg-surface-2 px-6 py-4" data-testid="explanation">
           <AgentWritten />
           <p className="text-base">{record.explanation.summary}</p>
           <p className="mt-1 text-sm text-ink-2">{record.explanation.recommendation_rationale}</p>
@@ -534,7 +547,7 @@ function ReflectSheet({ record }: SheetProps) {
 
 // ------------------------------------------------------------------ Act
 
-function ActSheet({ record, approvals, onDecided }: SheetProps) {
+function ActSheet({ record, approvals, onDecided, onNext }: SheetProps) {
   const labels = record.affected?.labels;
   const dest = record.affected?.plant ?? "";
   const done = record.actions.filter((a) => a.status === "EXECUTED" && a.tier <= 2);
@@ -543,10 +556,9 @@ function ActSheet({ record, approvals, onDecided }: SheetProps) {
   const chosen = record.solver_results.find((o) => o.option_id === record.chosen_option);
   const s = record.summary;
   const baseline = s?.baseline ? record.solver_results.find((o) => o.option_id === s.baseline) : null;
-  const model = laneModel(record, { kind: "act" });
   if (!record.actions.length && record.status !== "ESCALATED") return <Waiting>Executing the plan.</Waiting>;
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-6">
       {chosen && (
         <p className="text-base" data-testid="act-summary">
           Plan {chosen.option_id}: {chosen.result.actions.map((a) => actionLine(a, labels)).join(", ")}.
@@ -559,10 +571,12 @@ function ActSheet({ record, approvals, onDecided }: SheetProps) {
         </p>
       )}
       {done.length > 0 && (
-        <div className="space-y-2">
-          <StatusPlate tone="done">Done by SIAGA</StatusPlate>
+        <div className="flex flex-col gap-2">
+          <StatusPlate tone="done" className="self-start">
+            Done by SIAGA
+          </StatusPlate>
           {done.map((a) => (
-            <article key={a.action_id} className="flex items-center gap-4 rounded-[12px] border-2 border-sign-green bg-road-white px-4 py-3" data-testid="executed-action">
+            <article key={a.action_id} className={cn(CARD, "flex items-center gap-4 px-6 py-4")} data-testid="executed-action">
               <Truck className="size-7 shrink-0 text-sign-green" aria-hidden />
               <div className="min-w-0 flex-1">
                 <div className="font-black">{actionTitle(a, labels, dest)}</div>
@@ -582,9 +596,9 @@ function ActSheet({ record, approvals, onDecided }: SheetProps) {
         </div>
       )}
       {anyPending && <LaneDivider label="Needs you" />}
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {pendingFirst.map((a) => (
-          <ApprovalSign key={a.approval_id} approval={a} record={record} onDecided={onDecided} />
+          <ApprovalSign key={a.approval_id} approval={a} record={record} onDecided={onDecided} onNext={onNext} />
         ))}
       </div>
       {record.notes.map((n) => (
@@ -592,7 +606,6 @@ function ActSheet({ record, approvals, onDecided }: SheetProps) {
           <TierPlate tier={n.tier} /> <span>{n.text}</span>
         </p>
       ))}
-      {model && <LaneMap model={model} />}
     </div>
   );
 }
@@ -608,21 +621,21 @@ function VerifySheet({ record, events }: SheetProps) {
   const reopened = record.status === "REOPENED";
   const clock = caseClock(events.length ? events : [], now);
   const due = record.verify_due_at && now ? Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000)) : null;
-  const model = laneModel(record, { kind: "verify" });
   const reply = whatsappReply(events);
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-6">
       {reopened && (
-        <div className="rounded-[12px] border-4 border-stop-red bg-road-white px-4 py-3" data-testid="reopened-plate">
-          <StatusPlate tone="rejected">Reopened</StatusPlate>
-          <p className="mt-1 text-base font-bold">
-            SAP no longer shows the planned supply arriving in time. A planner needs to look at it; everything executed so
-            far stays in SAP and in the audit trail.
+        <div className={cn(CARD, "flex flex-col gap-2 p-6 inset-ring-2 inset-ring-stop-red")} data-testid="reopened-plate">
+          <StatusPlate tone="rejected" className="self-start">
+            Reopened
+          </StatusPlate>
+          <p className="text-base font-bold">
+            SAP no longer shows the planned supply arriving in time. Everything executed so far stays in SAP and in the
+            audit trail.
           </p>
         </div>
       )}
       {!v && <Waiting>{due !== null ? `SIAGA re-reads SAP in ${due} s.` : "Verification runs after every action is executed."}</Waiting>}
-      {model && <LaneMap model={model} />}
       {v && (
         <p className={cn("text-xl", reopened ? "font-bold text-risk-ink" : "")} data-testid="coverage">
           {thousands(v.projected_supply)} of {thousands(v.demand)} cartons {v.covered ? "covered" : "projected"}
@@ -630,7 +643,7 @@ function VerifySheet({ record, events }: SheetProps) {
         </p>
       )}
       {resolved && s && (
-        <GantrySign>
+        <GantrySign flat>
           <p className="text-3xl font-black" data-testid="outcome-line">
             {juta(s.exposure_avoided)} protected for {juta(s.case_cost ?? s.chosen_cost)}
           </p>
@@ -638,7 +651,7 @@ function VerifySheet({ record, events }: SheetProps) {
         </GantrySign>
       )}
       {v && (
-        <ul className="space-y-1 text-base" data-testid="verify-checks">
+        <ul className="flex flex-col gap-1 text-base" data-testid="verify-checks">
           {v.checks.map((c) => (
             <li key={c.ref} className={cn("flex items-center gap-2", !c.ok && "font-bold text-risk-ink")}>
               {c.ok ? <Check className="size-4 text-sign-green" strokeWidth={3} aria-hidden /> : <X className="size-4" aria-hidden />}
@@ -665,7 +678,7 @@ function VerifySheet({ record, events }: SheetProps) {
 
 function Waiting({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-[12px] border-2 border-dashed border-curb px-4 py-6 text-base text-ink-2" data-testid="sheet-waiting">
+    <p className="rounded-[12px] bg-surface-2 p-6 text-base text-ink-2" data-testid="sheet-waiting">
       {children}
     </p>
   );

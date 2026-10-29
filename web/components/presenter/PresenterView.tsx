@@ -15,7 +15,9 @@ import { StageCanvas } from "./StageCanvas";
 import { StageRail } from "./StageRail";
 import { StartCanvas } from "./StartCanvas";
 import { caseTitle, shortId } from "@/lib/caseView";
-import { Logo } from "../signs";
+import { cn } from "@/lib/utils";
+import { CARD, Logo } from "../signs";
+import { AgentContext } from "./canvases/Frame";
 import { modelNote } from "../planner/PlannerHeader";
 
 const KEYS: [string, string][] = [
@@ -65,6 +67,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
   }, [pacing]);
 
   const next = pacing.steps[pacing.index + 1];
+  const agents = agentsByStage(viewEvents, config);
   const note = modelNote(config, events);
 
   return (
@@ -76,7 +79,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
       data-steps={pacing.steps.length}
       data-held={pacing.held ? "1" : undefined}
     >
-      <header className="flex h-14 shrink-0 items-center gap-5 bg-asphalt px-6 whitespace-nowrap text-white">
+      <header className="flex h-14 shrink-0 items-center gap-6 bg-asphalt px-8 whitespace-nowrap text-white">
         <Logo height={26} />
         {record && (
           <span className="min-w-0 truncate text-lg font-black" data-testid="presenter-case-title" title={caseTitle(record)}>
@@ -92,7 +95,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           {config?.replay && (
             <span
               data-testid="replay-badge"
-              className="rounded-[4px] border-2 border-white px-2 py-0.5 text-xs font-black tracking-[0.08em]"
+              className="rounded-[6px] bg-road-white px-2 py-1 text-xs font-black tracking-[0.08em] text-asphalt"
               title={config.replay_source ? `Recorded run (${config.replay_source.provider})` : "Recorded run"}
             >
               REPLAY
@@ -106,7 +109,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           >
             <PanelRight className="size-4" aria-hidden />
             <span className="sr-only">Details</span>
-            <Kbd className="border-white/70 bg-transparent text-white">D</Kbd>
+            <Kbd className="bg-transparent text-white inset-ring-white/70">D</Kbd>
           </button>
           {modeSwitch}
           <PresenterClock events={events} />
@@ -119,18 +122,19 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         </div>
       )}
 
-      <main className="grid min-h-0 flex-1 grid-cols-[15rem_minmax(0,1fr)_19rem] gap-5 px-6 py-4">
+      <main className="grid min-h-0 flex-1 grid-cols-[13rem_minmax(0,1fr)_17rem] gap-8 px-8 py-4">
         <div>
           <StageRail
             events={viewEvents}
             record={record}
             focus={step?.stage ?? null}
             onSelect={pacing.show}
-            agents={agentsByStage(viewEvents, config)}
+            agents={agents}
           />
         </div>
-        <section className="relative min-h-0 overflow-hidden rounded-[12px] border-[3px] border-asphalt bg-road-white p-5 shadow-[var(--shadow-card)]">
+        <section className={cn(CARD, "relative min-h-0 overflow-hidden p-6")}>
           {record && step ? (
+            <AgentContext.Provider value={agents[step.stage]}>
             <StageCanvas
               key={`${record.case_id}-${pacing.index}`}
               stage={step.stage}
@@ -144,6 +148,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
                 pacing.touch();
               }}
             />
+            </AgentContext.Provider>
           ) : record ? (
             <p className="text-xl font-bold">Reading the signals…</p>
           ) : (
@@ -162,7 +167,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         </section>
         <ImpactMeter record={record} viewEvents={viewEvents} isLatest={pacing.isLatest} />
       </main>
-      <footer className="flex h-9 shrink-0 items-center gap-4 bg-asphalt px-6 text-sm whitespace-nowrap text-white">
+      <footer className="flex h-9 shrink-0 items-center gap-4 bg-asphalt px-8 text-sm whitespace-nowrap text-white">
         {record && (
           <span className="font-mono text-xs" data-testid="case-line">
             Case {shortId(record.case_id)}
@@ -178,7 +183,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           <button
             onClick={pacing.toLatest}
             data-testid="follow-live"
-            className="inline-flex items-center gap-1.5 rounded-[4px] border-2 border-signal-yellow px-2 font-bold text-signal-yellow hover:bg-white/10"
+            className="inline-flex items-center gap-1 rounded-[6px] bg-signal-yellow px-2 font-bold text-asphalt transition-colors duration-[var(--dur-fast)] hover:bg-[#ffd24d]"
           >
             <Radio className="size-4" aria-hidden /> Jump to live
           </button>
@@ -192,7 +197,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         <ul className="ml-auto flex items-center gap-4" aria-label="Keys" data-testid="key-footer">
           {KEYS.map(([k, what]) => (
             <li key={k} className="inline-flex items-center gap-1.5">
-              <Kbd className="border-white/70 bg-transparent text-white">{k}</Kbd>
+              <Kbd className="bg-transparent text-white inset-ring-white/70">{k}</Kbd>
               <span>{what}</span>
             </li>
           ))}

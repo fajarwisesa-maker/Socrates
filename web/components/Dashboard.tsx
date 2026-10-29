@@ -3,6 +3,7 @@
 import { MotionConfig } from "motion/react";
 import { useEffect } from "react";
 import { setMode, useMode } from "@/lib/mode";
+import { useReducedMotion } from "@/lib/motion";
 import { useCase } from "@/lib/useCase";
 import PlannerView from "./PlannerView";
 import { ModeSwitch } from "./presenter/ModeSwitch";
@@ -11,6 +12,7 @@ import { PresenterView } from "./presenter/PresenterView";
 export default function Dashboard() {
   const state = useCase();
   const mode = useMode();
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     // Presenter mode scales the root font size with the viewport (globals.css).
@@ -28,10 +30,10 @@ export default function Dashboard() {
   }, [mode]);
 
   const toggle = <ModeSwitch mode={mode} onChange={setMode} />;
-  // reducedMotion="user": with prefers-reduced-motion, transforms are skipped; components
-  // also check useReducedMotion() and show the end state at once.
+  // With reduced motion (the OS setting, or ?motion=off) motion skips transforms, the CSS
+  // ends every transition at once and components show their end state (lib/motion.ts).
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion={reduce ? "always" : "user"}>
       {mode === "presenter" ? (
         <PresenterView state={state} modeSwitch={toggle} />
       ) : (

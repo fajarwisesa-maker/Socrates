@@ -1,7 +1,8 @@
 "use client";
 
 import { Timer } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { caseClock } from "@/lib/caseClock";
 import { clock } from "@/lib/format";
 import type { CaseEvent } from "@/lib/types";

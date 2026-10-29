@@ -194,7 +194,7 @@ export default function AuditView({
           </button>
           {open && (
             <>
-              <div className="mt-3 space-y-2" data-testid="audit-filters">
+              <div className="mt-4 flex flex-col gap-2" data-testid="audit-filters">
                 <FilterRow
                   label="Stage"
                   value={stageFilter}
@@ -234,7 +234,7 @@ export default function AuditView({
                 ) : (
                   <table className="w-full text-sm" data-testid="audit-table">
                     <thead className="sticky top-0 bg-road-white">
-                      <tr className="border-b-2 border-asphalt text-left text-xs font-black tracking-[0.06em] uppercase">
+                      <tr className="border-b border-divider text-left text-xs font-black tracking-[0.06em] text-ink-2 uppercase">
                         <th className="py-1 pr-2">#</th>
                         <th className="pr-2">Time</th>
                         <th className="pr-2">Stage</th>
@@ -246,7 +246,7 @@ export default function AuditView({
                     </thead>
                     <tbody>
                       {shown.map(({ entry: e, stage }) => (
-                        <tr key={e.seq} className="border-b border-curb align-top" data-stage={stage} data-type={typeOf(e.kind)}>
+                        <tr key={e.seq} className="border-b border-divider align-top last:border-0" data-stage={stage} data-type={typeOf(e.kind)}>
                           <td className="py-1 pr-2 font-mono text-xs text-ink-2">{e.seq}</td>
                           <td className="pr-2 font-mono text-xs whitespace-nowrap">{e.ts.slice(11, 19)}</td>
                           <td className="pr-2 text-xs">{STAGE_NAME[stage] ?? stage}</td>
@@ -289,7 +289,7 @@ function FilterRow({
   testId: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={`Filter by ${label.toLowerCase()}`} data-testid={testId}>
+    <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={`Filter by ${label.toLowerCase()}`} data-testid={testId}>
       <span className="sign-label mr-1 w-14 text-xs">{label}</span>
       {options.map((o) => (
         <button
@@ -299,8 +299,8 @@ function FilterRow({
           onClick={() => onChange(o.id)}
           data-testid={`${testId}-${o.id}`}
           className={cn(
-            "min-h-11 rounded-[6px] border-2 border-asphalt px-3 text-xs font-bold",
-            value === o.id ? "bg-asphalt text-white" : "bg-road-white text-asphalt hover:bg-surface-2",
+            "min-h-11 rounded-[6px] px-4 text-xs font-bold transition-[background-color,color,box-shadow] duration-[var(--dur-fast)]",
+            value === o.id ? "bg-asphalt text-white" : "bg-road-white text-asphalt inset-ring inset-ring-hairline hover:bg-surface-2",
           )}
         >
           {o.label}

@@ -128,7 +128,7 @@ test("presenter pacing: dwell, Space, H and R walk the story without re-running 
   await expect(canvas).toHaveAttribute("data-stage", "PERCEIVE");
   // the agent is already waiting for approval, but the view and the meter have not run ahead
   await expect(page.getByTestId("next-step")).toContainText("Next: Assess", { timeout: 30_000 });
-  await expect(page.getByTestId("meter-at-risk")).toContainText("—");
+  await expect(page.getByTestId("meter-at-risk")).toContainText("Not yet");
   await expect(page.getByTestId("evidence-links").locator("path")).toHaveCount(5);
 
   await page.keyboard.press("Space");

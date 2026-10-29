@@ -1,7 +1,8 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { dayShort, juta } from "@/lib/format";
 import { actionLine } from "@/lib/present";
 import type { CaseRecord, SolverResult } from "@/lib/types";
@@ -41,10 +42,11 @@ export function OptionCard({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: reduce ? 0 : 0.3, duration: 0.5, ease: "easeOut" }}
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-[12px] border-[3px] p-5",
-        state === "rejected" && "border-stop-red bg-road-white transition-colors",
-        state === "chosen" && "border-sign-green bg-road-white shadow-[var(--shadow-card)]",
-        state === "plain" && "border-asphalt bg-road-white",
+        "relative flex flex-col overflow-hidden rounded-[12px] bg-road-white p-6",
+        "transition-shadow duration-[var(--dur-base)]",
+        state === "rejected" && "inset-ring-2 inset-ring-stop-red",
+        state === "chosen" && "inset-ring-2 inset-ring-sign-green",
+        state === "plain" && "inset-ring inset-ring-hairline",
       )}
     >
       <div className="text-xl font-semibold text-ink">
@@ -93,18 +95,18 @@ export function OptionCard({
       </div>
       {!compact &&
         (feasible ? (
-          <ul className="mt-3 space-y-1 text-xl text-ink-2">
+          <ul className="mt-4 flex flex-col gap-1 text-xl text-ink-2">
             {r.actions.map((a, i) => (
               <li key={i}>{actionLine(a, labels)}</li>
             ))}
             {latest && <li>arrives by {dayShort(record.day0, latest)}</li>}
           </ul>
         ) : (
-          <p className="mt-3 text-xl text-ink-2">{r.infeasible_reason ?? "cannot cover the shortfall in time"}</p>
+          <p className="mt-4 text-xl text-ink-2">{r.infeasible_reason ?? "cannot cover the shortfall in time"}</p>
         ))}
       {note && (
         <motion.div
-          className="mt-3 text-xl leading-snug"
+          className="mt-4 text-xl leading-snug"
           initial={play && !reduce ? { opacity: 0, y: 6 } : false}
           animate={{ opacity: 1, y: 0 }}
           transition={t(play === "reject" ? 1.3 : 0.9)}

@@ -21,8 +21,8 @@ export function ModeSwitch({
       aria-label="Mode (P)"
       data-testid="mode-switch"
       className={cn(
-        "inline-flex shrink-0 overflow-hidden rounded-[6px] border-2 text-xs font-black tracking-[0.08em] uppercase",
-        dark ? "border-white" : "border-asphalt",
+        "inline-flex shrink-0 overflow-hidden rounded-[6px] text-xs font-black tracking-[0.08em] uppercase inset-ring-2",
+        dark ? "inset-ring-white" : "inset-ring-asphalt",
       )}
     >
       {(["planner", "presenter"] as const).map((m) => (

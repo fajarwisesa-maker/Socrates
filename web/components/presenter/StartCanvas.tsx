@@ -82,8 +82,8 @@ function SourceButton({
       onClick={onClick}
       data-testid={testId}
       className={
-        "flex items-center gap-4 rounded-[12px] border-[3px] p-5 text-left text-xl font-black [&_svg]:size-8 " +
-        (loaded ? "border-sign-green bg-sign-green text-white" : "border-asphalt bg-road-white text-asphalt hover:bg-surface-2")
+        "flex items-center gap-4 rounded-[12px] p-6 text-left text-xl font-black transition-[background-color,color,box-shadow] duration-[var(--dur-fast)] [&_svg]:size-8 " +
+        (loaded ? "bg-sign-green text-white" : "bg-road-white text-asphalt inset-ring-2 inset-ring-asphalt hover:bg-surface-2")
       }
     >
       {icon}

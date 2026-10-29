@@ -1,7 +1,8 @@
 "use client";
 
 import { Info, MessageCircle, Timer } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { caseClock } from "@/lib/caseClock";
 import { dayShort, juta, minutesSeconds, thousands } from "@/lib/format";
 import { plantName, whatsappReply } from "@/lib/present";
@@ -43,7 +44,7 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
           <LaneMap model={laneModel(record, { kind: "verify" })!} size="sm" className="mx-auto w-[88%]" />
         )}
         {failed && (
-          <div className="flex items-start gap-3 rounded-[12px] border-4 border-stop-red bg-road-white px-4 py-2.5" data-testid="reopened-plate">
+          <div className="flex items-start gap-4 rounded-[12px] bg-road-white px-6 py-2 inset-ring-2 inset-ring-stop-red" data-testid="reopened-plate">
             <StatusPlate tone="rejected">Reopened</StatusPlate>
             <p className="text-lg font-bold">SIAGA handed the case back: a planner needs to look at it. Everything done so far stays in SAP and in the audit trail.</p>
           </div>
@@ -57,7 +58,7 @@ export function VerifyCanvas({ record, events, round }: { record: CaseRecord; ev
         )}
         {verified && summary && (
           // wow moment 4: the clock has stopped; the result lands in two beats
-          <GantrySign className="flex flex-col gap-1 px-5 py-2.5">
+          <GantrySign flat className="flex flex-col gap-1 px-6 py-2">
             <motion.p
               className="text-[1.75rem] leading-tight font-black"
               data-testid="final-line"

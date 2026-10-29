@@ -1,7 +1,8 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { STAGE_LABEL, STAGES, stageInfo, type StageState } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
@@ -9,9 +10,9 @@ import { cn } from "@/lib/utils";
 import { KmPost } from "../signs";
 
 /**
- * Vertical stepper of the seven stages. Done = check, current = pulsing dot, not yet = hollow.
- * A rejected plan shows as a loop from Reflect back to Plan with "1 replan".
- * With specialist agents (v2), each stage names the agent working it under its label.
+ * Vertical stepper of the seven stages: names only, plus one note on the current stage
+ * ("Needs you") or a flagged one ("1 replan"). The agent working a stage is named in the
+ * stage heading; here only screen readers hear it.
  */
 export function StageRail({
   events,
@@ -26,9 +27,8 @@ export function StageRail({
   onSelect?: (stage: Stage) => void;
   agents?: Partial<Record<Stage, string>>;
 }) {
-  // rem: row height; the replan loop is drawn in the same units. A third line (the agent)
-  // needs a taller row; v1 keeps its layout.
-  const ROW = Object.keys(agents).length ? 4.75 : 4.25;
+  // rem: row height; the replan loop is drawn in the same units
+  const ROW = 4.25;
   const now = useNow(500);
   const reduce = useReducedMotion();
   const infos = STAGES.map((s) => (record ? stageInfo(s, events, record, now) : null));
@@ -113,21 +113,21 @@ export function StageRail({
                 type="button"
                 onClick={() => onSelect?.(stage)}
                 disabled={state === "pending"}
-                className="pt-[0.35rem] text-left disabled:cursor-default"
+                className="min-w-0 pt-2 text-left disabled:cursor-default"
                 aria-current={isFocus ? "step" : undefined}
               >
                 <div
                   className={cn(
-                    "text-xl leading-tight",
-                    isFocus ? "font-bold text-ink" : state === "pending" ? "font-medium text-ink-2" : "font-semibold text-ink",
+                    "text-xl leading-tight transition-colors duration-[var(--dur-base)]",
+                    isFocus ? "font-black text-ink" : state === "pending" ? "font-medium text-ink-2" : "font-semibold text-ink",
                   )}
                 >
                   {STAGE_LABEL[stage]}
                 </div>
                 {agents[stage] && (
-                  <div className="text-base leading-tight font-medium whitespace-nowrap text-ink-2" data-testid={`rail-agent-${stage}`}>
+                  <span className="sr-only" data-testid={`rail-agent-${stage}`}>
                     {agents[stage]}
-                  </div>
+                  </span>
                 )}
                 {stage === "REFLECT" && replans > 0 ? (
                   <div className="flex items-center gap-1.5 text-xl leading-tight font-semibold text-risk-ink" data-testid="rail-replans">
@@ -164,7 +164,7 @@ function SubLabel({
     tone = "font-bold text-asphalt";
   } else if (stage === "VERIFY" && state === "waiting" && record?.verify_due_at && now) {
     const s = Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000));
-    text = `SAP check in ${s} s`;
+    text = `Check in ${s} s`;
   } else if (state === "running") text = "Working…";
   else if (state === "escalated") {
     text = "Escalated";

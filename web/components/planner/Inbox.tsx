@@ -13,7 +13,10 @@ import { STAGE_LABEL } from "@/lib/stages";
 import type { InboxCase } from "@/lib/useInbox";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
-import { GantrySign, RouteShield, SignHeading, StatusPlate, TierPlate, WarningPlate, type PlateTone } from "../signs";
+import { useCountUp } from "@/lib/motion";
+import { Reveal } from "../Reveal";
+import { Figure } from "../Figure";
+import { CARD, GantrySign, RouteShield, SignHeading, StatusPlate, TierPlate, WarningPlate, type PlateTone } from "../signs";
 import { Button } from "../ui/button";
 
 const SHORT: Record<string, string> = {
@@ -25,13 +28,16 @@ const SHORT: Record<string, string> = {
 
 type Group = "needs" | "reopened" | "escalated" | "running" | "resolved";
 
-const GROUPS: { id: Group; label: string; tone: PlateTone; empty: string }[] = [
-  { id: "needs", label: "Needs you", tone: "needs", empty: "Nothing waits for your decision." },
-  { id: "reopened", label: "Reopened", tone: "rejected", empty: "No reopened cases. A case reopens when SAP shows that an executed fix did not hold." },
-  { id: "escalated", label: "Escalated", tone: "escalated", empty: "No escalated cases. SIAGA hands a case to you when evidence is missing, no plan is feasible, or its budget runs out." },
-  { id: "running", label: "Running", tone: "running", empty: "Nothing running. A new WhatsApp signal or forwarder PDF opens a case here." },
-  { id: "resolved", label: "Resolved", tone: "verified", empty: "Resolved cases appear here after SIAGA confirms coverage in SAP." },
+const GROUPS: { id: Group; label: string; tone: PlateTone }[] = [
+  { id: "needs", label: "Needs you", tone: "needs" },
+  { id: "reopened", label: "Reopened", tone: "rejected" },
+  { id: "escalated", label: "Escalated", tone: "escalated" },
+  { id: "running", label: "Running", tone: "running" },
+  { id: "resolved", label: "Resolved", tone: "verified" },
 ];
+
+/** Stagger for a list entrance: 70 ms apart, at most five steps. */
+const stagger = (i: number) => Math.min(i, 4) * 70;
 
 function groupOf(status: string): Group {
   if (status === "AWAITING_APPROVAL") return "needs";
@@ -70,44 +76,72 @@ export function Inbox({
   for (const c of cases) groups[groupOf(c.record.status)].push(c);
   groups.needs.sort((a, b) => firstApproveBy(a).localeCompare(firstApproveBy(b)));
   const needs = groups.needs.length;
+  const others = GROUPS.filter((g) => g.id !== "needs");
 
   return (
-    <main className="mx-auto grid max-w-[1440px] gap-10 px-6 py-8 lg:grid-cols-[minmax(0,1fr)_300px]" data-testid="inbox">
-      <div className="min-w-0 space-y-8">
-        <div>
+    <main className="mx-auto grid max-w-[1440px] gap-8 px-8 py-8 lg:grid-cols-[minmax(0,1fr)_280px]" data-testid="inbox">
+      <div className="flex min-w-0 flex-col gap-8">
+        <div className="flex flex-col gap-1">
           <h1 className="text-4xl font-black">Inbox</h1>
-          <p className="mt-1 text-base text-ink-2" data-testid="inbox-summary">
+          <p className="text-base text-ink-2" data-testid="inbox-summary">
             {!loaded
               ? "Loading cases."
               : needs
-                ? `${needs} case${needs === 1 ? "" : "s"} need${needs === 1 ? "s" : ""} your decision. Sorted by approve-by time.`
+                ? `${needs} case${needs === 1 ? "" : "s"} need${needs === 1 ? "s" : ""} your decision, by approve-by time.`
                 : cases.length
                   ? "Nothing needs your decision right now."
                   : "No cases yet. Start one from the demo inputs, or send the WhatsApp signal."}
           </p>
         </div>
-        {GROUPS.map((g) => (
-          <section key={g.id} className="space-y-3" data-testid={`inbox-${g.id}`}>
-            <StatusPlate tone={g.tone} count={groups[g.id].length} className="px-3 py-1 text-sm">
-              {g.label}
-            </StatusPlate>
-            {groups[g.id].length === 0 ? (
-              <p className="text-base text-ink-2">{g.empty}</p>
-            ) : g.id === "needs" ? (
-              groups.needs.map((c) => <NeedsYouCard key={c.record.case_id} c={c} now={now} onOpen={onOpen} />)
-            ) : (
-              groups[g.id].map((c) => <CaseRow key={c.record.case_id} c={c} onOpen={onOpen} />)
-            )}
-          </section>
-        ))}
+
+        <section className="flex flex-col gap-4" data-testid="inbox-needs">
+          <StatusPlate tone="needs" count={needs} className="self-start px-4 text-sm">
+            Needs you
+          </StatusPlate>
+          {needs === 0 ? (
+            <p className="text-base text-ink-2">Nothing waits for your decision.</p>
+          ) : (
+            groups.needs.map((c, i) => (
+              <Reveal key={c.record.case_id} delay={stagger(i)}>
+                <NeedsYouCard c={c} now={now} onOpen={onOpen} />
+              </Reveal>
+            ))
+          )}
+        </section>
+
+        {/* the other groups as one row of count tiles; their cases are listed under it */}
+        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="inbox-tiles" aria-label="Other cases">
+          {others.map((g, i) => (
+            <Reveal as="li" key={g.id} delay={stagger(i)} testId={`inbox-tile-${g.id}`}>
+              <div className={cn(CARD, "flex flex-col gap-1 px-6 py-4")}>
+                <StatusPlate tone={g.tone} className="self-start">
+                  {g.label}
+                </StatusPlate>
+                <span className="text-3xl font-black">{groups[g.id].length}</span>
+              </div>
+            </Reveal>
+          ))}
+        </ul>
+        {others
+          .filter((g) => groups[g.id].length > 0)
+          .map((g) => (
+            <section key={g.id} className="flex flex-col gap-2" data-testid={`inbox-${g.id}`}>
+              <SignHeading>{g.label}</SignHeading>
+              {groups[g.id].map((c, i) => (
+                <Reveal key={c.record.case_id} delay={stagger(i)}>
+                  <CaseRow c={c} onOpen={onOpen} />
+                </Reveal>
+              ))}
+            </section>
+          ))}
       </div>
-      <aside className="space-y-8">
+      <aside className="flex flex-col gap-8">
         <DemoInputs onStarted={onStarted} disabled={busy} onReset={onReset} />
         <div>
-          <SignHeading className="mb-3">What SIAGA may do alone</SignHeading>
-          <div className="space-y-3">
+          <SignHeading className="mb-4">What SIAGA may do alone</SignHeading>
+          <div className="flex flex-col gap-2">
             {[0, 1, 2, 3].map((t) => (
-              <TierPlate key={t} tier={t} meaning="long" />
+              <TierPlate key={t} tier={t} meaning="short" />
             ))}
           </div>
         </div>
@@ -124,9 +158,14 @@ function NeedsYouCard({ c, now, onOpen }: { c: InboxCase; now: number | null; on
   const cause = causeSign(r);
   const lane = laneCode(r);
   const dest = plantName(r.affected?.labels, r.affected?.plant ?? "");
+  const atRisk = useCountUp(r.risk?.max_exposure ?? null, juta, { id: `inbox-${r.case_id}-at-risk` });
+  const cost = r.summary ? (r.summary.case_cost ?? r.summary.chosen_cost) : null;
+  const planCost = useCountUp(cost, juta, { id: `inbox-${r.case_id}-plan-cost` });
+  const figure = (v: number | null, shown: string | null) => (v === null ? "Not yet" : <Figure shown={shown ?? juta(v)} final={juta(v)} />);
   return (
-    <article className="overflow-hidden rounded-[14px] border-4 border-asphalt bg-signal-yellow" data-testid="inbox-case">
-      <GantrySign className="rounded-[10px] rounded-b-none">
+    // the one heavy sign on the inbox: the green gantry with its white inner line
+    <article className="overflow-hidden rounded-[12px] bg-signal-yellow" data-testid="inbox-case">
+      <GantrySign className="rounded-b-none">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {lane && <RouteShield code={lane} />}
           <span className="text-2xl font-black tracking-wide uppercase">{corridor(r) ?? caseTitle(r)}</span>
@@ -139,36 +178,39 @@ function NeedsYouCard({ c, now, onOpen }: { c: InboxCase; now: number | null; on
             </WarningPlate>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-3 border-t-2 border-white/80 pt-3">
-          {[
-            ["At risk", r.risk ? juta(r.risk.max_exposure) : "—"],
-            ["Plan cost", r.summary ? juta(r.summary.case_cost ?? r.summary.chosen_cost) : "—"],
-            [`Cutoff at ${dest}`, r.risk?.deadline ? dayShort(r.day0, r.risk.deadline).replace(" WIB", "") : "—"],
-          ].map(([k, v], i) => (
-            <div key={k} className={cn("px-3", i > 0 && "border-l-2 border-white/80")}>
+        <div className="mt-4 grid grid-cols-3 border-t border-white/40 pt-4">
+          {(
+            [
+              ["At risk", figure(r.risk?.max_exposure ?? null, atRisk)],
+              ["Plan cost", figure(cost, planCost)],
+              [`Cutoff at ${dest}`, r.risk?.deadline ? dayShort(r.day0, r.risk.deadline).replace(" WIB", "") : "Not yet"],
+            ] as const
+          ).map(([k, v], i) => (
+            <div key={k} className={cn("flex flex-col gap-1 px-4", i > 0 && "border-l border-white/40")}>
               <div className="text-sm font-bold">{k}</div>
               <div className="text-2xl font-black">{v}</div>
             </div>
           ))}
         </div>
       </GantrySign>
-      <div className="flex flex-wrap items-center gap-3 px-6 py-3 text-asphalt">
+      <div className="flex flex-wrap items-center gap-4 px-6 py-4 text-asphalt">
         <span className="font-bold">
           Approve {SHORT[action?.kind ?? ""] ?? "action"} ({pending ? juta(pending.card.cost) : ""})
           {pending?.card.approve_by ? ` by ${dayShort(r.day0, pending.card.approve_by)}` : ""}
         </span>
         {left && (
-          <span className={cn("ml-auto rounded-[6px] px-2.5 py-1 font-mono text-sm font-bold", left.expired ? "bg-stop-red text-white" : "bg-asphalt text-signal-yellow")}>
+          <span className={cn("ml-auto rounded-[6px] px-2 py-1 font-mono text-sm font-bold", left.expired ? "bg-stop-red text-white" : "bg-asphalt text-signal-yellow")}>
             {left.expired ? "Expired" : `${left.text} left`}
           </span>
         )}
-        <button
+        <Button
           onClick={() => onOpen(r.case_id)}
           data-testid="open-case"
-          className={cn("inline-flex min-h-11 items-center gap-2 text-sm font-black tracking-[0.1em] uppercase hover:underline", !left && "ml-auto")}
+          variant="outline"
+          className={cn("text-sm tracking-[0.1em] uppercase", !left && "ml-auto")}
         >
-          Open case <ArrowRight className="size-4" aria-hidden />
-        </button>
+          Open case <ArrowRight aria-hidden />
+        </Button>
       </div>
     </article>
   );
@@ -184,10 +226,7 @@ function CaseRow({ c, onOpen }: { c: InboxCase; onOpen: (id: string) => void }) 
   else if (r.status === "REOPENED") detail = "SAP no longer shows the planned supply arriving in time";
   else detail = r.stage ? `At ${STAGE_LABEL[r.stage as keyof typeof STAGE_LABEL] ?? r.stage}` : "Starting";
   return (
-    <article
-      className="flex flex-wrap items-center gap-4 rounded-[12px] border-2 border-asphalt bg-road-white px-4 py-3"
-      data-testid="inbox-case"
-    >
+    <article className={cn(CARD, "flex flex-wrap items-center gap-4 px-6 py-4")} data-testid="inbox-case">
       {lane && <RouteShield code={lane} />}
       <div className="min-w-0 flex-1">
         <div className="font-black">{caseTitle(r)}</div>
@@ -195,17 +234,14 @@ function CaseRow({ c, onOpen }: { c: InboxCase; onOpen: (id: string) => void }) 
           <span className="font-mono">{shortId(r.case_id)}</span> · {detail}
         </div>
       </div>
-      <button
-        onClick={() => onOpen(r.case_id)}
-        className="inline-flex min-h-11 items-center gap-2 text-sm font-black tracking-[0.1em] uppercase hover:underline"
-      >
-        Open case <ArrowRight className="size-4" aria-hidden />
-      </button>
+      <Button variant="link" className="text-sm tracking-[0.1em] uppercase" onClick={() => onOpen(r.case_id)}>
+        Open case <ArrowRight aria-hidden />
+      </Button>
     </article>
   );
 }
 
-/** Demo inputs: dashed so they read as demo-only. */
+/** Demo inputs, labelled as demo-only. */
 function DemoInputs({ onStarted, disabled, onReset }: { onStarted: (id: string) => void; disabled: boolean; onReset: () => void }) {
   const [text, setText] = useState("");
   const [pdf, setPdf] = useState<File | null>(null);
@@ -230,9 +266,12 @@ function DemoInputs({ onStarted, disabled, onReset }: { onStarted: (id: string) 
   }
 
   return (
-    <section className="rounded-[12px] border-2 border-dashed border-asphalt-muted p-4" data-testid="signal-inbox">
-      <SignHeading className="mb-3">Demo inputs</SignHeading>
-      <div className="space-y-2">
+    <section className={cn(CARD, "p-6")} data-testid="signal-inbox">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <SignHeading>Demo inputs</SignHeading>
+        <StatusPlate tone="muted">Demo only</StatusPlate>
+      </div>
+      <div className="flex flex-col gap-2">
         <Button
           variant="outline"
           className="w-full justify-start"
@@ -259,7 +298,7 @@ function DemoInputs({ onStarted, disabled, onReset }: { onStarted: (id: string) 
             rows={3}
             lang="id"
             placeholder="Or paste a driver's WhatsApp message"
-            className="w-full rounded-[8px] border-2 border-curb bg-road-white p-2 text-sm text-asphalt italic"
+            className="w-full rounded-[8px] bg-road-white p-2 text-sm text-asphalt italic inset-ring inset-ring-hairline"
           />
         </label>
         <div className="flex items-center gap-2 text-sm">

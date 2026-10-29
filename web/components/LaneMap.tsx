@@ -29,12 +29,14 @@ const ANCHOR: Record<Anchor, { transform: string; align: string }> = {
   "bottom-right": { transform: `translate(-0.5rem, ${GAP})`, align: "items-start" },
 };
 
+// filled plates; white ones carry the grey hairline. Colours change over 400 ms when a
+// route's state changes (the map stays mounted and morphs).
 const TONE: Record<PlateTone, string> = {
-  green: "bg-sign-green text-white border-white shadow-[0_0_0_2px_var(--sign-green)]",
-  white: "bg-road-white text-asphalt border-asphalt",
-  yellow: "bg-signal-yellow text-asphalt border-asphalt",
-  red: "bg-stop-red text-white border-stop-red",
-  asphalt: "bg-asphalt text-white border-asphalt",
+  green: "bg-sign-green text-white",
+  white: "bg-road-white text-asphalt inset-ring inset-ring-hairline",
+  yellow: "bg-signal-yellow text-asphalt",
+  red: "bg-stop-red text-white",
+  asphalt: "bg-asphalt text-white",
 };
 
 function pos(x: number, y: number): CSSProperties {
@@ -46,7 +48,8 @@ function PlateBox({ plate, size }: { plate: Plate; size: "sm" | "md" }) {
     <span
       data-testid={plate.testId}
       className={cn(
-        "inline-flex items-center gap-1 rounded-[5px] border-2 px-1.5 py-px leading-tight font-black tracking-[0.05em] whitespace-nowrap uppercase",
+        "inline-flex items-center gap-1 rounded-[5px] px-2 py-0.5 leading-tight font-black tracking-[0.05em] whitespace-nowrap uppercase",
+        "transition-[background-color,color,box-shadow] duration-[400ms] ease-[var(--ease-standard)]",
         size === "sm" ? "text-xs" : "text-sm",
         TONE[plate.tone],
       )}
@@ -134,8 +137,9 @@ export function LaneMap({
     <figure
       data-testid={testId}
       className={cn(
-        "shrink-0 overflow-x-auto overflow-y-hidden rounded-[12px] border-[3px] border-asphalt bg-sea",
-        mini && "rounded-[8px] border-2",
+        // the hairline is an outline: it is painted over the map, never changes its size
+        "shrink-0 overflow-x-auto overflow-y-hidden rounded-[12px] bg-sea outline outline-1 -outline-offset-1 outline-hairline",
+        mini && "rounded-[8px]",
         className,
       )}
       aria-label={model.title}
@@ -234,7 +238,7 @@ export function LaneMap({
       </div>
       {!mini && model.legend.length > 0 && (
         <ul
-          className="flex flex-wrap gap-x-4 gap-y-0.5 border-t-2 border-asphalt bg-road-white px-2 py-1 text-xs font-bold text-asphalt"
+          className="flex flex-wrap gap-x-4 gap-y-1 border-t border-hairline bg-road-white px-4 py-1 text-xs font-bold text-asphalt"
           aria-label="Legend"
           data-testid="map-legend"
         >

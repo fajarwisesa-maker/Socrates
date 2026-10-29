@@ -16,13 +16,13 @@ export function Panel({
   return (
     <section
       data-testid={testId}
-      className={`rounded-[12px] border-2 border-asphalt bg-road-white ${className}`}
+      className={`rounded-[12px] bg-road-white inset-ring inset-ring-hairline ${className}`}
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-asphalt px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-divider px-6 py-4">
         <h2 className="sign-label text-sm text-asphalt">{title}</h2>
         {right}
       </header>
-      <div className="p-4">{children}</div>
+      <div className="px-6 py-4">{children}</div>
     </section>
   );
 }

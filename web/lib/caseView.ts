@@ -120,11 +120,10 @@ export function stageNote(stage: Stage, record: CaseRecord, events: CaseEvent[],
   return null;
 }
 
-/** "KM 2 OF 7 · IMPACT AGENT" */
+/** "KM 2 · Impact Agent" (the agent is named here, not on the rail); "KM 2 of 7" in v1 */
 export function sheetKicker(stage: Stage, agent: string | undefined): string {
-  return [`KM ${["PERCEIVE", "ASSESS", "PLAN", "SIMULATE", "REFLECT", "ACT", "VERIFY"].indexOf(stage) + 1} of 7`, agent]
-    .filter(Boolean)
-    .join(" · ");
+  const km = `KM ${["PERCEIVE", "ASSESS", "PLAN", "SIMULATE", "REFLECT", "ACT", "VERIFY"].indexOf(stage) + 1}`;
+  return agent ? `${km} · ${agent}` : `${km} of 7`;
 }
 
 export const SHEET_TITLE: Record<Stage, string> = {

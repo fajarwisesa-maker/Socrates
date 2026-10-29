@@ -2,9 +2,10 @@
 
 import { Check, X } from "lucide-react";
 import { ApprovalSign } from "@/components/ApprovalSign";
-import { StatusPlate, TierPlate, TIER_MEANING } from "@/components/signs";
-import { juta } from "@/lib/format";
-import { actionTitle, eta } from "@/lib/present";
+import { CARD, StatusPlate } from "@/components/signs";
+import { cn } from "@/lib/utils";
+import { juta, thousands } from "@/lib/format";
+import { actionTitle, eta, plantName } from "@/lib/present";
 import type { Approval, CaseAction, CaseRecord } from "@/lib/types";
 import { Frame } from "./Frame";
 
@@ -56,16 +57,14 @@ export function ActCanvas({
       tone={record.status === "ESCALATED" ? "risk" : "ink"}
     >
       <div className="flex h-full flex-col gap-4">
-        <div className="grid grid-cols-2 items-stretch gap-4">
-          {shown.slice(0, 3).map((a) => {
-            const approval = a.approval_id ? approvals.find((x) => x.approval_id === a.approval_id) : undefined;
-            return approval ? (
-              <ApprovalSign key={a.action_id} approval={approval} record={record} variant="presenter" onDecided={onDecided} />
-            ) : (
-              <ExecutedCard key={a.action_id} action={a} record={record} />
-            );
-          })}
-        </div>
+        {shown.slice(0, 3).map((a) => {
+          const approval = a.approval_id ? approvals.find((x) => x.approval_id === a.approval_id) : undefined;
+          return approval ? (
+            <ApprovalSign key={a.action_id} approval={approval} record={record} variant="presenter" onDecided={onDecided} />
+          ) : (
+            <ExecutedCard key={a.action_id} action={a} record={record} />
+          );
+        })}
         {dropped.length > 0 && (
           <p className="flex items-start gap-2 text-xl text-ink-2" data-testid="dropped-action">
             <X className="mt-1 size-5 shrink-0 text-risk-ink" aria-hidden />
@@ -86,30 +85,30 @@ export function ActCanvas({
   );
 }
 
-/** An action SIAGA executed without asking (Tier 2 or lower). */
+/** An action SIAGA executed without asking (Tier 2 or lower): two short lines. */
 function ExecutedCard({ action: a, record }: { action: CaseAction; record: CaseRecord }) {
   const labels = record.affected?.labels;
   return (
-    <div
-      data-testid="executed-card"
-      className="flex flex-col rounded-[12px] border-[3px] border-sign-green bg-road-white p-4 shadow-[var(--shadow-card)]"
-    >
-      <div className="flex items-center gap-2">
-        <StatusPlate tone="done" icon={<Check className="size-4" strokeWidth={3} aria-hidden />}>
-          Done by SIAGA
+    <div data-testid="executed-card" className={cn(CARD, "px-6 py-4")}>
+      <div className="flex items-center gap-4">
+        <StatusPlate tone="done" className="shrink-0" icon={<Check className="size-4" strokeWidth={3} aria-hidden />}>
+          Done · Tier {a.tier}
         </StatusPlate>
-        <TierPlate tier={a.tier} />
-      </div>
-      <div className="mt-2 text-xl font-black">{actionTitle(a, labels, record.affected?.plant ?? "")}</div>
-      <div className="mt-2 text-[2.25rem] leading-none font-black">{juta(a.cost)}</div>
-      <div className="mt-2 text-lg">
-        SAP{" "}
-        <span className="font-mono font-bold" data-testid="presenter-sap-ref">
-          {a.sap_ref}
+        <span className="min-w-0 truncate text-xl font-black" title={actionTitle(a, labels, record.affected?.plant ?? "")}>
+          {VERB[a.kind] ?? a.kind} · {thousands(a.quantity)} ctn{a.planned?.reference ? ` from ${plantName(labels, a.planned.reference)}` : ""}
         </span>
-        {a.eta && <> · arrives {eta(record, a.eta)}</>}
       </div>
-      <p className="mt-auto pt-2 text-base">{TIER_MEANING[a.tier]?.short ?? ""}: internal and reversible, so no approval needed.</p>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-4 text-lg">
+        <b className="text-2xl leading-none font-black">{juta(a.cost)}</b>
+        <span>
+          SAP{" "}
+          <span className="font-mono font-bold" data-testid="presenter-sap-ref">
+            {a.sap_ref}
+          </span>
+          {a.eta && <> · arrives {eta(record, a.eta)}</>}
+        </span>
+        <span className="text-ink-2">no approval needed</span>
+      </div>
     </div>
   );
 }

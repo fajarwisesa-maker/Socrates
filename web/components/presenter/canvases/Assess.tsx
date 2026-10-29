@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { dayShort, juta, pct, thousands } from "@/lib/format";
 import { delayChip } from "@/lib/present";
 import { cn } from "@/lib/utils";
@@ -37,9 +38,9 @@ export function AssessCanvas({ record, round }: { record: CaseRecord; round: num
             // the order cards turn red as the risk function reports 100 %
             <motion.div
               key={o.order}
-              className="rounded-[12px] border-[3px] px-4 py-2.5"
-              initial={reduce ? false : { backgroundColor: "#ffffff", borderColor: "#c9cac4" }}
-              animate={{ backgroundColor: "#f8e1e4", borderColor: "#b00d28" }}
+              className="rounded-[12px] px-6 py-2"
+              initial={reduce ? false : { backgroundColor: "#ffffff", boxShadow: "inset 0 0 0 1px #d8d9d3" }}
+              animate={{ backgroundColor: "#f8e1e4", boxShadow: "inset 0 0 0 2px #b00d28" }}
               transition={{ delay: reduce ? 0 : 0.6, duration: 0.6 }}
             >
               <div className="flex items-center justify-between gap-3">

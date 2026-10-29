@@ -6,7 +6,7 @@ import { firstSentence, type PrecedentHit, type ReplanReason } from "@/lib/planV
 import { period, STRATEGY } from "@/lib/present";
 import type { Candidate } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AgentWritten, StatusPlate } from "./signs";
+import { AgentWritten, CARD, StatusPlate } from "./signs";
 
 const ICON: Record<string, LucideIcon> = {
   stock_transfer: Truck,
@@ -22,9 +22,9 @@ export function StrategyPlate({ strategy, onSign = false, large = false }: { str
     <span
       data-strategy={strategy}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-[6px] border-2 bg-road-white font-bold whitespace-nowrap",
-        onSign ? "border-road-white text-sign-green" : "border-asphalt text-asphalt",
-        large ? "px-2.5 py-1 text-lg" : "px-2 py-0.5 text-sm",
+        "inline-flex items-center gap-1 rounded-[6px] bg-road-white font-bold whitespace-nowrap",
+        onSign ? "text-sign-green" : "text-asphalt inset-ring inset-ring-hairline",
+        large ? "px-2 py-1 text-lg" : "px-2 py-1 text-sm",
       )}
     >
       {Icon && <Icon className={large ? "size-5" : "size-4"} strokeWidth={2.5} aria-hidden />}
@@ -50,22 +50,22 @@ export function CandidateSign({
     <div
       data-testid={`candidate-${candidate.option_id}`}
       className={cn(
-        "flex items-center gap-3 rounded-[12px] bg-sign-green text-white shadow-[inset_0_0_0_3px_var(--sign-green),inset_0_0_0_5px_#fff,var(--shadow-sign)]",
-        large ? "px-5 py-3" : "px-4 py-3",
+        "flex items-center gap-4 rounded-[12px] bg-sign-green text-white",
+        large ? "px-6 py-4" : "px-6 py-4",
         className,
       )}
     >
       <span
         className={cn(
           "flex shrink-0 items-center justify-center rounded-[6px] bg-road-white font-mono font-black text-sign-green",
-          large ? "h-11 min-w-12 px-1.5 text-xl" : "h-9 min-w-10 px-1 text-base",
+          large ? "h-11 min-w-12 px-2 text-xl" : "h-9 min-w-10 px-1 text-base",
         )}
       >
         {candidate.option_id}
       </span>
       <div className="min-w-0 flex-1">
         <div className={cn("leading-tight font-black", large ? "text-2xl" : "text-xl")}>{candidate.label}</div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap gap-2">
           {candidate.strategies.map((s) => (
             <StrategyPlate key={s} strategy={s} onSign large={large} />
           ))}
@@ -82,8 +82,8 @@ export function ReplanPlate({ reason, large = false }: { reason: ReplanReason; l
     <div
       data-testid="replan-reason"
       className={cn(
-        "flex flex-wrap items-center gap-3 rounded-[12px] border-4 border-stop-red bg-road-white",
-        large ? "px-4 py-2.5" : "px-4 py-2",
+        "flex flex-wrap items-center gap-4 rounded-[12px] bg-road-white inset-ring-2 inset-ring-stop-red",
+        large ? "px-6 py-2" : "px-6 py-2",
       )}
     >
       <StatusPlate tone="rejected" className={large ? "text-sm" : undefined}>
@@ -113,8 +113,8 @@ export function PrecedentPlate({
 }) {
   const matches = hit.tags.filter((t) => strategies.includes(t));
   return (
-    <div data-testid={`precedent-${hit.id}`} className="rounded-[12px] border-[3px] border-asphalt bg-road-white">
-      <div className={cn("flex flex-wrap items-center gap-2 border-b-2 border-asphalt", large ? "px-4 py-2" : "px-3 py-1.5")}>
+    <div data-testid={`precedent-${hit.id}`} className={CARD}>
+      <div className={cn("flex flex-wrap items-center gap-2 border-b border-divider", large ? "px-6 py-2" : "px-6 py-2")}>
         <BookOpen className={large ? "size-5" : "size-4"} aria-hidden />
         <span className="font-mono text-sm font-bold">{hit.id}</span>
         {hit.period && <span className="font-mono text-sm">{period(hit.period)}</span>}
@@ -123,7 +123,7 @@ export function PrecedentPlate({
           {hit.synthetic && <StatusPlate tone="muted">Synthetic precedent</StatusPlate>}
         </span>
       </div>
-      <div className={large ? "px-4 py-3" : "px-3 py-2"}>
+      <div className={large ? "px-6 py-2" : "px-6 py-4"}>
         <div className={cn("leading-snug font-black", large ? "text-xl" : "text-base")}>{hit.title}</div>
         {hit.lesson && (
           <p className={cn("mt-1 leading-snug", large ? "text-lg" : "text-sm")} data-testid="precedent-lesson">
@@ -131,7 +131,7 @@ export function PrecedentPlate({
           </p>
         )}
         {!large && matches.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="sign-label text-xs">Used here</span>
             {matches.map((s) => (
               <StrategyPlate key={s} strategy={s} />

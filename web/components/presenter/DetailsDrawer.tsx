@@ -40,14 +40,14 @@ export function DetailsDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent data-testid="details-drawer" className="text-base">
-        <div className="border-b-2 border-surface-2 px-6 pt-5 pb-3">
+        <div className="border-b border-divider px-6 pt-6 pb-4">
           <SheetTitle className="text-xl font-bold text-ink">Details · {title}</SheetTitle>
           <SheetDescription className="text-sm text-ink-2">
             Everything behind the canvas, for questions. <Kbd>D</Kbd> or <Kbd>Esc</Kbd> closes.
           </SheetDescription>
         </div>
         <Tabs.Root defaultValue="step" className="flex min-h-0 flex-1 flex-col">
-          <Tabs.List className="flex gap-1 border-b-2 border-surface-2 px-6" aria-label="Details">
+          <Tabs.List className="flex gap-1 border-b border-divider px-6" aria-label="Details">
             {[
               ["step", "This step"],
               ["options", "Options & Critic"],
@@ -59,18 +59,18 @@ export function DetailsDrawer({
                 key={v}
                 value={v}
                 data-testid={`drawer-tab-${v}`}
-                className="-mb-[2px] border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-ink-2 data-[state=active]:border-brand data-[state=active]:text-ink"
+                className="px-4 py-2 text-sm font-semibold text-ink-2 transition-[color,box-shadow] duration-[var(--dur-fast)] data-[state=active]:text-ink data-[state=active]:shadow-[inset_0_-2px_0_var(--brand)]"
               >
                 {label}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            <Tabs.Content value="step" className="space-y-3">
+            <Tabs.Content value="step" className="flex flex-col gap-4">
               {record && <StateNotices size="planner" items={notices(stepEvents, record, false)} />}
               <StepEvents events={stepEvents} />
             </Tabs.Content>
-            <Tabs.Content value="options" className="space-y-4">
+            <Tabs.Content value="options" className="flex flex-col gap-4">
               <OptionsTable record={record} />
               <CriticChecks record={record} />
             </Tabs.Content>
@@ -180,7 +180,7 @@ function StepEvents({ events }: { events: CaseEvent[] }) {
 function CriticChecks({ record }: { record: CaseRecord | null }) {
   if (!record?.critic_findings.length) return null;
   return (
-    <section className="space-y-3" data-testid="drawer-critic">
+    <section className="flex flex-col gap-4" data-testid="drawer-critic">
       <h3 className="text-sm font-semibold tracking-wide text-ink-2 uppercase">Critic checks (rules in code)</h3>
       {record.critic_findings.map((f) => (
         <div key={f.option_id} className="text-sm">
@@ -305,7 +305,7 @@ function CaseFacts({
       <button
         onClick={onReset}
         data-testid="drawer-reset"
-        className="rounded-[var(--radius-control)] border-2 border-line px-3 py-2 font-semibold text-ink-2 hover:bg-surface-2"
+        className="rounded-[var(--radius-control)] px-4 py-2 font-semibold text-ink-2 inset-ring-2 inset-ring-asphalt hover:bg-surface-2"
       >
         Reset demo (SAP and cases)
       </button>

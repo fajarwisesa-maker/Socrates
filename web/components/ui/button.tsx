@@ -6,17 +6,24 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-[0.5em] whitespace-nowrap font-extrabold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-[1.1em] [&_svg]:shrink-0",
+  [
+    "inline-flex shrink-0 items-center justify-center gap-[0.5em] whitespace-nowrap font-extrabold",
+    // hover 200ms, press 120ms (active), colours and shadow only: no scaling
+    "transition-[background-color,color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-standard)] active:duration-[var(--dur-press)]",
+    "disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-[1.1em] [&_svg]:shrink-0",
+  ].join(" "),
   {
     variants: {
       variant: {
-        // signs: green = primary / approve; white with an asphalt or red rule = secondary
-        brand: "bg-sign-green text-white shadow-[var(--shadow-sign)] hover:bg-brand-ink",
-        approve: "bg-sign-green text-white shadow-[var(--shadow-sign)] hover:bg-brand-ink",
-        outline: "border-2 border-asphalt bg-road-white text-asphalt hover:bg-surface-2",
+        // primary: filled green (yellow on dark); secondary: a 2px asphalt hairline;
+        // tertiary (`link`): underlined text
+        brand: "bg-sign-green text-white hover:bg-brand-ink active:bg-[#003d22]",
+        approve: "bg-sign-green text-white hover:bg-brand-ink active:bg-[#003d22]",
+        outline: "bg-transparent text-asphalt inset-ring-2 inset-ring-asphalt hover:bg-asphalt/8 active:bg-asphalt/15",
         ghost: "text-ink-2 hover:bg-surface-2 hover:text-ink",
-        danger: "border-2 border-stop-red bg-road-white text-risk-ink hover:bg-risk-soft",
-        stop: "bg-stop-red text-white shadow-[var(--shadow-sign)] hover:bg-risk-ink",
+        danger: "bg-road-white text-risk-ink inset-ring-2 inset-ring-stop-red hover:bg-risk-soft",
+        stop: "bg-stop-red text-white hover:bg-risk-ink active:bg-[#6f0818]",
+        link: "h-auto rounded-[4px] px-0 font-bold text-asphalt underline decoration-2 underline-offset-4 hover:decoration-sign-green",
       },
       size: {
         sm: "h-9 rounded-[8px] px-3 text-sm",
@@ -37,7 +44,7 @@ function Button({
   ...props
 }: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "button";
-  return <Comp data-slot="button" className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <Comp data-slot="button" className={cn(buttonVariants({ variant, size: variant === "link" ? null : size, className }))} {...props} />;
 }
 
 export { Button, buttonVariants };

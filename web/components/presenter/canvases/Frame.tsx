@@ -1,6 +1,11 @@
+import { createContext, useContext } from "react";
+import { CARD } from "@/components/signs";
 import { STAGE_LABEL, STAGES } from "@/lib/stages";
 import type { Stage } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+/** The agent of the stage on screen, named in the kicker ("KM 2 · Assess · Impact Agent"). */
+export const AgentContext = createContext<string | undefined>(undefined);
 
 /** Kicker, one headline sentence, one visual. */
 export function Frame({
@@ -18,11 +23,13 @@ export function Frame({
   tone?: "ink" | "risk" | "human" | "ok";
   children: React.ReactNode;
 }) {
+  const agent = useContext(AgentContext);
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="stage-canvas" data-stage={stage} data-round={round}>
-      <p className="sign-label font-mono text-sm text-asphalt-muted">
-        KM {STAGES.indexOf(stage) + 1} of 7 · {STAGE_LABEL[stage]}
+      <p className="sign-label font-mono text-sm text-asphalt-muted" data-testid="canvas-kicker">
+        KM {STAGES.indexOf(stage) + 1} · {STAGE_LABEL[stage]}
         {kicker ? ` · ${kicker}` : ""}
+        {agent ? ` · ${agent}` : ""}
       </p>
       <h1
         data-testid="canvas-headline"
@@ -35,7 +42,7 @@ export function Frame({
       >
         {headline}
       </h1>
-      <div className="mt-5 min-h-0 flex-1">{children}</div>
+      <div className="mt-6 min-h-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -50,7 +57,7 @@ export function Card({
   testId?: string;
 }) {
   return (
-    <div data-testid={testId} className={cn("rounded-[12px] border-2 border-asphalt bg-road-white p-5", className)}>
+    <div data-testid={testId} className={cn(CARD, "p-6", className)}>
       {children}
     </div>
   );

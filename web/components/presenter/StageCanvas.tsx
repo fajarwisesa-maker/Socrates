@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { notices } from "@/lib/notices";
 import { stageRounds } from "@/lib/present";
 import type { Approval, CaseEvent, CaseRecord, Stage } from "@/lib/types";

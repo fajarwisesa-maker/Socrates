@@ -24,30 +24,57 @@ export function Logo({ height = 28, className }: { height?: number; className?: 
   );
 }
 
-/** Green panel with a white inner border: case header, impact, outcome, approved. */
+/**
+ * Green panel. The heavy form (a white inner line) is the one sign per screen: the case
+ * header, or the inbox's "Needs you" sign. `flat` is the same green with no line: impact,
+ * outcome, candidates.
+ */
 export function GantrySign({
   children,
   className,
   testId,
   as: Tag = "div",
   label,
+  flat = false,
 }: {
   children: ReactNode;
   className?: string;
   testId?: string;
   as?: "div" | "section" | "header";
   label?: string;
+  flat?: boolean;
 }) {
   return (
     <Tag
       data-testid={testId}
       aria-label={label}
       className={cn(
-        "rounded-[12px] bg-sign-green text-white shadow-[inset_0_0_0_4px_var(--sign-green),inset_0_0_0_7px_#fff,var(--shadow-sign)]",
-        "px-5 py-4",
+        "rounded-[12px] bg-sign-green p-6 text-white",
+        !flat && "shadow-[inset_0_0_0_4px_var(--sign-green),inset_0_0_0_7px_#fff]",
         className,
       )}
     >
+      {children}
+    </Tag>
+  );
+}
+
+/** The card: white, 12px radius, one 1px hairline drawn inside (never changes the size). */
+export const CARD = "rounded-[12px] bg-road-white inset-ring inset-ring-hairline";
+
+export function Card({
+  children,
+  className,
+  testId,
+  as: Tag = "div",
+}: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+  as?: "div" | "section" | "article" | "aside";
+}) {
+  return (
+    <Tag data-testid={testId} className={cn(CARD, "p-6", className)}>
       {children}
     </Tag>
   );
@@ -60,9 +87,9 @@ export function RouteShield({ code, className }: { code: string; className?: str
       data-testid="route-shield"
       aria-label={`Route ${code}`}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center border-[3px] border-asphalt bg-road-white px-3 pt-1 pb-1.5",
+        "inline-flex shrink-0 items-center justify-center bg-road-white px-3 pt-1 pb-1.5 inset-ring-2 inset-ring-asphalt",
         "font-mono text-sm leading-none font-bold tracking-wide whitespace-nowrap text-asphalt uppercase",
-        "rounded-t-[8px] rounded-b-[45%_60%] shadow-[var(--shadow-sign)]",
+        "rounded-t-[8px] rounded-b-[45%_60%]",
         className,
       )}
     >
@@ -71,7 +98,7 @@ export function RouteShield({ code, className }: { code: string; className?: str
   );
 }
 
-/** Signal-yellow plate, 4px asphalt border: approval, "needs you", the disruption cause. */
+/** Signal-yellow plate: "needs you", the disruption cause. Filled; `lg` has a 2px asphalt hairline. */
 export function WarningPlate({
   children,
   className,
@@ -87,10 +114,10 @@ export function WarningPlate({
     <div
       data-testid={testId}
       className={cn(
-        "border-asphalt bg-signal-yellow text-asphalt shadow-[var(--shadow-sign)]",
-        size === "sm" && "rounded-[8px] border-[3px] px-2 py-0.5",
-        size === "md" && "rounded-[10px] border-4 px-3 py-1.5",
-        size === "lg" && "rounded-[12px] border-4 p-5",
+        "bg-signal-yellow text-asphalt transition-colors duration-[var(--dur-base)]",
+        size === "sm" && "rounded-[6px] px-2 py-0.5",
+        size === "md" && "rounded-[8px] px-3 py-1",
+        size === "lg" && "rounded-[12px] px-8 py-6 inset-ring-2 inset-ring-asphalt",
         className,
       )}
     >
@@ -101,14 +128,15 @@ export function WarningPlate({
 
 export type PlateTone = "needs" | "done" | "rejected" | "verified" | "running" | "escalated" | "muted";
 
+// filled plates, no border; white plates carry the 1px grey hairline
 const PLATE: Record<PlateTone, string> = {
-  needs: "bg-signal-yellow text-asphalt border-asphalt",
-  done: "bg-sign-green text-white border-sign-green",
-  rejected: "bg-stop-red text-white border-stop-red",
-  verified: "bg-road-white text-brand-ink border-sign-green",
-  running: "bg-road-white text-asphalt border-asphalt",
-  escalated: "bg-asphalt text-white border-asphalt",
-  muted: "bg-road-white text-asphalt-muted border-curb",
+  needs: "bg-signal-yellow text-asphalt",
+  done: "bg-sign-green text-white",
+  rejected: "bg-stop-red text-white",
+  verified: "bg-road-white text-brand-ink inset-ring inset-ring-hairline",
+  running: "bg-road-white text-asphalt inset-ring inset-ring-hairline",
+  escalated: "bg-asphalt text-white",
+  muted: "bg-road-white text-asphalt-muted inset-ring inset-ring-hairline",
 };
 
 /** Small rectangular status plate: NEEDS YOU, DONE AUTOMATICALLY, REJECTED, VERIFIED… */
@@ -132,7 +160,8 @@ export function StatusPlate({
       data-testid={testId}
       data-tone={tone}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-[6px] border-2 px-2 py-0.5 text-xs leading-tight font-black tracking-[0.1em] whitespace-nowrap uppercase",
+        "inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-xs leading-tight font-black tracking-[0.1em] whitespace-nowrap uppercase",
+        "transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]",
         PLATE[tone],
         className,
       )}
@@ -147,11 +176,11 @@ export function StatusPlate({
 export type PostState = "done" | "current" | "flagged" | "pending" | "verified";
 
 const POST: Record<PostState, string> = {
-  done: "bg-sign-green text-white border-sign-green",
-  verified: "bg-sign-green text-white border-sign-green",
-  current: "bg-signal-yellow text-asphalt border-asphalt",
-  flagged: "bg-stop-red text-white border-stop-red",
-  pending: "bg-road-white text-asphalt border-asphalt",
+  done: "bg-sign-green text-white",
+  verified: "bg-sign-green text-white",
+  current: "bg-signal-yellow text-asphalt",
+  flagged: "bg-stop-red text-white",
+  pending: "bg-road-white text-asphalt inset-ring inset-ring-hairline",
 };
 
 /** 42px kilometre post with "KM" over the stage number (the stage rail). */
@@ -161,7 +190,8 @@ export function KmPost({ n, state, className }: { n: number; state: PostState; c
       aria-hidden
       data-post={state}
       className={cn(
-        "relative z-10 flex h-[2.75rem] w-[2.625rem] shrink-0 flex-col items-center justify-center rounded-[6px] border-2 leading-none",
+        "relative z-10 flex h-[2.75rem] w-[2.625rem] shrink-0 flex-col items-center justify-center rounded-[6px] leading-none",
+        "transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]",
         POST[state],
         className,
       )}
@@ -189,8 +219,8 @@ export function LaneDivider({ label, className }: { label: string; className?: s
 }
 
 export const TIER_MEANING: Record<number, { short: string; long: string }> = {
-  0: { short: "Observed", long: "SAP reads, risk, simulations, status checks." },
-  1: { short: "Drafted", long: "Drafts such as an RFQ. Nothing is sent." },
+  0: { short: "Reads and checks", long: "SAP reads, risk, simulations, status checks." },
+  1: { short: "Drafts only", long: "Drafts such as an RFQ. Nothing is sent." },
   2: { short: "Done automatically", long: "Internal, reversible actions under Rp 50 jt." },
   3: { short: "Needs your approval", long: "Supplier POs, spot air, customer date changes, or Rp 50 jt and above." },
 };
@@ -199,14 +229,14 @@ export const TIER_MEANING: Record<number, { short: string; long: string }> = {
 export function TierPlate({ tier, meaning, className }: { tier: number; meaning?: "short" | "long"; className?: string }) {
   const tone =
     tier >= 3
-      ? "bg-signal-yellow text-asphalt border-asphalt"
+      ? "bg-signal-yellow text-asphalt"
       : tier === 2
-        ? "bg-sign-green text-white border-sign-green"
-        : "bg-road-white text-asphalt border-asphalt";
+        ? "bg-sign-green text-white"
+        : "bg-road-white text-asphalt inset-ring inset-ring-hairline";
   const plate = (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-[6px] border-2 px-1.5 py-0.5 text-xs leading-tight font-black tracking-[0.08em] whitespace-nowrap uppercase",
+        "inline-flex shrink-0 items-center rounded-[6px] px-2 py-1 text-xs leading-tight font-black tracking-[0.08em] whitespace-nowrap uppercase",
         tone,
         !meaning && className,
       )}
@@ -217,10 +247,16 @@ export function TierPlate({ tier, meaning, className }: { tier: number; meaning?
   if (!meaning) return plate;
   const m = TIER_MEANING[tier];
   return (
-    <span className={cn("flex items-start gap-3", className)}>
+    <span className={cn("flex items-center gap-2", className)}>
       {plate}
       <span className="text-sm text-asphalt">
-        <b className="font-bold">{m?.short}.</b> {meaning === "long" ? m?.long : null}
+        {meaning === "long" ? (
+          <>
+            <b className="font-bold">{m?.short}.</b> {m?.long}
+          </>
+        ) : (
+          m?.short
+        )}
       </span>
     </span>
   );

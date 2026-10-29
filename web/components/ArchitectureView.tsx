@@ -123,8 +123,8 @@ function Node({ box, children }: { box: Box; children?: React.ReactNode }) {
       data-testid={`arch-${box.id}`}
       data-live={box.live ? "1" : "0"}
       className={cn(
-        "rounded-[var(--radius-control)] border-2 px-3 py-2",
-        box.live ? "border-brand bg-brand-soft" : "border-dashed border-line bg-surface",
+        "rounded-[var(--radius-control)] px-4 py-2",
+        box.live ? "bg-brand-soft inset-ring-2 inset-ring-brand" : "bg-surface inset-ring inset-ring-hairline",
       )}
     >
       <div className={cn("text-sm font-semibold", box.live ? "text-brand-ink" : "text-ink-2")}>{box.title}</div>
@@ -159,10 +159,10 @@ export default function ArchitectureView({ config, record }: { config: Config | 
     <div data-testid="architecture" className="space-y-1">
       <div className="mb-2 flex flex-wrap gap-3 text-xs text-ink-2">
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm border-2 border-brand bg-brand-soft" /> in this run
+          <span className="inline-block size-3 rounded-sm bg-brand-soft inset-ring-2 inset-ring-brand" /> in this run
         </span>
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm border-2 border-dashed border-line bg-surface" /> not in
+          <span className="inline-block size-3 rounded-sm bg-surface inset-ring inset-ring-hairline" /> not in
           this run
         </span>
         <span>“now” = what runs here today · “target” = the AWS / SAP service in the design</span>

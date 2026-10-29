@@ -55,8 +55,8 @@ export function PlannerHeader({
               data-testid={`nav-${id}`}
               aria-current={nav === id ? "page" : undefined}
               className={cn(
-                "min-h-11 border-b-4 text-sm font-black tracking-[0.1em] uppercase",
-                nav === id ? "border-signal-yellow text-white" : "border-transparent text-white/80 hover:text-white",
+                "min-h-11 text-sm font-black tracking-[0.1em] uppercase transition-[color,box-shadow] duration-[var(--dur-fast)]",
+                nav === id ? "text-white shadow-[inset_0_-4px_0_var(--signal-yellow)]" : "text-white/80 hover:text-white",
               )}
             >
               {label}
@@ -67,7 +67,7 @@ export function PlannerHeader({
           {config?.replay && (
             <span
               data-testid="replay-badge"
-              className="rounded-[4px] border-2 border-white px-2 py-0.5 text-xs font-black tracking-[0.08em] uppercase"
+              className="rounded-[6px] bg-road-white px-2 py-1 text-xs font-black tracking-[0.08em] text-asphalt uppercase"
               title={config.replay_source ? `Recorded ${config.replay_source.recorded_at}` : "Recorded run"}
             >
               REPLAY · recorded run{config.replay_source ? ` (${config.replay_source.provider})` : ""}

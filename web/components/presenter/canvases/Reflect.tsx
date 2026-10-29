@@ -1,7 +1,8 @@
 "use client";
 
 import { RotateCcw, ShieldCheck, XCircle } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { juta } from "@/lib/format";
 import { stageRounds } from "@/lib/present";
 import type { CaseEvent, CaseRecord, CriticFinding } from "@/lib/types";
@@ -83,7 +84,7 @@ export function ReflectCanvas({ record, events, round }: { record: CaseRecord; e
           />
         ) : thisRoundRejected ? (
           <motion.div
-            className="flex h-full flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border-2 border-dashed border-line p-5 text-center text-xl text-ink-2"
+            className="flex h-full flex-col items-center justify-center gap-4 rounded-[var(--radius-card)] bg-surface-2 p-6 text-center text-xl text-ink-2"
             initial={reduce ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: reduce ? 0 : 2, duration: 0.4 }}
