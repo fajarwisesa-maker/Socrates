@@ -1,9 +1,11 @@
+"use client";
+
 // Schematic lane map in the Jalan Tol style (docs/redesign-prompt.md 5). Roads and markers
 // are inline SVG; every word is an HTML plate positioned over it, so the type follows the
 // scale (and Presenter's rem scaling) and stays measurable by the projector check. No map
 // tiles, no library, no network. Built from lib/laneModel.ts.
 import { Check, Truck } from "lucide-react";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { COAST, MAP_H, MAP_W, type Anchor } from "@/lib/laneLayout";
 import { LEGEND_TEXT, type LaneModel, type MapRoad, type Plate, type PlateTone, type RoadState } from "@/lib/laneModel";
 import { cn } from "@/lib/utils";
@@ -52,6 +54,8 @@ function PlateBox({ plate, size }: { plate: Plate; size: "sm" | "md" }) {
         "transition-[background-color,color,box-shadow] duration-[400ms] ease-[var(--ease-standard)]",
         size === "sm" ? "text-xs" : "text-sm",
         TONE[plate.tone],
+        // on Verify the routes turn first, then the DC's coverage plate
+        plate.testId === "map-coverage" && "delay-[400ms]",
       )}
     >
       {plate.icon === "truck" && <Truck className="size-[1.2em] shrink-0" aria-hidden />}
@@ -65,55 +69,91 @@ function path(points: [number, number][]) {
   return points.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
 }
 
-function Road({ road }: { road: MapRoad }) {
-  const d = path(road.points);
-  const common = { d, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  switch (road.state) {
-    case "blocked":
-    case "faded":
-      return (
-        <g opacity={road.state === "faded" ? 0.35 : 1}>
-          <path {...common} stroke="var(--stop-red)" strokeWidth={15} />
-          <path {...common} stroke="url(#siaga-hatch)" strokeWidth={10} strokeLinecap="butt" />
-        </g>
-      );
-    case "candidate":
-      return <path {...common} stroke="#8d8f8b" strokeWidth={8} />;
-    case "pending":
-      return (
-        <g>
-          <path {...common} stroke="var(--asphalt)" strokeWidth={13} />
-          <path {...common} stroke="var(--signal-yellow)" strokeWidth={8} strokeDasharray="14 8" strokeLinecap="butt" />
-        </g>
-      );
-    case "failed":
-      return (
-        <g>
-          <path {...common} stroke="var(--stop-red)" strokeWidth={13} />
-          <path {...common} stroke="#fff" strokeWidth={4} strokeDasharray="10 8" strokeLinecap="butt" />
-        </g>
-      );
-    case "rejected":
-      return (
-        <g>
-          <path {...common} stroke="var(--stop-red)" strokeWidth={13} />
-          <path {...common} stroke="#fff" strokeWidth={7} />
-        </g>
-      );
-    default: // chosen, verified
-      return (
-        <g>
-          <path {...common} stroke="var(--sign-green)" strokeWidth={13} />
-          <path {...common} stroke="#fff" strokeWidth={2} strokeDasharray="10 8" strokeLinecap="butt" />
-        </g>
-      );
+/** Paint per road state: the base stroke (the part that draws in) and an overlay. */
+const PAINT: Record<RoadState, { base: string; width: number; opacity?: number; overlay?: { stroke: string; width: number; dash?: string } }> = {
+  blocked: { base: "var(--stop-red)", width: 15, overlay: { stroke: "url(#siaga-hatch)", width: 10 } },
+  faded: { base: "var(--stop-red)", width: 15, opacity: 0.35, overlay: { stroke: "url(#siaga-hatch)", width: 10 } },
+  candidate: { base: "#8d8f8b", width: 8 },
+  pending: { base: "var(--asphalt)", width: 13, overlay: { stroke: "var(--signal-yellow)", width: 8, dash: "14 8" } },
+  failed: { base: "var(--stop-red)", width: 13, overlay: { stroke: "#fff", width: 4, dash: "10 8" } },
+  rejected: { base: "var(--stop-red)", width: 13, overlay: { stroke: "#fff", width: 7 } },
+  chosen: { base: "var(--sign-green)", width: 13, overlay: { stroke: "#fff", width: 2, dash: "10 8" } },
+  verified: { base: "var(--sign-green)", width: 13, overlay: { stroke: "#fff", width: 2, dash: "10 8" } },
+};
+const EXECUTED: RoadState[] = ["chosen", "verified"];
+
+/**
+ * One road. It draws in from its first point (the source) to its last (the DC) one frame
+ * after it appears, and again when its action is executed (pending or candidate to
+ * chosen). Other state changes transition its colours and opacity in place.
+ */
+function Road({ road, animate = true }: { road: MapRoad; animate?: boolean }) {
+  const executed = EXECUTED.includes(road.state);
+  const [was, setWas] = useState(executed);
+  const [generation, setGeneration] = useState(0);
+  if (was !== executed) {
+    setWas(executed);
+    if (executed) setGeneration((g) => g + 1);
   }
+  return <DrawnRoad key={generation} road={road} animate={animate} />;
+}
+
+function DrawnRoad({ road, animate }: { road: MapRoad; animate: boolean }) {
+  const [drawn, setDrawn] = useState(!animate);
+  useEffect(() => {
+    if (drawn) return;
+    // two frames: the hidden state is painted first, so the transition has a start
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setDrawn(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [drawn]);
+  const d = path(road.points);
+  const paint = PAINT[road.state];
+  const common = { d, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <g
+      data-road={road.id}
+      data-state={road.state}
+      style={{ opacity: paint.opacity ?? 1, transition: "opacity 400ms var(--ease-standard)" }}
+    >
+      <path
+        {...common}
+        pathLength={1}
+        strokeWidth={paint.width}
+        style={{
+          stroke: paint.base,
+          // dash 1, gap 1.1: at offset 1.05 the whole road (and both caps) sits in the gap
+          strokeDasharray: "1 1.1",
+          strokeDashoffset: drawn ? 0 : 1.05,
+          transition: "stroke-dashoffset var(--dur-slow) var(--ease-out), stroke 400ms var(--ease-standard)",
+        }}
+      />
+      {paint.overlay && (
+        <path
+          {...common}
+          strokeWidth={paint.overlay.width}
+          strokeLinecap={paint.overlay.dash || paint.overlay.stroke.startsWith("url") ? "butt" : "round"}
+          strokeDasharray={paint.overlay.dash}
+          style={{
+            stroke: paint.overlay.stroke,
+            opacity: drawn ? 1 : 0,
+            transition: `opacity var(--dur-base) var(--ease-standard) ${animate ? "var(--dur-slow)" : "0ms"}, stroke 400ms var(--ease-standard)`,
+          }}
+        />
+      )}
+    </g>
+  );
 }
 
 function LegendSwatch({ state }: { state: RoadState }) {
   return (
     <svg viewBox="0 0 32 12" className="h-3 w-8 shrink-0" aria-hidden>
-      <Road road={{ id: state, state, text: "", points: [[4, 6], [28, 6]] }} />
+      <Road road={{ id: state, state, text: "", points: [[4, 6], [28, 6]] }} animate={false} />
     </svg>
   );
 }
@@ -196,10 +236,13 @@ export function LaneMap({
                 cx={n.x}
                 cy={n.y}
                 r={8}
-                fill={tone === "yellow" ? "var(--signal-yellow)" : "#fff"}
-                stroke={tone === "green" ? "var(--sign-green)" : tone === "white" ? "#8d8f8b" : "var(--asphalt)"}
                 strokeWidth={4}
                 strokeDasharray={n.kind === "air" ? "4 3" : undefined}
+                style={{
+                  fill: tone === "yellow" ? "var(--signal-yellow)" : "#fff",
+                  stroke: tone === "green" ? "var(--sign-green)" : tone === "white" ? "#8d8f8b" : "var(--asphalt)",
+                  transition: "fill 400ms var(--ease-standard), stroke 400ms var(--ease-standard)",
+                }}
               />
             );
           })}

@@ -3,16 +3,24 @@
 import { notices } from "@/lib/notices";
 import { stageRounds } from "@/lib/present";
 import type { Approval, CaseEvent, CaseRecord, Stage } from "@/lib/types";
-import { ActCanvas } from "./canvases/Act";
-import { AssessCanvas } from "./canvases/Assess";
+import { laneModel } from "@/lib/laneModel";
+import { useNow } from "@/lib/useNow";
+import { ActBody, actHead } from "./canvases/Act";
+import { AssessBody, assessHead } from "./canvases/Assess";
+import { Frame } from "./canvases/Frame";
 import { PerceiveCanvas } from "./canvases/Perceive";
 import { PlanCanvas } from "./canvases/Plan";
 import { ReflectCanvas } from "./canvases/Reflect";
 import { SimulateCanvas } from "./canvases/Simulate";
 import { StateNotices } from "../StateNotices";
-import { VerifyCanvas } from "./canvases/Verify";
+import { VerifyBody, verifyHead } from "./canvases/Verify";
 
-/** One stage (and round) on the canvas, plus the intentional states around it. */
+const MAP_VIEW: Partial<Record<Stage, "assess" | "act" | "verify">> = { ASSESS: "assess", ACT: "act", VERIFY: "verify" };
+
+/**
+ * One stage (and round) on the canvas, plus the intentional states around it. Mounted once
+ * per case: each step's content is keyed by the step, the lane map is not.
+ */
 export function StageCanvas({
   stage,
   round,
@@ -31,28 +39,54 @@ export function StageCanvas({
   /** the shown step is the agent's current one (a retry note only makes sense live) */
   live?: boolean;
 }) {
+  const now = useNow(500);
   const evs = stageRounds(events, stage)[round - 1] ?? [];
   // Presenter shows a retry only while it happens, and never the "retried" footnote
   const items = notices(evs, record, live).filter((n) => n.kind !== "retried");
+  const stepKey = `${stage}-${round}`;
+  const view = MAP_VIEW[stage];
 
-  const body = (() => {
+  let body: React.ReactNode;
+  if (view) {
+    // one Frame for the three map stages: the map stays mounted and morphs between them
+    const head =
+      stage === "ASSESS" ? { tone: "ink" as const, ...assessHead(record) } : stage === "ACT" ? actHead(record) : verifyHead(record, now);
+    body = (
+      <Frame
+        stage={stage}
+        round={round}
+        stepKey={stepKey}
+        headline={head.headline}
+        tone={head.tone}
+        map={laneModel(record, { kind: view })}
+        // Assess: the map fades in and its blocked road draws before the orders appear
+        bodyDelay={stage === "ASSESS" ? 500 : 80}
+      >
+        {stage === "ASSESS" ? (
+          <AssessBody key={stepKey} record={record} />
+        ) : stage === "ACT" ? (
+          <ActBody key={stepKey} record={record} approvals={approvals} onDecided={onDecided} />
+        ) : (
+          <VerifyBody key={stepKey} record={record} events={events} />
+        )}
+      </Frame>
+    );
+  } else {
     switch (stage) {
       case "PERCEIVE":
-        return <PerceiveCanvas record={record} round={round} />;
-      case "ASSESS":
-        return <AssessCanvas record={record} round={round} />;
+        body = <PerceiveCanvas key={stepKey} record={record} round={round} />;
+        break;
       case "PLAN":
-        return <PlanCanvas record={record} events={events} round={round} />;
+        body = <PlanCanvas key={stepKey} record={record} events={events} round={round} />;
+        break;
       case "SIMULATE":
-        return <SimulateCanvas record={record} round={round} events={evs} />;
+        body = <SimulateCanvas key={stepKey} record={record} round={round} events={evs} />;
+        break;
       case "REFLECT":
-        return <ReflectCanvas record={record} events={events} round={round} />;
-      case "ACT":
-        return <ActCanvas record={record} approvals={approvals} round={round} onDecided={onDecided} />;
-      case "VERIFY":
-        return <VerifyCanvas record={record} events={events} round={round} />;
+        body = <ReflectCanvas key={stepKey} record={record} events={events} round={round} />;
+        break;
     }
-  })();
+  }
 
   return (
     // keyed per step by the caller: the old step leaves at once, the new one rises in

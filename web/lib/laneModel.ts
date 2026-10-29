@@ -190,7 +190,8 @@ function route(record: CaseRecord, b: Base, key: string, i: number, state: RoadS
   return {
     node: { key, kind: key === "AIR" ? "air" : "source", x: p.x, y: p.y, anchor: p.label, plates },
     road: {
-      id: `${key}-${state}`,
+      // one id per source: when its action is executed the same road changes state (morphs)
+      id: key,
       points: [
         [p.x, p.y],
         [d.x, d.y],
@@ -288,7 +289,7 @@ export function laneModel(record: CaseRecord, view: LaneView): LaneModel | null 
   if (verify && v) {
     destPlates.push(
       v.covered && !reopened
-        ? { text: `Covered · ${thousands(v.projected_supply)} of ${thousands(v.demand)} ctn`, tone: "green", icon: "check", testId: "map-coverage" }
+        ? { text: `${thousands(v.demand)} ctn covered`, tone: "green", icon: "check", testId: "map-coverage" }
         : { text: `Not covered · ${thousands(v.projected_supply)} of ${thousands(v.demand)} ctn`, tone: "red", testId: "map-coverage" },
     );
   } else if (!verify && risk) {

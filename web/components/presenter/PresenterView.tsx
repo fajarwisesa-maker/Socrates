@@ -136,7 +136,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           {record && step ? (
             <AgentContext.Provider value={agents[step.stage]}>
             <StageCanvas
-              key={`${record.case_id}-${pacing.index}`}
+              key={record.case_id}
               stage={step.stage}
               round={step.round}
               events={events}

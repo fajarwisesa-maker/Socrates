@@ -12,7 +12,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { actionFor, approvalTitle, countdown, DECISION_OBJECT } from "@/lib/caseView";
 import { dayShort, juta, thousands } from "@/lib/format";
-import { plantName } from "@/lib/present";
 import type { Approval, CaseAction, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
@@ -38,14 +37,13 @@ const IDS = {
 /** Presenter: the object on the button and the title, short enough for one line. */
 const SHORT_OBJECT: Record<string, string> = { alternate_supplier: "PO", spot_air: "air charter", stock_transfer: "transfer" };
 
-function shortTitle(a: CaseAction | undefined, record: CaseRecord): string | null {
+function shortTitle(a: CaseAction | undefined): string | null {
   if (!a) return null;
-  const labels = record.affected?.labels;
-  const ref = a.planned?.reference ?? "";
   const q = thousands(a.quantity);
-  if (a.kind === "alternate_supplier") return `Bridge PO · ${q} ctn · ${labels?.suppliers?.[ref]?.city ?? ref}`;
+  // the source is on the map right above the sign
+  if (a.kind === "alternate_supplier") return `Bridge PO · ${q} ctn`;
   if (a.kind === "spot_air") return `Air charter · ${q} ctn`;
-  if (a.kind === "stock_transfer") return `Transfer · ${q} ctn · ${plantName(labels, ref)}`;
+  if (a.kind === "stock_transfer") return `Transfer · ${q} ctn`;
   return null;
 }
 
@@ -237,7 +235,7 @@ export function ApprovalSign({
         <div className="flex items-center gap-4">
           <span className="sign-label shrink-0 text-sm">{label}</span>
           <h3 id={titleId} className="min-w-0 flex-1 truncate text-xl leading-tight font-black" title={title}>
-            {shortTitle(action, record) ?? title}
+            {shortTitle(action) ?? title}
           </h3>
           {tone === "pending" && !rejecting && !busy && (
             <Button variant="link" className="shrink-0 text-base" onClick={() => setRejecting(true)} data-testid={ids.rejectOpen}>
