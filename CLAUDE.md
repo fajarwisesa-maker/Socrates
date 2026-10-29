@@ -36,6 +36,7 @@ and the decisions made. **Update it every phase.**
 | "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters and the Plan stage restyle (added 28 Oct) |
 | Polish pass (`docs/polish-prompt.md`, 29 Oct) | phases 0–5 done (`docs/polish-plan.md`): spacing scale, one heavy sign per screen, hairline cards, copy budget, motion system, lane map that draws and morphs, Presenter story timing |
 | UI v3 (owner's mockup `ui.pdf`, 29 Oct) | Planner is now the mockup's sidebar app on real data (`docs/ui-v3-plan.md`): Overview, Signals, Impact, Response options, Approvals, Verification, Audit trail, Architecture, Evaluation ("Coming later"); Presenter kept, teal header |
+| UI v3 polish (`siaga-v3-polish-prompt.md`, 29 Oct) | phases 0–5 done (`docs/ui-v3-polish-plan.md`): meaning tints, one card recipe, 12-column grid with equal heights, no nested boxes, one case-status function (escalated cases offer no Approve), one money format, map labels that never overlap (tested), Presenter impact tiles |
 
 ## How to run
 
@@ -864,6 +865,49 @@ Plan, page map and the left-out list: `docs/ui-v3-plan.md`. Front end only.
   verified", "Next: after your approval"); both are white now.
 - Results: pytest 292 passed (2 skipped); web smoke 12/12 (+4 skipped), replay 11/11 (+4),
   multi + fake delay + PII 13/13 (+3); rehearse 3/3, rehearse-fault 1/1; washout passes.
+
+### UI v3 polish (owner's brief `siaga-v3-polish-prompt.md`, 29 Oct)
+
+Plan, audit and results: `docs/ui-v3-polish-plan.md`. Front end only; no backend change.
+
+- **Meaning tints** (`--tint-{risk,needs,ok,info}-{bg,line}`, `TINT` in `planner/ui.tsx`): only
+  KPI cards, the approval sign and one highlight row per panel get a tinted surface; panels
+  get a tone icon tile. `--chip-ok-fg` #134a2b and `--chip-needs-fg` #5a3800 are darker than
+  the brief's values so 12 px map plates pass the projector washout.
+- **Primitives:** `Kpi` (tone, `compact` for five in a row), `Panel` (tone, fills its grid
+  row, `footer` pinned with `mt-auto`), `Rows` / `RowItem` (hairline dividers, one tinted
+  row), `Note` (replaces the grey `ComingLater`), `NoBreakCodes` (SAP codes never break at
+  their hyphen). The engine card is white.
+- **One status** (`lib/caseView.ts`): `caseStatusView()` gives the header chip, Approvals badge
+  and page chip and which approvals are decidable (only while AWAITING_APPROVAL);
+  `approvalState()` gives each sign (pending, waiting for SIAGA, approved, rejected, too
+  late, escalated); `actionChip()`; `plainError()` turns API errors into one sentence (raw
+  text to the console); stages after an escalation stay grey (`afterEscalation`).
+  e2e `status.spec.ts` plays back the live escalated case (case read as ESCALATED with a
+  PENDING card): no Approve, no countdown, no "waiting", no "409".
+- **Money:** short form everywhere; the full figure only as small text under a big one
+  ("part of the Rp 99 jt plan").
+- **Layouts:** 12 columns, 24 px between panels, 16 px between KPIs; map + side 8 + 4, pairs
+  6 + 6; Impact has 5 compact KPIs from xl (2 + 2 + 1 below), the cascade as divided
+  columns and the orders as rows next to the map; Approvals puts "Why this plan" under the
+  sign; content rows wrap instead of `truncate` (kept for the case list and the PDF name). A
+  first-load skeleton matches the Overview grid.
+- **Lane map:** place names on white plates, status plates in chip tones, only the
+  destination keeps solid teal; per-place `label`, `status` ("row", "stack" or an anchor)
+  and nudges in `laneLayout.ts`; plate text follows the map width (`@container`). Cikarang's
+  labels sit below-right, not below-left as the brief asked: below-left has no room next to
+  Tangerang's status and the map's edge. On Assess the DC plate says only the shortfall; on
+  the map the bridge PO reads "PO 500 ctn". e2e `map.spec.ts` checks every fixture state at
+  576, 600 and 860 px: no label leaves the map or overlaps a label, a marker or a road.
+- **Presenter:** grid 11rem / centre / 14.5rem; impact = three tinted tiles; the map fills
+  92% of the centre card; the approval strip uses the Planner tones (two short rows: one row
+  does not fit 1280 px); rail notes in tone colours. Every step fits 1280x720.
+- Dev note: a second `next dev` needs its own `SIAGA_DIST_DIR` (`.next-*` is git- and
+  lint-ignored).
+- Results: pytest 293 passed (2 skipped); web smoke 14/14 (+4 skipped), replay 11/11 (+4),
+  multi + fake delay + PII 15/15 (+3); rehearse 3/3, rehearse-fault 1/1, replay with the
+  network cut 1/1; washout passes; a page audit (every Planner page, five states, 1280 /
+  1440 / 1600 px) finds no sideways scroll, cut-off text or unequal panel rows.
 
 ### Polish pass (owner's brief `docs/polish-prompt.md`, 29 Oct)
 

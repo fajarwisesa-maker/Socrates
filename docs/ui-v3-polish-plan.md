@@ -74,3 +74,28 @@ brief's text is the reference.
 4. Map labels: per-node name and status anchors with offsets, tone plates, overlap check.
 5. Presenter: three tinted impact tiles, Act layout, tinted rail notes.
 6. Verification: tests, screenshots per state, CLAUDE.md.
+
+## Results (phase 5)
+
+| Check | Result |
+| --- | --- |
+| `make test` | 293 passed, 2 skipped |
+| `make web-smoke` (fake) | 14 passed, 4 skipped (new: `status.spec.ts`, `map.spec.ts`) |
+| replay smoke | 11 passed, 4 skipped |
+| multi + fake delay + PII smoke | 15 passed, 3 skipped |
+| `make rehearse N=3` / `rehearse-fault N=1` / replay, network cut | 3/3, 1/1, 1/1 |
+| projector washout | passes (after darkening `--chip-ok-fg` and `--chip-needs-fg`) |
+| page audit (9 pages x awaiting, resolved, rejected, reopened, escalated x 1280/1440/1600) | no sideways scroll, no cut-off text, no unequal panel rows |
+| Presenter steps at 1280x720 | every step fits (no overflow in the centre card) |
+
+## Deviations from the brief
+
+- The reference screenshots were not attached; the brief's text was the reference.
+- Cikarang's map labels sit below-right, not below-left: below-left runs into Tangerang's
+  status plate and off the map's left edge at the Presenter width.
+- On Assess the DC plate reads "900 ctn short" (not "2 orders at risk · 900 ctn short"), and
+  the bridge PO route reads "PO 500 ctn": the longer plates collided with the stuck PO.
+- The Presenter approval strip keeps two short rows: one row with the title, cost,
+  approve-by, Reject and Approve does not fit the centre card at 1280 px.
+- The ESCALATED e2e test replays the state through route interception: the backend now
+  withdraws pending approvals on escalation, so a live API never returns that mix again.
