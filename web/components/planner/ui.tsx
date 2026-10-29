@@ -1,6 +1,7 @@
-// UI v3 building blocks (the owner's mockup, docs/ui-v3-plan.md): soft status chips, page
-// headers, KPI cards and titled panels on white cards with one hairline. Numbers are
-// backend values, formatted by the caller.
+// UI v3 building blocks (the owner's mockup, docs/ui-v3-plan.md; polish pass
+// docs/ui-v3-polish-plan.md): soft status chips, page headers, tinted KPI cards, titled
+// panels on white cards with one hairline, rows divided by hairlines and note rows.
+// Numbers are backend values, formatted by the caller.
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { CARD } from "../signs";
@@ -72,77 +73,206 @@ export function PageHeader({
   );
 }
 
-/** A titled white card. */
+export type Tone = "risk" | "needs" | "ok" | "info" | "neutral";
+
+/** Tinted surfaces (UI v3 polish 3.1): only KPI cards, the approval sign and one highlight
+ *  row per panel get one. Text on them uses the chip fg; the value uses the strong colour. */
+export const TINT: Record<Tone, { surface: string; label: string; strong: string; tile: string }> = {
+  risk: {
+    surface: "bg-tint-risk-bg inset-ring inset-ring-tint-risk-line",
+    label: "text-chip-risk-fg",
+    strong: "text-stop-red",
+    tile: "bg-chip-risk-bg text-chip-risk-fg",
+  },
+  needs: {
+    surface: "bg-tint-needs-bg inset-ring inset-ring-tint-needs-line",
+    label: "text-chip-needs-fg",
+    strong: "text-asphalt",
+    tile: "bg-chip-needs-bg text-chip-needs-fg",
+  },
+  ok: {
+    surface: "bg-tint-ok-bg inset-ring inset-ring-tint-ok-line",
+    label: "text-chip-ok-fg",
+    strong: "text-chip-ok-fg",
+    tile: "bg-chip-ok-bg text-chip-ok-fg",
+  },
+  info: {
+    surface: "bg-tint-info-bg inset-ring inset-ring-tint-info-line",
+    label: "text-chip-info-fg",
+    strong: "text-asphalt",
+    tile: "bg-chip-info-bg text-chip-info-fg",
+  },
+  neutral: {
+    surface: "bg-road-white inset-ring inset-ring-hairline",
+    label: "text-ink-2",
+    strong: "text-asphalt",
+    tile: "bg-chip-muted-bg text-sign-green",
+  },
+};
+
+/** Chip tone for a meaning tone ("neutral" reads as the muted chip). */
+export function chipTone(t: Tone): ChipTone {
+  return t === "neutral" ? "muted" : t;
+}
+
+/** 32 px rounded icon tile in a tone's chip colours. */
+export function IconTile({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-[8px] [&_svg]:size-4",
+        "transition-colors duration-[var(--dur-base)] ease-[var(--ease-standard)]",
+        TINT[tone].tile,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** A titled white card. It fills its grid row (equal heights); the footer is pinned to the
+ *  bottom so footers in one row line up. */
 export function Panel({
   title,
   icon,
+  tone = "neutral",
   right,
   description,
   children,
+  footer,
   className,
   testId,
 }: {
   title: ReactNode;
   icon?: ReactNode;
+  /** colours the icon tile only; the body stays white */
+  tone?: Tone;
   right?: ReactNode;
   description?: ReactNode;
   children: ReactNode;
+  footer?: ReactNode;
   className?: string;
   testId?: string;
 }) {
   return (
-    <section className={cn(CARD, "flex min-w-0 flex-col gap-4 p-6", className)} data-testid={testId}>
+    <section className={cn(CARD, "flex h-full min-w-0 flex-col gap-4 p-6", className)} data-testid={testId}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="flex items-center gap-2 text-lg font-black text-asphalt [&_svg]:size-5 [&_svg]:text-sign-green">
-            {icon}
-            {title}
-          </h2>
-          {description && <p className="text-sm text-ink-2">{description}</p>}
+        <div className="flex min-w-0 items-start gap-4">
+          {icon && <IconTile tone={tone}>{icon}</IconTile>}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-lg leading-8 font-black text-asphalt">{title}</h2>
+            {description && <p className="text-sm text-ink-2">{description}</p>}
+          </div>
         </div>
         {right}
       </div>
       {children}
+      {footer && <div className="mt-auto flex flex-col gap-2 border-t border-divider pt-4">{footer}</div>}
     </section>
   );
 }
 
-const KPI_TONE = {
-  ink: "text-asphalt",
-  risk: "text-chip-risk-fg",
-  ok: "text-brand-ink",
-  needs: "text-chip-needs-fg",
-} as const;
-
-/** One headline number: label, icon, value, one note line. */
+/** One headline number on a tinted card: label, icon tile, value, one note line. */
 export function Kpi({
   label,
   value,
   note,
   icon,
-  tone = "ink",
+  tone = "neutral",
+  className,
   testId,
 }: {
   label: string;
   value: ReactNode;
   note?: ReactNode;
   icon?: ReactNode;
-  tone?: keyof typeof KPI_TONE;
+  tone?: Tone;
+  className?: string;
+  testId?: string;
+}) {
+  const t = TINT[tone];
+  return (
+    <div
+      className={cn(
+        "flex h-full min-w-0 flex-col gap-1 rounded-[12px] p-5",
+        "transition-[background-color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]",
+        t.surface,
+        className,
+      )}
+      data-testid={testId}
+      data-tone={tone}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className={cn("text-xs font-bold tracking-[0.06em] uppercase", t.label)}>{label}</span>
+        {icon && <IconTile tone={tone}>{icon}</IconTile>}
+      </div>
+      <div className={cn("text-3xl leading-tight font-black whitespace-nowrap", t.strong)}>{value}</div>
+      {note && <p className="text-sm text-ink-2">{note}</p>}
+    </div>
+  );
+}
+
+/** Rows inside a panel, divided by hairlines (no boxes inside boxes). */
+export function Rows({ children, className, label, testId }: { children: ReactNode; className?: string; label?: string; testId?: string }) {
+  return (
+    <ul className={cn("flex flex-col divide-y divide-divider", className)} aria-label={label} data-testid={testId}>
+      {children}
+    </ul>
+  );
+}
+
+/** One row. `tone` makes it the panel's one tinted highlight row. */
+export function RowItem({
+  children,
+  tone,
+  className,
+  testId,
+}: {
+  children: ReactNode;
+  tone?: Exclude<Tone, "neutral">;
+  className?: string;
   testId?: string;
 }) {
   return (
-    <div className={cn(CARD, "flex min-w-0 flex-col gap-1 p-6")} data-testid={testId}>
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-bold tracking-[0.06em] text-ink-2 uppercase">{label}</span>
-        {icon && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-2 text-sign-green [&_svg]:size-4">
-            {icon}
-          </span>
-        )}
-      </div>
-      <div className={cn("text-3xl leading-tight font-black whitespace-nowrap", KPI_TONE[tone])}>{value}</div>
-      {note && <p className="text-sm text-ink-2">{note}</p>}
-    </div>
+    <li
+      data-testid={testId}
+      className={cn(
+        "flex min-w-0 items-start gap-4 py-3 transition-colors duration-[var(--dur-fast)]",
+        tone ? cn("my-1 rounded-[8px] border-0 px-4", TINT[tone].surface) : "first:pt-0 last:pb-0",
+        className,
+      )}
+    >
+      {children}
+    </li>
+  );
+}
+
+/** A small note row inside a panel: a chip and one muted line (replaces the grey boxes). */
+export function Note({
+  chip,
+  tone = "muted",
+  icon,
+  children,
+  className,
+  testId,
+}: {
+  chip?: string;
+  tone?: ChipTone;
+  icon?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <p className={cn("flex items-start gap-2 text-sm text-ink-2", className)} data-testid={testId}>
+      {icon && <span className="mt-0.5 shrink-0 [&_svg]:size-4">{icon}</span>}
+      {chip && (
+        <Chip tone={tone} className="shrink-0">
+          {chip}
+        </Chip>
+      )}
+      <span className="min-w-0">{children}</span>
+    </p>
   );
 }
 
@@ -152,19 +282,6 @@ export function Fact({ label, children, className }: { label: string; children: 
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <span className="text-xs font-bold tracking-[0.06em] text-ink-2 uppercase">{label}</span>
       <span className="text-base font-bold text-asphalt">{children}</span>
-    </div>
-  );
-}
-
-/** Placeholder for a part of the mockup that has no data source yet. */
-export function ComingLater({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-[12px] bg-surface-2 p-6 text-ink-2" data-testid={testId}>
-      <Chip tone="muted" className="self-start">
-        Coming later
-      </Chip>
-      <h2 className="text-lg font-black text-asphalt">{title}</h2>
-      <p className="text-sm">{children}</p>
     </div>
   );
 }

@@ -60,6 +60,18 @@
   --chip-muted-bg: #eceeed;
   --chip-muted-fg: #3c4240;
 
+  /* UI v3 polish (docs/ui-v3-polish-plan.md): one soft surface per meaning, used only for KPI
+     cards, the approval sign and one highlight row per panel. Text on them uses the chip fg. */
+  --tint-risk-bg: #fdf2f2;
+  --tint-risk-line: #f2d0d0;
+  --tint-needs-bg: #fff8e8;
+  --tint-needs-line: #f1dda8;
+  --tint-ok-bg: #f0f8f3;
+  --tint-ok-line: #c8e3d3;
+  --tint-info-bg: #f1f6fc;
+  --tint-info-line: #cfdcee;
+  --row-hover: #f6f7f7;
+
   /* Older token names, mapped onto the palette so every component follows it. */
   --canvas: var(--concrete);
   --surface: var(--road-white);
@@ -116,6 +128,15 @@
   --color-chip-info-fg: var(--chip-info-fg);
   --color-chip-muted-bg: var(--chip-muted-bg);
   --color-chip-muted-fg: var(--chip-muted-fg);
+  --color-tint-risk-bg: var(--tint-risk-bg);
+  --color-tint-risk-line: var(--tint-risk-line);
+  --color-tint-needs-bg: var(--tint-needs-bg);
+  --color-tint-needs-line: var(--tint-needs-line);
+  --color-tint-ok-bg: var(--tint-ok-bg);
+  --color-tint-ok-line: var(--tint-ok-line);
+  --color-tint-info-bg: var(--tint-info-bg);
+  --color-tint-info-line: var(--tint-info-line);
+  --color-row-hover: var(--row-hover);
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -215,6 +236,8 @@ body {
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
 }
 .siaga-pulse { animation: siaga-pulse 1.6s ease-out infinite; }
+/* the stepper's current stage pulses once when it becomes current (UI v3 polish 4b) */
+.pulse-once { animation: siaga-pulse 1.2s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
   .siaga-pulse { animation: none; }
 }

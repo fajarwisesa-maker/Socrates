@@ -79,7 +79,7 @@ export function Overview({ record, events, approvals, onPage }: CasePageProps) {
           <Kpi
             label="Orders at risk"
             icon={<FileWarning aria-hidden />}
-            tone={atRisk.length ? "risk" : "ink"}
+            tone={atRisk.length ? "risk" : "neutral"}
             value={risk ? `${atRisk.length} order${atRisk.length === 1 ? "" : "s"}` : "Not yet"}
             note={risk?.deadline ? `Loading cutoff ${dayShort(record.day0, risk.deadline)}` : undefined}
             testId="kpi-orders"

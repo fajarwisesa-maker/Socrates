@@ -24,7 +24,7 @@ import type { Approval, CaseEvent, CaseRecord, Config } from "@/lib/types";
 import type { AuditData } from "@/lib/useInbox";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
-import { Logo, RouteShield } from "../signs";
+import { CARD, Logo, RouteShield } from "../signs";
 import { Chip, type ChipTone } from "./ui";
 
 /** "Model: Claude via SAP AI Core" etc., from the case's own events, else /config. */
@@ -95,7 +95,7 @@ export function Sidebar({
               className={cn(
                 "flex min-h-11 items-center gap-2 rounded-[8px] px-2 text-left text-sm font-bold",
                 "transition-[background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-standard)]",
-                active ? "bg-sign-green text-white" : "text-asphalt hover:bg-surface-2",
+                active ? "bg-sign-green text-white" : "text-asphalt hover:bg-row-hover",
               )}
             >
               <Icon className="size-4 shrink-0" aria-hidden />
@@ -109,7 +109,7 @@ export function Sidebar({
           ];
         })}
       </nav>
-      <div className="m-4 flex flex-col gap-1 rounded-[12px] bg-surface-2 p-4 text-xs" data-testid="engine-card">
+      <div className={cn(CARD, "m-4 flex flex-col gap-1 p-4 text-xs")} data-testid="engine-card">
         <div className="flex items-center justify-between gap-2">
           <span className="font-bold tracking-[0.08em] text-ink-2 uppercase">Engine</span>
           {config && (

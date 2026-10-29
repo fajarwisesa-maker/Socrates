@@ -16,7 +16,7 @@ import { CAUSE, delay, plantName, supplierName } from "@/lib/present";
 import type { CaseRecord, DelayPrediction } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CARD } from "../../signs";
-import { Chip, ComingLater, Kpi, PageHeader, Panel } from "../ui";
+import { Chip, Kpi, Note, PageHeader, Panel } from "../ui";
 import type { CasePageProps } from "./types";
 
 const PENALTY: Record<string, string> = { OTIF_PENALTY: "OTIF penalty", LOST_MARGIN: "Lost margin" };
@@ -76,7 +76,7 @@ export function Impact({ record, events }: CasePageProps) {
           <Kpi label="Shortfall" icon={<Boxes aria-hidden />} value={`${thousands(risk.shortfall)} ctn`} note={`${thousands(risk.usable_stock)} usable of ${thousands(risk.demand)}`} />
         </Reveal>
         <Reveal delay={210}>
-          <Kpi label="Stockout chance" tone={maxP > 0 ? "risk" : "ink"} icon={<Percent aria-hidden />} value={pct(maxP)} note="Highest of the orders" />
+          <Kpi label="Stockout chance" tone={maxP > 0 ? "risk" : "neutral"} icon={<Percent aria-hidden />} value={pct(maxP)} note="Highest of the orders" />
         </Reveal>
         <Reveal delay={280}>
           <Kpi
@@ -105,9 +105,10 @@ export function Impact({ record, events }: CasePageProps) {
               <AgentWritten by={agent} />
             </Panel>
           )}
-          <ComingLater title="Stock depletion over time">
-            A day-by-day stock curve needs a consumption forecast per DC, which the seed data does not hold yet.
-          </ComingLater>
+          <Note chip="Coming later">
+            Stock depletion over time: a day-by-day stock curve needs a consumption forecast per DC, which the seed data does not
+            hold yet.
+          </Note>
         </div>
       </div>
 
