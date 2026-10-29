@@ -32,6 +32,10 @@ export default function MapGallery() {
                 <div style={{ width: 576 }}>
                   <LaneMap model={model} size="sm" testId={`map-${name}`} />
                 </div>
+                {/* the Planner map at 1280 px (8 of 12 columns) and on a wide screen */}
+                <div style={{ width: 600 }}>
+                  <LaneMap model={model} testId={`map-${name} planner`} />
+                </div>
                 <div style={{ width: 860 }}>
                   <LaneMap model={model} />
                 </div>

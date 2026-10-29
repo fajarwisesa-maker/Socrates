@@ -2,12 +2,14 @@
 // states from the case record (risk, actions, verification); positions from laneLayout.ts.
 // No number is computed here: only copied and formatted.
 import { thousands } from "./format";
-import { MAP_H, MAP_W, place, placeInText, type Anchor } from "./laneLayout";
+import { MAP_H, MAP_W, place, placeInText, type Anchor, type Place } from "./laneLayout";
 import { CAUSE, plantName, supplierName } from "./present";
 import type { CaseAction, CaseRecord, PlannedAction, SolverResult } from "./types";
 
 export type RoadState = "blocked" | "faded" | "candidate" | "chosen" | "pending" | "verified" | "rejected" | "failed";
-export type PlateTone = "green" | "white" | "yellow" | "red" | "asphalt";
+/** "dest": the destination DC's solid teal plate (the only solid one); "place": a white
+ *  name plate with a hairline; the rest are the status chip tones. */
+export type PlateTone = "dest" | "place" | "risk" | "needs" | "ok" | "info" | "muted";
 
 export interface Plate {
   text: string;
@@ -22,7 +24,23 @@ export interface MapNode {
   x: number;
   y: number;
   anchor: Anchor;
+  /** name plates (and the status plates when they stack under the name) */
   plates: Plate[];
+  /** status plates with an anchor of their own, or in a row next to the name */
+  status?: { anchor: Anchor | "row"; plates: Plate[]; dx: number; dy: number };
+  dx: number;
+  dy: number;
+  /** marker tone: what the plates say (fill and stroke of a source marker) */
+  marker?: PlateTone;
+}
+
+/** A node from a layout place: name plates, then the status plates where the layout puts them. */
+function node(key: string, kind: MapNode["kind"], p: Place, names: Plate[], status: Plate[], marker?: PlateTone): MapNode {
+  const where = p.status ?? "stack";
+  const n: MapNode = { key, kind, x: p.x, y: p.y, anchor: p.label, plates: names, dx: p.dx ?? 0, dy: p.dy ?? 0, marker };
+  if (!status.length) return n;
+  if (where === "stack") return { ...n, plates: [...names, ...status] };
+  return { ...n, status: { anchor: where, plates: status, dx: p.sdx ?? 0, dy: p.sdy ?? 0 } };
 }
 
 export interface MapRoad {
@@ -83,7 +101,7 @@ interface Base {
   destName: string;
   originKey: string;
   originName: string;
-  hit: { key: string; x: number; y: number; anchor: Anchor; name: string };
+  hit: { key: string; x: number; y: number; anchor: Anchor; name: string; place: Place };
   laneCode: string | null;
 }
 
@@ -100,9 +118,10 @@ function base(record: CaseRecord): Base | null {
   const d = place(a.plant, 1);
   const found = placeInText(record.disruption?.location);
   const where = record.disruption?.location?.split(",").at(-1)?.trim().split(/[-–]/)[0] ?? "";
+  const fallback: Place = { x: (o.x + d.x) / 2, y: (o.y + d.y) / 2 - 10, label: "top" };
   const hit = found
-    ? { key: found.key, x: found.place.x, y: found.place.y, anchor: found.place.label, name: found.place.name ?? where }
-    : { key: "DISRUPTION", x: (o.x + d.x) / 2, y: (o.y + d.y) / 2 - 10, anchor: "bottom" as Anchor, name: where };
+    ? { key: found.key, x: found.place.x, y: found.place.y, anchor: found.place.label, name: found.place.name ?? where, place: found.place }
+    : { key: "DISRUPTION", x: fallback.x, y: fallback.y, anchor: fallback.label, name: where, place: fallback };
   return { dest: a.plant, destName: plantName(labels, a.plant), originKey, originName, hit, laneCode };
 }
 
@@ -120,7 +139,7 @@ function sourceName(record: CaseRecord, kind: string, reference: string): string
 
 const VERB: Record<string, string> = {
   stock_transfer: "transfer",
-  alternate_supplier: "bridge PO",
+  alternate_supplier: "PO", // the approval sign says "Bridge PO"; the map has no room for it
   spot_air: "air",
 };
 
@@ -133,15 +152,8 @@ function corridor(record: CaseRecord, b: Base, state: RoadState): { nodes: MapNo
   const cause = record.disruption?.cause ?? "other";
   const causeWord = SIGN_CAUSE[cause] ?? CAUSE[cause] ?? "Disruption";
   const nodes: MapNode[] = [
-    { key: b.originKey, kind: "origin", x: o.x, y: o.y, anchor: o.label, plates: [{ text: b.originName, tone: "green" }] },
-    {
-      key: b.hit.key,
-      kind: "disruption",
-      x: b.hit.x,
-      y: b.hit.y,
-      anchor: b.hit.anchor,
-      plates: [{ text: [causeWord, b.hit.name].filter(Boolean).join(" · "), tone: "yellow", testId: "map-disruption" }],
-    },
+    node(b.originKey, "origin", o, [{ text: b.originName, tone: "place" }], []),
+    node(b.hit.key, "disruption", b.hit.place, [{ text: [causeWord, b.hit.name].filter(Boolean).join(" · "), tone: "risk", testId: "map-disruption" }], []),
   ];
   const roads: MapRoad[] = [
     {
@@ -159,13 +171,15 @@ function corridor(record: CaseRecord, b: Base, state: RoadState): { nodes: MapNo
   ];
   const badges: MapBadge[] = [];
   if (po && state === "blocked") {
+    // under the origin's marker, right-aligned to it and clear of the blocked road, so it never
+    // crowds the disruption sign
     badges.push({
-      x: b.hit.x + (o.x - b.hit.x) * 0.62,
-      y: b.hit.y + (o.y - b.hit.y) * 0.62 + 6,
-      anchor: "bottom",
+      x: o.x + 30,
+      y: o.y + 30,
+      anchor: "bottom-left",
       plates: [
-        { text: `PO ${po.PurchaseOrder}`, tone: "asphalt", icon: "truck", testId: "map-stuck" },
-        ...(qty ? [{ text: `${thousands(qty)} ctn stuck`, tone: "asphalt" as PlateTone }] : []),
+        { text: `PO ${po.PurchaseOrder}`, tone: "risk", icon: "truck", testId: "map-stuck" },
+        ...(qty ? [{ text: `${thousands(qty)} ctn stuck`, tone: "risk" as PlateTone }] : []),
       ],
     });
   }
@@ -173,8 +187,7 @@ function corridor(record: CaseRecord, b: Base, state: RoadState): { nodes: MapNo
 }
 
 function destNode(b: Base, plates: Plate[]): MapNode {
-  const d = place(b.dest, 1);
-  return { key: b.dest, kind: "dest", x: d.x, y: d.y, anchor: d.label, plates: [{ text: b.destName, tone: "green" }, ...plates] };
+  return node(b.dest, "dest", place(b.dest, 1), [{ text: b.destName, tone: "dest" }], plates);
 }
 
 function route(record: CaseRecord, b: Base, key: string, i: number, state: RoadState, name: string, label: string): {
@@ -184,11 +197,11 @@ function route(record: CaseRecord, b: Base, key: string, i: number, state: RoadS
   const p = place(key, i + 2);
   const d = place(b.dest, 1);
   const tone: PlateTone =
-    state === "failed" ? "red" : state === "candidate" || state === "rejected" ? "white" : state === "pending" ? "yellow" : "green";
-  // one plate per source keeps each in its own row at the Presenter canvas width
-  const plates: Plate[] = [{ text: label ? `${name} · ${label}` : name, tone, icon: state === "verified" ? "check" : undefined }];
+    state === "failed" || state === "rejected" ? "risk" : state === "candidate" ? "muted" : state === "pending" ? "needs" : "ok";
+  // the place name on a white plate; what happens on the route as a status chip
+  const status: Plate[] = label ? [{ text: label, tone, icon: state === "verified" ? "check" : undefined }] : [];
   return {
-    node: { key, kind: key === "AIR" ? "air" : "source", x: p.x, y: p.y, anchor: p.label, plates },
+    node: node(key, key === "AIR" ? "air" : "source", p, [{ text: name, tone: "place" }], status, tone),
     road: {
       // one id per source: when its action is executed the same road changes state (morphs)
       id: key,
@@ -222,8 +235,12 @@ export function laneModel(record: CaseRecord, view: LaneView): LaneModel | null 
 
   if (view.kind === "assess") {
     const c = corridor(record, b, "blocked");
-    const atRisk = risk?.orders.filter((o) => o.stockout_probability > 0).length ?? 0;
-    const dest = destNode(b, risk ? [{ text: `${atRisk} order${atRisk === 1 ? "" : "s"} at risk · ${thousands(risk.shortfall)} ctn short`, tone: "red", testId: "map-at-risk" }] : []);
+    const dest = destNode(
+      b,
+      // the shortfall only: the orders at risk are listed next to the map, and a longer plate
+      // would run into the stuck PO
+      risk ? [{ text: `${thousands(risk.shortfall)} ctn short`, tone: "risk", testId: "map-at-risk" }] : [],
+    );
     // possible sources, from SAP: other lanes into the destination, alternate suppliers
     const sources: { key: string; name: string }[] = [];
     for (const [code, lane] of Object.entries(labels?.lanes ?? {})) {
@@ -289,11 +306,11 @@ export function laneModel(record: CaseRecord, view: LaneView): LaneModel | null 
   if (verify && v) {
     destPlates.push(
       v.covered && !reopened
-        ? { text: `${thousands(v.demand)} ctn covered`, tone: "green", icon: "check", testId: "map-coverage" }
-        : { text: `Not covered · ${thousands(v.projected_supply)} of ${thousands(v.demand)} ctn`, tone: "red", testId: "map-coverage" },
+        ? { text: `${thousands(v.demand)} ctn covered`, tone: "ok", icon: "check", testId: "map-coverage" }
+        : { text: `Not covered · ${thousands(v.projected_supply)} of ${thousands(v.demand)} ctn`, tone: "risk", testId: "map-coverage" },
     );
   } else if (!verify && risk) {
-    destPlates.push({ text: `${thousands(risk.shortfall)} ctn short`, tone: "red" });
+    destPlates.push({ text: `${thousands(risk.shortfall)} ctn short`, tone: "risk" });
   }
   return finish(
     verify

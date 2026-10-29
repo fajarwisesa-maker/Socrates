@@ -52,9 +52,9 @@
   --chip-risk-bg: #fbe5e5;
   --chip-risk-fg: #8a1a1a;
   --chip-needs-bg: #fcefd2;
-  --chip-needs-fg: #6e4500;
+  --chip-needs-fg: #5a3800; /* was #6e4500: 4.3:1 after the projector washout, now 5.0 */
   --chip-ok-bg: #dff0e6;
-  --chip-ok-fg: #1b5536;
+  --chip-ok-fg: #134a2b; /* was #1b5536: 4.3:1 after the washout, now 4.8 */
   --chip-info-bg: #e3ecf7;
   --chip-info-fg: #1d426c;
   --chip-muted-bg: #eceeed;

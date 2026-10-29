@@ -5,9 +5,9 @@
 // scale (and Presenter's rem scaling) and stays measurable by the projector check. No map
 // tiles, no library, no network. Built from lib/laneModel.ts.
 import { Check, Truck } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { COAST, MAP_H, MAP_W, type Anchor } from "@/lib/laneLayout";
-import { LEGEND_TEXT, type LaneModel, type MapRoad, type Plate, type PlateTone, type RoadState } from "@/lib/laneModel";
+import { LEGEND_TEXT, type LaneModel, type MapNode, type MapRoad, type Plate, type PlateTone, type RoadState } from "@/lib/laneModel";
 import { cn } from "@/lib/utils";
 
 const GAP = "0.375rem";
@@ -31,28 +31,79 @@ const ANCHOR: Record<Anchor, { transform: string; align: string }> = {
   "bottom-right": { transform: `translate(-0.5rem, ${GAP})`, align: "items-start" },
 };
 
-// filled plates; white ones carry the grey hairline. Colours change over 400 ms when a
-// route's state changes (the map stays mounted and morphs).
+// place names are white plates with the hairline; status plates use the chip tones; only the
+// destination DC keeps the solid teal plate. Colours change over 400 ms when a route's state
+// changes (the map stays mounted and morphs).
 const TONE: Record<PlateTone, string> = {
-  green: "bg-sign-green text-white",
-  white: "bg-road-white text-asphalt inset-ring inset-ring-hairline",
-  yellow: "bg-signal-yellow text-asphalt",
-  red: "bg-stop-red text-white",
-  asphalt: "bg-asphalt text-white",
+  dest: "bg-sign-green text-white",
+  place: "bg-road-white text-asphalt inset-ring inset-ring-hairline",
+  risk: "bg-chip-risk-bg text-chip-risk-fg inset-ring inset-ring-tint-risk-line",
+  needs: "bg-chip-needs-bg text-chip-needs-fg inset-ring inset-ring-tint-needs-line",
+  ok: "bg-chip-ok-bg text-chip-ok-fg inset-ring inset-ring-tint-ok-line",
+  info: "bg-chip-info-bg text-chip-info-fg inset-ring inset-ring-tint-info-line",
+  muted: "bg-chip-muted-bg text-chip-muted-fg inset-ring inset-ring-hairline",
+};
+
+/** Marker colours of a source by its route's tone. */
+const MARKER: Partial<Record<PlateTone, { fill: string; stroke: string }>> = {
+  needs: { fill: "var(--signal-yellow)", stroke: "var(--asphalt)" },
+  ok: { fill: "#fff", stroke: "var(--sign-green)" },
+  risk: { fill: "#fff", stroke: "var(--stop-red)" },
+  muted: { fill: "#fff", stroke: "#8d8f8b" },
 };
 
 function pos(x: number, y: number): CSSProperties {
   return { left: `${(x / MAP_W) * 100}%`, top: `${(y / MAP_H) * 100}%` };
 }
 
+/** One group of plates at an anchor beside a marker (plus a nudge in map units). */
+function PlateGroup({
+  n,
+  anchor,
+  dx,
+  dy,
+  plates,
+  row,
+  size,
+  role,
+}: {
+  n: MapNode;
+  anchor: Anchor;
+  dx: number;
+  dy: number;
+  plates: Plate[];
+  row?: Plate[];
+  size: "sm" | "md";
+  role: "name" | "status";
+}) {
+  const [x, y] = edge(n.x + dx, n.y + dy, anchor, RADIUS[n.kind]);
+  return (
+    <div
+      className={cn("absolute flex gap-1", row ? "flex-row items-center" : cn("flex-col", ANCHOR[anchor].align))}
+      style={{ ...pos(x, y), transform: ANCHOR[anchor].transform }}
+      data-node={n.key}
+      data-group={role}
+    >
+      {plates.map((p, i) => (
+        <PlateBox key={i} plate={p} size={size} />
+      ))}
+      {row?.map((p, i) => (
+        <PlateBox key={`s${i}`} plate={p} size={size} />
+      ))}
+    </div>
+  );
+}
+
 function PlateBox({ plate, size }: { plate: Plate; size: "sm" | "md" }) {
   return (
     <span
       data-testid={plate.testId}
+      data-plate={plate.tone}
       className={cn(
         "inline-flex items-center gap-1 rounded-[5px] px-2 py-0.5 leading-tight font-black tracking-[0.05em] whitespace-nowrap uppercase",
         "transition-[background-color,color,box-shadow] duration-[400ms] ease-[var(--ease-standard)]",
-        size === "sm" ? "text-xs" : "text-sm",
+        // md: 14 px plates once the map is wide enough (container query), 12 px below that
+        size === "sm" ? "text-xs" : "text-xs @2xl:text-sm",
         TONE[plate.tone],
         // on Verify the routes turn first, then the DC's coverage plate
         plate.testId === "map-coverage" && "delay-[400ms]",
@@ -178,7 +229,7 @@ export function LaneMap({
       data-testid={testId}
       className={cn(
         // the hairline is an outline: it is painted over the map, never changes its size
-        "shrink-0 overflow-x-auto overflow-y-hidden rounded-[12px] bg-sea outline outline-1 -outline-offset-1 outline-hairline",
+        "@container shrink-0 overflow-x-auto overflow-y-hidden rounded-[12px] bg-sea outline outline-1 -outline-offset-1 outline-hairline",
         mini && "rounded-[8px]",
         className,
       )}
@@ -201,6 +252,7 @@ export function LaneMap({
               return (
                 <polygon
                   key={n.key}
+                  data-marker={n.key}
                   points={`${n.x},${n.y - 17} ${n.x + 17},${n.y} ${n.x},${n.y + 17} ${n.x - 17},${n.y}`}
                   fill="#fff"
                   stroke="var(--asphalt)"
@@ -210,7 +262,7 @@ export function LaneMap({
               );
             if (n.kind === "disruption")
               return (
-                <g key={n.key}>
+                <g key={n.key} data-marker={n.key}>
                   <polygon
                     points={`${n.x},${n.y - 20} ${n.x + 20},${n.y} ${n.x},${n.y + 20} ${n.x - 20},${n.y}`}
                     fill="var(--signal-yellow)"
@@ -224,23 +276,24 @@ export function LaneMap({
               );
             if (n.kind === "origin")
               return (
-                <g key={n.key}>
+                <g key={n.key} data-marker={n.key}>
                   <circle cx={n.x} cy={n.y} r={10} fill="#fff" stroke="var(--asphalt)" strokeWidth={3} />
                   <circle cx={n.x} cy={n.y} r={5} fill="var(--asphalt)" />
                 </g>
               );
-            const tone = n.plates[0]?.tone;
+            const m = MARKER[n.marker ?? "muted"] ?? MARKER.muted!;
             return (
               <circle
                 key={n.key}
+                data-marker={n.key}
                 cx={n.x}
                 cy={n.y}
                 r={8}
                 strokeWidth={4}
                 strokeDasharray={n.kind === "air" ? "4 3" : undefined}
                 style={{
-                  fill: tone === "yellow" ? "var(--signal-yellow)" : "#fff",
-                  stroke: tone === "green" ? "var(--sign-green)" : tone === "white" ? "#8d8f8b" : "var(--asphalt)",
+                  fill: m.fill,
+                  stroke: m.stroke,
                   transition: "fill 400ms var(--ease-standard), stroke 400ms var(--ease-standard)",
                 }}
               />
@@ -254,22 +307,28 @@ export function LaneMap({
               Laut Jawa
             </span>
             {model.nodes.map((n) => (
-              <div
-                key={n.key}
-                className={cn("absolute flex flex-col gap-1", ANCHOR[n.anchor].align)}
-                style={{ ...pos(...edge(n.x, n.y, n.anchor, RADIUS[n.kind])), transform: ANCHOR[n.anchor].transform }}
-                data-node={n.key}
-              >
-                {n.plates.map((p, i) => (
-                  <PlateBox key={i} plate={p} size={size} />
-                ))}
-              </div>
+              <Fragment key={n.key}>
+                <PlateGroup
+                  n={n}
+                  anchor={n.anchor}
+                  dx={n.dx}
+                  dy={n.dy}
+                  plates={n.plates}
+                  row={n.status?.anchor === "row" ? n.status.plates : undefined}
+                  size={size}
+                  role="name"
+                />
+                {n.status && n.status.anchor !== "row" && (
+                  <PlateGroup n={n} anchor={n.status.anchor} dx={n.status.dx} dy={n.status.dy} plates={n.status.plates} size={size} role="status" />
+                )}
+              </Fragment>
             ))}
             {model.badges.map((b, i) => (
               <div
                 key={i}
                 className={cn("absolute flex flex-col gap-1", ANCHOR[b.anchor].align)}
                 style={{ ...pos(b.x, b.y), transform: ANCHOR[b.anchor].transform }}
+                data-group="badge"
               >
                 {b.plates.map((p, j) => (
                   <PlateBox key={j} plate={p} size={size} />
