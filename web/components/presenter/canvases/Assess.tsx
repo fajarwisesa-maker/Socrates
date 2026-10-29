@@ -56,7 +56,7 @@ export function AssessBody({ record }: { record: CaseRecord }) {
               </span>
               <span className="text-right text-stop-red">
                 <span className="block text-3xl leading-none font-black">
-                  <CountUp value={o.stockout_probability} format={pct} duration={0.9} />
+                  <CountUp value={o.stockout_probability} format={pct} delay={0.3} />
                 </span>
                 <span className="sign-label text-xs text-risk-ink">stockout</span>
               </span>

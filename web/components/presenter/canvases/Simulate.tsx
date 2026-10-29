@@ -1,6 +1,7 @@
 import { Calculator } from "lucide-react";
 import { solverLabel } from "@/lib/present";
 import type { CaseEvent, CaseRecord } from "@/lib/types";
+import { Reveal } from "@/components/Reveal";
 import { OptionCard } from "../OptionCard";
 import { Frame } from "./Frame";
 
@@ -33,8 +34,11 @@ export function SimulateCanvas({
     >
       <div className="flex h-full flex-col gap-5">
         <div className="grid grid-cols-2 gap-4">
-          {options.slice(0, 3).map((o) => (
-            <OptionCard key={o.option_id} option={o} record={record} />
+          {/* the solver's options rise in one after another, 140 ms apart */}
+          {options.slice(0, 3).map((o, i) => (
+            <Reveal key={o.option_id} delay={i * 140}>
+              <OptionCard option={o} record={record} />
+            </Reveal>
           ))}
         </div>
         {options.length > 0 && (

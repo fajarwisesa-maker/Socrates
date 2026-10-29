@@ -84,7 +84,7 @@ export function EvidenceLinks({ container, startDelay = 0.4 }: { container: Reac
             strokeLinecap="round"
             initial={reduce ? false : { pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ delay: reduce ? 0 : startDelay + i * 0.22, duration: 0.45, ease: "easeOut" }}
+            transition={{ delay: reduce ? 0 : startDelay + i * 0.1, duration: 0.45, ease: "easeOut" }}
           />
           <motion.circle
             cx={l.x2}
@@ -93,7 +93,7 @@ export function EvidenceLinks({ container, startDelay = 0.4 }: { container: Reac
             fill="var(--brand)"
             initial={reduce ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: reduce ? 0 : startDelay + i * 0.22 + 0.4 }}
+            transition={{ delay: reduce ? 0 : startDelay + i * 0.1 + 0.4 }}
           />
         </g>
       ))}

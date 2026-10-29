@@ -27,7 +27,8 @@ export function OptionCard({
   play?: "reject" | "enter";
 }) {
   const reduce = useReducedMotion();
-  const stampAt = reduce ? 0 : 0.8;
+  // Reflect: the card is there, then the REJECTED plate pops (280 ms, 1.3 to 1)
+  const stampAt = reduce ? 0 : 0.6;
   const t = (delay: number) => ({ delay: reduce ? 0 : delay, duration: reduce ? 0 : 0.35 });
   const r = option.result;
   const feasible = r.status === "optimal" && r.covered_quantity >= r.required_quantity;
@@ -38,9 +39,10 @@ export function OptionCard({
     <motion.div
       data-testid={`option-card-${option.option_id}`}
       data-state={state}
-      initial={play === "enter" && !reduce ? { opacity: 0, x: 60 } : false}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: reduce ? 0 : 0.3, duration: 0.5, ease: "easeOut" }}
+      // Reflect after a replan: the chosen card rises in
+      initial={play === "enter" && !reduce ? { opacity: 0, y: 10 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: reduce ? 0 : 0.4, duration: reduce ? 0 : 0.32, ease: [0.2, 0.7, 0.2, 1] }}
       className={cn(
         "relative flex flex-col overflow-hidden rounded-[12px] bg-road-white p-6",
         "transition-shadow duration-[var(--dur-base)]",
@@ -80,9 +82,10 @@ export function OptionCard({
           <motion.span
             data-testid="rejected-stamp"
             className="rounded-[6px] bg-stop-red px-3 py-1 text-xl font-black tracking-[0.12em] text-white uppercase shadow-[inset_0_0_0_2px_var(--stop-red),inset_0_0_0_4px_#fff]"
-            initial={play === "reject" && !reduce ? { opacity: 0, scale: 2.2, rotate: -20 } : false}
-            animate={{ opacity: 1, scale: 1, rotate: -8 }}
-            transition={{ delay: stampAt, type: reduce ? false : "spring", stiffness: 500, damping: 22 }}
+            style={{ rotate: -8 }}
+            initial={play === "reject" && !reduce ? { opacity: 0, scale: 1.3 } : false}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: stampAt, duration: reduce ? 0 : 0.28, ease: [0.2, 0.7, 0.2, 1] }}
           >
             Rejected
           </motion.span>
@@ -109,7 +112,7 @@ export function OptionCard({
           className="mt-4 text-xl leading-snug"
           initial={play && !reduce ? { opacity: 0, y: 6 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={t(play === "reject" ? 1.3 : 0.9)}
+          transition={t(play === "reject" ? 1.0 : 0.8)}
         >
           {note}
         </motion.div>

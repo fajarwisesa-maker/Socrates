@@ -13,6 +13,9 @@ import { Card, Frame } from "./Frame";
 
 const SHOWN_FIELDS = ["cause", "location", "delay", "references"] as const;
 
+/** Perceive's story, in seconds from the step's start (docs/polish-prompt.md 4.3). */
+const T = { fields: 1.9, links: 2.1, pdf: 2.5, confidence: 2.9 };
+
 export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: number }) {
   const reduce = useReducedMotion();
   const box = useRef<HTMLDivElement>(null);
@@ -37,7 +40,9 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
   return (
     <Frame stage="PERCEIVE" round={round} headline={headline}>
       <div ref={box} className="relative grid h-full grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
-        <EvidenceLinks container={box} startDelay={0.3 + ev.filter((e) => e.signal === 1).length * 0.25} />
+        {/* story (4.3): the WhatsApp phrases light up at 0.7 / 1.1 / 1.5 s, the fields rise in,
+            the lines join phrase to field, the PDF phrases arrive, then the confidence */}
+        <EvidenceLinks container={box} startDelay={T.links} />
         <div className="flex min-h-0 flex-col gap-3">
           {record.signals.map((s, i) => {
             const spans = ev.filter((e) => e.signal === i + 1);
@@ -52,7 +57,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                       key={e.start}
                       initial={reduce ? false : { opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: reduce ? 0 : 1.5 + j * 0.08, duration: 0.3 }}
+                      transition={{ delay: reduce ? 0 : T.pdf + j * 0.07, duration: reduce ? 0 : 0.32 }}
                       data-field={e.field}
                       data-evidence={`${e.signal}:${e.start}`}
                       className={
@@ -86,8 +91,15 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
 
         <Card className="flex flex-col bg-surface p-0" testId="disruption-card">
           <dl className="divide-y-2 divide-surface-2">
-            {SHOWN_FIELDS.map((f) => (
-              <div key={f} className="px-5 py-3" data-field-row={f}>
+            {SHOWN_FIELDS.map((f, i) => (
+              <motion.div
+                key={f}
+                className="px-6 py-2"
+                data-field-row={f}
+                initial={reduce ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: reduce ? 0 : T.fields + i * 0.07, duration: reduce ? 0 : 0.32 }}
+              >
                 <dt className="flex items-center justify-between text-lg text-ink-2">
                   {FIELD[f]}
                   <Sources
@@ -100,9 +112,9 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                   />
                 </dt>
                 <dd className="text-xl font-semibold text-ink">{value[f]}</dd>
-              </div>
+              </motion.div>
             ))}
-            <div className="px-4 py-2.5" data-testid="confidence">
+            <div className="px-6 py-2" data-testid="confidence">
               <dt className="text-lg text-ink-2">Confidence</dt>
               <dd className="text-xl font-semibold text-ink">
                 {progression.length > 1
@@ -112,7 +124,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                         initial={reduce || i === 0 ? false : { opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         // the second source is fused after the WhatsApp has been read
-                        transition={{ delay: reduce ? 0 : 1.9 + (i - 1) * 0.4, duration: 0.4 }}
+                        transition={{ delay: reduce ? 0 : T.confidence + (i - 1) * 0.4, duration: reduce ? 0 : 0.32 }}
                       >
                         {i > 0 && <span className="px-1 text-ink-2">→</span>}
                         <span className={i === progression.length - 1 ? "text-brand-ink" : "text-ink-2"}>{p.label}</span>
@@ -125,7 +137,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                   className="text-lg text-ink-2"
                   initial={reduce ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: reduce ? 0 : 2.2 }}
+                  transition={{ delay: reduce ? 0 : T.confidence + 0.3, duration: reduce ? 0 : 0.32 }}
                 >
                   The notice agrees on lane and delay
                 </motion.p>

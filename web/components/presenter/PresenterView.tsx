@@ -48,14 +48,20 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
     pacing.fromStart(state.incomingId);
   }
 
+  // Act with a decision pending: the story waits for the planner, so Next is disabled
+  const awaiting =
+    step?.stage === "ACT" && !pacing.steps[pacing.index + 1] && state.approvals.some((a) => a.status === "PENDING");
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
       if (e.metaKey || e.ctrlKey || e.altKey || t?.closest("input, textarea, [contenteditable]")) return;
       if (e.key === " ") {
         e.preventDefault();
-        pacing.advance();
-      } else if (e.key === "ArrowRight") pacing.advance();
+        if (!awaiting) pacing.advance();
+      } else if (e.key === "ArrowRight") {
+        if (!awaiting) pacing.advance();
+      }
       else if (e.key === "ArrowLeft") pacing.back();
       else if (e.key === "h" || e.key === "H") pacing.toggleHold();
       else if (e.key === "r" || e.key === "R") pacing.restart();
@@ -64,7 +70,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pacing]);
+  }, [pacing, awaiting]);
 
   const next = pacing.steps[pacing.index + 1];
   const agents = agentsByStage(viewEvents, config);
@@ -188,11 +194,19 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
             <Radio className="size-4" aria-hidden /> Jump to live
           </button>
         )}
-        {record && pacing.progress !== null && next && (
-          <span className="inline-flex items-center gap-1.5 font-bold" data-testid="next-step">
-            Next: {STAGE_LABEL[next.stage]}
-            {next.round > 1 ? ` (${next.round})` : ""}
+        {record && awaiting ? (
+          <span className="inline-flex items-center gap-1 font-bold text-white/70" data-testid="next-step" aria-disabled="true">
+            Next: after your approval
           </span>
+        ) : (
+          record &&
+          pacing.progress !== null &&
+          next && (
+            <span className="inline-flex items-center gap-1 font-bold" data-testid="next-step">
+              Next: {STAGE_LABEL[next.stage]}
+              {next.round > 1 ? ` (${next.round})` : ""}
+            </span>
+          )
         )}
         <ul className="ml-auto flex items-center gap-4" aria-label="Keys" data-testid="key-footer">
           {KEYS.map(([k, what]) => (

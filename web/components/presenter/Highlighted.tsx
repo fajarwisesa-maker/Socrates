@@ -10,9 +10,21 @@ import type { Evidence } from "@/lib/types";
  * highlighted (offsets come from the backend); they light up one after another. A v2 English
  * gloss (Signal Agent) sits under its phrase.
  */
-export function Highlighted({ text, spans, stagger = 0.25 }: { text: string; spans: Evidence[]; stagger?: number }) {
+export function Highlighted({
+  text,
+  spans,
+  start = 0.7,
+  end = 1.5,
+}: {
+  text: string;
+  spans: Evidence[];
+  /** seconds: the first phrase lights up at `start`, the last at `end` (0.7, 1.1, 1.5 s for three) */
+  start?: number;
+  end?: number;
+}) {
   const reduce = useReducedMotion();
   const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const stagger = sorted.length > 1 ? Math.min(0.4, (end - start) / (sorted.length - 1)) : 0;
   const pieces: React.ReactNode[] = [];
   let pos = 0;
   sorted.forEach((s, i) => {
@@ -31,7 +43,7 @@ export function Highlighted({ text, spans, stagger = 0.25 }: { text: string; spa
         }
         initial={reduce ? false : { backgroundColor: "rgba(255,194,14,0)", color: "#1e2124" }}
         animate={{ backgroundColor: "#ffc20e", color: "#1e2124" }}
-        transition={{ delay: reduce ? 0 : 0.2 + i * stagger, duration: 0.35 }}
+        transition={{ delay: reduce ? 0 : start + i * stagger, duration: reduce ? 0 : 0.32 }}
       >
         {gloss ? (
           <>

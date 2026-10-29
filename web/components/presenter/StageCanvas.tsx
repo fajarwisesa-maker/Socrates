@@ -59,8 +59,9 @@ export function StageCanvas({
         headline={head.headline}
         tone={head.tone}
         map={laneModel(record, { kind: view })}
-        // Assess: the map fades in and its blocked road draws before the orders appear
-        bodyDelay={stage === "ASSESS" ? 500 : 80}
+        // Assess: the map fades in and its blocked road draws before the orders appear;
+        // Act: the routes draw (transfer green, bridge PO yellow), then the sign
+        bodyDelay={stage === "ASSESS" ? 500 : stage === "ACT" ? 600 : 80}
       >
         {stage === "ASSESS" ? (
           <AssessBody key={stepKey} record={record} />

@@ -34,7 +34,7 @@ export function toSteps(events: CaseEvent[]): Step[] {
 }
 
 /** The longest wow moments need a little more than the default dwell. */
-const MIN_DWELL_MS: Partial<Record<Stage, number>> = { PERCEIVE: 3000, REFLECT: 3500 };
+const MIN_DWELL_MS: Partial<Record<Stage, number>> = { PERCEIVE: 3800, REFLECT: 3500 };
 
 export interface Pacing {
   steps: Step[];
