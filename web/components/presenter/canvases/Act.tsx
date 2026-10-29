@@ -49,7 +49,7 @@ export function ActBody({ record, approvals, onDecided }: { record: CaseRecord; 
   const shown = record.actions.filter((a) => !CLOSED.includes(a.status));
   const dropped = record.actions.filter((a) => CLOSED.includes(a.status));
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-3">
       {shown.slice(0, 3).map((a) => {
         const approval = a.approval_id ? approvals.find((x) => x.approval_id === a.approval_id) : undefined;
         return approval ? (

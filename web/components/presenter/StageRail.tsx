@@ -130,8 +130,8 @@ export function StageRail({
                   </span>
                 )}
                 {stage === "REFLECT" && replans > 0 ? (
-                  <div className="flex items-center gap-1.5 text-xl leading-tight font-semibold text-risk-ink" data-testid="rail-replans">
-                    <RotateCcw className="size-5" aria-hidden />
+                  <div className="flex items-center gap-1.5 text-xl leading-tight font-semibold whitespace-nowrap text-chip-risk-fg" data-testid="rail-replans">
+                    <RotateCcw className="size-5 shrink-0" aria-hidden />
                     {replans} replan{replans > 1 ? "s" : ""}
                   </div>
                 ) : (
@@ -161,17 +161,21 @@ function SubLabel({
   let tone = "text-ink-2";
   if (stage === "ACT" && state === "waiting") {
     text = "Needs you";
-    tone = "font-bold text-asphalt";
+    tone = "font-bold text-chip-needs-fg";
   } else if (stage === "VERIFY" && state === "waiting" && record?.verify_due_at && now) {
     const s = Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000));
     text = `Check in ${s} s`;
-  } else if (state === "running") text = "Working…";
+    tone = "text-chip-info-fg";
+  } else if (state === "running") {
+    text = "Working…";
+    tone = "text-chip-info-fg";
+  }
   else if (state === "escalated") {
     text = "Escalated";
-    tone = "text-risk-ink";
+    tone = "font-bold text-chip-risk-fg";
   } else if (state === "failed") {
     text = "Re-opened";
-    tone = "text-risk-ink";
+    tone = "font-bold text-chip-risk-fg";
   }
   if (!text) return null;
   return <div className={cn("text-xl leading-tight font-medium whitespace-nowrap", tone)}>{text}</div>;

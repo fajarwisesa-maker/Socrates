@@ -49,7 +49,7 @@ export function AssessBody({ record }: { record: CaseRecord }) {
           >
             <div className="flex items-center justify-between gap-4">
               <span className="min-w-0">
-                <span className="block truncate text-xl font-black">{customer(o.order)}</span>
+                <span className="block text-xl leading-tight font-black">{customer(o.order)}</span>
                 <span className="block text-base">
                   {thousands(o.quantity)} ctn · {juta(o.penalty)} if missed
                 </span>

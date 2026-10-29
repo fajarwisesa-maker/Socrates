@@ -62,10 +62,10 @@ export function Frame({
       {map && (
         // fades in once; afterwards it only morphs
         <Reveal kind="fade-in" className="mt-4 shrink-0">
-          <LaneMap key="map" model={map} size="sm" className="mx-auto w-[80%]" />
+          <LaneMap key="map" model={map} size="sm" className="mx-auto w-[92%]" />
         </Reveal>
       )}
-      <Reveal key={`body-${stepKey}`} delay={bodyDelay} className={cn(map ? "mt-4" : "mt-6", "min-h-0 flex-1")}>
+      <Reveal key={`body-${stepKey}`} delay={bodyDelay} className={cn(map ? "mt-3" : "mt-6", "min-h-0 flex-1")}>
         {children}
       </Reveal>
     </div>

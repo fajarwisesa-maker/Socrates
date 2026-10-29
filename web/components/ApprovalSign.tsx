@@ -2,8 +2,10 @@
 
 // The approval sign (docs/redesign-prompt.md 6.5, docs/polish-prompt.md 3.3 and 4.2): ONE
 // element whose colours change with the state, so approve and reject read as a change in
-// place. Pending: yellow with a 2px asphalt hairline. Approved: green, no outline, with the
-// SAP document. Rejected or too late: white with a 2px red hairline while SIAGA replans.
+// place, in the same tones in both modes (UI v3 polish 3.2): pending = needs surface, a 2px
+// yellow hairline and a yellow label plate; approved = ok surface, 2px teal hairline, the SAP
+// document; rejected = white, 2px red hairline; too late or escalated = risk surface, no
+// buttons. The state comes from lib/caseView.ts approvalState (the case status decides).
 // Up front: what, cost and deadline, what happens if you reject, the buttons. Why, the
 // other options and the binding note sit under "Show details". Every amount and date comes
 // from the approval card the backend built.
@@ -67,13 +69,14 @@ const LABEL_PLATE: Record<Tone, string> = {
   escalated: "bg-chip-risk-bg text-chip-risk-fg",
 };
 
-const TONE: Record<Tone, string> = {
-  pending: "bg-signal-yellow text-asphalt inset-ring-2 inset-ring-asphalt",
-  busy: "bg-signal-yellow text-asphalt inset-ring-2 inset-ring-asphalt",
-  approved: "bg-sign-green text-white inset-ring-2 inset-ring-transparent",
-  rejected: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
-  expired: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
-  escalated: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
+/** Presenter: one short line in place of the Planner's sentences (the strip has one row). */
+const PRESENTER_CLOSED: Record<Tone, string> = {
+  pending: "",
+  approved: "",
+  busy: "SIAGA is still working",
+  rejected: "SIAGA keeps what was done and replans",
+  expired: "Approve-by passed: SIAGA replans",
+  escalated: "Handed to a human planner",
 };
 
 export function ApprovalSign({
@@ -270,10 +273,15 @@ export function ApprovalSign({
     return (
       <section
         {...common}
-        className={cn("rounded-[12px] px-6 py-4 transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]", TONE[tone])}
+        className={cn("rounded-[12px] px-6 py-3 transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]", PLANNER_TONE[tone])}
       >
         <div className="flex items-center gap-4">
-          <span className="sign-label shrink-0 text-sm">{label[tone]}</span>
+          <span
+            className={cn("sign-label shrink-0 rounded-[6px] px-2 py-1 text-sm transition-colors duration-[var(--dur-base)]", LABEL_PLATE[tone])}
+            data-testid="approval-label"
+          >
+            {label[tone]}
+          </span>
           <h3 id={titleId} className="min-w-0 flex-1 truncate text-xl leading-tight font-black" title={title}>
             {shortTitle(action) ?? title}
           </h3>
@@ -283,7 +291,7 @@ export function ApprovalSign({
             </Button>
           )}
         </div>
-        <div className="mt-2 flex min-h-12 items-center gap-4 text-lg">
+        <div className="mt-1 flex min-h-11 items-center gap-4 text-lg">
           <b className="shrink-0 text-2xl leading-none font-black">{juta(c.cost)}</b>
           {tone === "pending" && approveBy && (
             <span
@@ -297,10 +305,14 @@ export function ApprovalSign({
             </span>
           )}
           {sapLine}
-          {closedLine}
+          {tone !== "pending" && tone !== "approved" && (
+            <span className="min-w-0 text-lg" data-testid="approval-closed">
+              {PRESENTER_CLOSED[tone]}
+            </span>
+          )}
           {tone === "pending" && !rejecting && (
             <Button
-              size="lg"
+              size="md"
               variant="approve"
               disabled={!!busy}
               onClick={() => decide("approve")}

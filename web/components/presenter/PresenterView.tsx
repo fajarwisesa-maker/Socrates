@@ -128,7 +128,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         </div>
       )}
 
-      <main className="grid min-h-0 flex-1 grid-cols-[13rem_minmax(0,1fr)_17rem] gap-8 px-8 py-4">
+      <main className="grid min-h-0 flex-1 grid-cols-[11rem_minmax(0,1fr)_14.5rem] gap-8 px-8 py-4">
         <div>
           <StageRail
             events={viewEvents}
