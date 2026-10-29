@@ -241,3 +241,9 @@ html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="
   transition-duration: 0.01ms !important;
   transition-delay: 0ms !important;
 }
+
+@keyframes siaga-fade-out {
+  to { opacity: 0; }
+}
+/* a removed list item fades out over 200 ms, then it is gone */
+.fade-out { animation: siaga-fade-out var(--dur-fast) var(--ease-standard) both; pointer-events: none; }

@@ -26,7 +26,7 @@ import type { AuditData } from "@/lib/useInbox";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
-import { CARD, GantrySign, KmPost, RoadLine, RouteShield, SignHeading, StatusPlate, WarningPlate } from "../signs";
+import { CARD, GantrySign, KmPost, RoadLine, RouteShield, SignHeading, StatusPlate, WarningPlate, type PlateTone } from "../signs";
 import { Figure } from "../Figure";
 import { StageSheet } from "./sheets";
 
@@ -132,6 +132,13 @@ export function CaseFile({
 
 // ------------------------------------------------------------------ case sign
 
+const STATUS_TONE: Record<string, PlateTone> = {
+  AWAITING_APPROVAL: "needs",
+  RESOLVED: "verified",
+  REOPENED: "rejected",
+  ESCALATED: "escalated",
+};
+
 function CaseSign({ record, approvals, now }: { record: CaseRecord; approvals: Approval[]; now: number | null }) {
   const lane = laneCode(record);
   const cause = causeSign(record);
@@ -172,31 +179,26 @@ function CaseSign({ record, approvals, now }: { record: CaseRecord; approvals: A
           </span>
         )}
         <span className="ml-auto" data-testid="case-status" data-status={record.status}>
-          {record.status === "AWAITING_APPROVAL" ? (
-            <WarningPlate size="md" className="px-4 font-black">
-              <span className="sign-label text-sm">Needs you{left ? ` · ${left.expired ? "expired" : left.text}` : ""}</span>
-            </WarningPlate>
-          ) : record.status === "RESOLVED" ? (
-            <StatusPlate tone="verified" className="px-4 text-sm" icon={<Check className="size-4" strokeWidth={3} aria-hidden />}>
-              Resolved
-            </StatusPlate>
-          ) : record.status === "REOPENED" ? (
-            <StatusPlate tone="rejected" className="px-4 text-sm">
-              Reopened
-            </StatusPlate>
-          ) : record.status === "ESCALATED" ? (
-            <StatusPlate tone="escalated" className="px-4 text-sm">
-              Escalated
-            </StatusPlate>
-          ) : record.status === "VERIFYING" ? (
-            <StatusPlate tone="running" className="px-4 text-sm">
-              Verifying
-            </StatusPlate>
-          ) : (
-            <StatusPlate tone="running" className="px-4 text-sm">
-              {replanning ? "Replanning" : "Running"}
-            </StatusPlate>
-          )}
+          {/* one plate whose colour changes with the status (320 ms) */}
+          <StatusPlate
+            tone={STATUS_TONE[record.status] ?? "running"}
+            className="px-4 py-2 text-sm"
+            icon={record.status === "RESOLVED" ? <Check className="size-4" strokeWidth={3} aria-hidden /> : undefined}
+          >
+            {record.status === "AWAITING_APPROVAL"
+              ? `Needs you${left ? ` · ${left.expired ? "expired" : left.text}` : ""}`
+              : record.status === "RESOLVED"
+                ? "Resolved"
+                : record.status === "REOPENED"
+                  ? "Reopened"
+                  : record.status === "ESCALATED"
+                    ? "Escalated"
+                    : record.status === "VERIFYING"
+                      ? "Verifying"
+                      : replanning
+                        ? "Replanning"
+                        : "Running"}
+          </StatusPlate>
         </span>
       </div>
     </GantrySign>

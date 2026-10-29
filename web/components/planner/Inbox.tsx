@@ -13,7 +13,7 @@ import { STAGE_LABEL } from "@/lib/stages";
 import type { InboxCase } from "@/lib/useInbox";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
-import { useCountUp } from "@/lib/motion";
+import { useCountUp, useDelayed, useWithExits } from "@/lib/motion";
 import { Reveal } from "../Reveal";
 import { Figure } from "../Figure";
 import { CARD, GantrySign, RouteShield, SignHeading, StatusPlate, TierPlate, WarningPlate, type PlateTone } from "../signs";
@@ -38,6 +38,8 @@ const GROUPS: { id: Group; label: string; tone: PlateTone }[] = [
 
 /** Stagger for a list entrance: 70 ms apart, at most five steps. */
 const stagger = (i: number) => Math.min(i, 4) * 70;
+
+type Listed = { item: InboxCase; exiting: boolean };
 
 function groupOf(status: string): Group {
   if (status === "AWAITING_APPROVAL") return "needs";
@@ -72,10 +74,14 @@ export function Inbox({
   onReset: () => void;
 }) {
   const now = useNow(1000);
-  const groups = Object.fromEntries(GROUPS.map((g) => [g.id, [] as InboxCase[]])) as Record<Group, InboxCase[]>;
-  for (const c of cases) groups[groupOf(c.record.status)].push(c);
-  groups.needs.sort((a, b) => firstApproveBy(a).localeCompare(firstApproveBy(b)));
-  const needs = groups.needs.length;
+  const slow = useDelayed(300);
+  // a case that left (reset, or moved to another group) fades out over 200 ms
+  const listed = useWithExits(cases, (c) => c.record.case_id);
+  const groups = Object.fromEntries(GROUPS.map((g) => [g.id, [] as Listed[]])) as Record<Group, Listed[]>;
+  for (const l of listed) groups[groupOf(l.item.record.status)].push(l);
+  groups.needs.sort((a, b) => firstApproveBy(a.item).localeCompare(firstApproveBy(b.item)));
+  const count = (g: Group) => groups[g].filter((l) => !l.exiting).length;
+  const needs = count("needs");
   const others = GROUPS.filter((g) => g.id !== "needs");
 
   return (
@@ -85,7 +91,9 @@ export function Inbox({
           <h1 className="text-4xl font-black">Inbox</h1>
           <p className="text-base text-ink-2" data-testid="inbox-summary">
             {!loaded
-              ? "Loading cases."
+              ? slow
+                ? "Loading cases."
+                : "\u00a0"
               : needs
                 ? `${needs} case${needs === 1 ? "" : "s"} need${needs === 1 ? "s" : ""} your decision, by approve-by time.`
                 : cases.length
@@ -98,11 +106,11 @@ export function Inbox({
           <StatusPlate tone="needs" count={needs} className="self-start px-4 text-sm">
             Needs you
           </StatusPlate>
-          {needs === 0 ? (
+          {groups.needs.length === 0 ? (
             <p className="text-base text-ink-2">Nothing waits for your decision.</p>
           ) : (
-            groups.needs.map((c, i) => (
-              <Reveal key={c.record.case_id} delay={stagger(i)}>
+            groups.needs.map(({ item: c, exiting }, i) => (
+              <Reveal key={c.record.case_id} delay={stagger(i)} className={exiting ? "fade-out" : undefined}>
                 <NeedsYouCard c={c} now={now} onOpen={onOpen} />
               </Reveal>
             ))
@@ -117,7 +125,7 @@ export function Inbox({
                 <StatusPlate tone={g.tone} className="self-start">
                   {g.label}
                 </StatusPlate>
-                <span className="text-3xl font-black">{groups[g.id].length}</span>
+                <span className="text-3xl font-black">{count(g.id)}</span>
               </div>
             </Reveal>
           ))}
@@ -127,8 +135,8 @@ export function Inbox({
           .map((g) => (
             <section key={g.id} className="flex flex-col gap-2" data-testid={`inbox-${g.id}`}>
               <SignHeading>{g.label}</SignHeading>
-              {groups[g.id].map((c, i) => (
-                <Reveal key={c.record.case_id} delay={stagger(i)}>
+              {groups[g.id].map(({ item: c, exiting }, i) => (
+                <Reveal key={c.record.case_id} delay={stagger(i)} className={exiting ? "fade-out" : undefined}>
                   <CaseRow c={c} onOpen={onOpen} />
                 </Reveal>
               ))}

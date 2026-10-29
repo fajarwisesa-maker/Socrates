@@ -622,6 +622,7 @@ function VerifySheet({ record, events }: SheetProps) {
   const clock = caseClock(events.length ? events : [], now);
   const due = record.verify_due_at && now ? Math.max(0, Math.ceil((Date.parse(record.verify_due_at) - now) / 1000)) : null;
   const reply = whatsappReply(events);
+  const docs = record.actions.filter((a) => a.status === "EXECUTED" && a.sap_ref).length;
   return (
     <div className="flex flex-col gap-6">
       {reopened && (
@@ -635,32 +636,45 @@ function VerifySheet({ record, events }: SheetProps) {
           </p>
         </div>
       )}
-      {!v && <Waiting>{due !== null ? `SIAGA re-reads SAP in ${due} s.` : "Verification runs after every action is executed."}</Waiting>}
+      {!v && (
+        <Waiting>
+          {due !== null && due > 0
+            ? `SIAGA re-reads SAP in ${due} s.`
+            : record.verify_due_at
+              ? `Checking ${docs === 2 ? "both documents" : docs === 1 ? "the document" : `${docs} documents`} in SAP…`
+              : "Verification runs after every action is executed."}
+        </Waiting>
+      )}
       {v && (
-        <p className={cn("text-xl", reopened ? "font-bold text-risk-ink" : "")} data-testid="coverage">
+        <Reveal as="p" className={cn("text-xl", reopened ? "font-bold text-risk-ink" : "")} testId="coverage">
           {thousands(v.projected_supply)} of {thousands(v.demand)} cartons {v.covered ? "covered" : "projected"}
           {risk?.deadline ? ` by the cutoff ${dayShort(record.day0, risk.deadline)}` : ""}.
-        </p>
+        </Reveal>
       )}
       {resolved && s && (
-        <GantrySign flat>
-          <p className="text-3xl font-black" data-testid="outcome-line">
-            {juta(s.exposure_avoided)} protected for {juta(s.case_cost ?? s.chosen_cost)}
-          </p>
-          {clock.stoppedBy === "resolved" && <p className="mt-1 text-base">Signal to verified in {minutesSeconds(clock.seconds)}.</p>}
-        </GantrySign>
+        // the outcome rises in once SAP confirms it
+        <Reveal delay={80}>
+          <GantrySign flat>
+            <p className="text-3xl font-black" data-testid="outcome-line">
+              {juta(s.exposure_avoided)} protected for {juta(s.case_cost ?? s.chosen_cost)}
+            </p>
+            {clock.stoppedBy === "resolved" && <p className="mt-1 text-base">Signal to verified in {minutesSeconds(clock.seconds)}.</p>}
+          </GantrySign>
+        </Reveal>
       )}
       {v && (
-        <ul className="flex flex-col gap-1 text-base" data-testid="verify-checks">
-          {v.checks.map((c) => (
-            <li key={c.ref} className={cn("flex items-center gap-2", !c.ok && "font-bold text-risk-ink")}>
-              {c.ok ? <Check className="size-4 text-sign-green" strokeWidth={3} aria-hidden /> : <X className="size-4" aria-hidden />}
-              <span className="font-mono">{c.ref}</span>
-              {c.quantity !== undefined && <span>{thousands(c.quantity)} ctn</span>}
-              {c.on_time === false && <span>late</span>}
-            </li>
-          ))}
-        </ul>
+        <Reveal as="div" delay={160} testId="verify-checks">
+          <ul className="flex flex-col gap-1 text-base">
+            {v.checks.map((c) => (
+              <li key={c.ref} className={cn("flex items-center gap-2", !c.ok && "font-bold text-risk-ink")}>
+                {c.ok ? <Check className="size-4 text-sign-green" strokeWidth={3} aria-hidden /> : <X className="size-4" aria-hidden />}
+                <span className="font-mono">{c.ref}</span>
+                {c.quantity !== undefined && <span>{thousands(c.quantity)} ctn</span>}
+                {c.on_time === false && <span>late</span>}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
       )}
       {reply && (
         <p className="flex items-center gap-2 font-bold text-brand-ink" data-testid="planner-whatsapp-reply">

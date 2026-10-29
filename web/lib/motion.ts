@@ -76,3 +76,40 @@ export function useCountUp(
   if (target === null) return null;
   return skip || frame === null ? format(target) : format(frame);
 }
+
+/** False for the first `ms`, then true: a loading note shows only if loading takes longer. */
+export function useDelayed(ms = 300): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), ms);
+    return () => clearTimeout(t);
+  }, [ms]);
+  return ready;
+}
+
+/**
+ * A list on a poll: items that left stay for `ms` (marked `exiting`, at their old place) so
+ * they can fade out; everything else renders as given. Unchanged items keep their keys, so
+ * they never re-animate.
+ */
+export function useWithExits<T>(items: T[], key: (t: T) => string, ms = 200): { item: T; exiting: boolean }[] {
+  const [prev, setPrev] = useState(items);
+  const [gone, setGone] = useState<{ item: T; at: number }[]>([]);
+  if (prev !== items) {
+    const now = new Set(items.map(key));
+    const left = prev.flatMap((p, at) => (now.has(key(p)) ? [] : [{ item: p, at }]));
+    setPrev(items);
+    if (left.length) setGone((g) => [...g.filter((x) => !now.has(key(x.item))), ...left]);
+  }
+  useEffect(() => {
+    if (!gone.length) return;
+    const t = setTimeout(() => setGone([]), ms);
+    return () => clearTimeout(t);
+  }, [gone, ms]);
+  const out = items.map((item) => ({ item, exiting: false }));
+  for (const g of gone) {
+    if (items.some((i) => key(i) === key(g.item))) continue;
+    out.splice(Math.min(g.at, out.length), 0, { item: g.item, exiting: true });
+  }
+  return out;
+}

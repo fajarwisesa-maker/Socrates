@@ -3,6 +3,7 @@
 // Planner mode (docs/redesign-prompt.md section 6): asphalt header, then the inbox, the
 // case file of the followed case, or its audit trail.
 import { useState } from "react";
+import { useDelayed } from "@/lib/motion";
 import type { CaseState } from "@/lib/useCase";
 import { useAudit, useInbox } from "@/lib/useInbox";
 import AuditView from "./AuditView";
@@ -66,9 +67,7 @@ export default function PlannerView({
       ) : !caseId ? (
         <Empty onInbox={() => setNav("inbox")} />
       ) : !record ? (
-        <p className="mx-auto max-w-[1440px] px-6 py-10 text-lg font-bold" role="status">
-          Loading case…
-        </p>
+        <LoadingCase />
       ) : nav === "audit" ? (
         <main className="mx-auto max-w-[1440px] px-6 py-6" data-testid="audit-page">
           <h1 className="mb-4 text-3xl font-black">Audit trail</h1>
@@ -102,5 +101,15 @@ function Empty({ onInbox }: { onInbox: () => void }) {
         .
       </p>
     </main>
+  );
+}
+
+/** Shown only when loading a case takes longer than 300 ms, so a quick switch never flashes. */
+function LoadingCase() {
+  const slow = useDelayed(300);
+  return (
+    <p className="mx-auto max-w-[1440px] px-8 py-12 text-lg font-bold" role="status">
+      {slow ? "Loading case…" : ""}
+    </p>
   );
 }
