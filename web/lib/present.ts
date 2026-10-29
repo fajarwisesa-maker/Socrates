@@ -178,7 +178,19 @@ export function glossFor(e: { quote: string; gloss_en?: string | null }): string
   return norm(g) === norm(e.quote) ? null : g;
 }
 
-export const SAP_MODEL_NOTE = "Model: Claude via SAP AI Core";
+/** One item per located quote: the model may cite the same words for two fields (a live run
+ *  quoted one phrase for both lane and location), which is one highlight, not two. */
+export function uniqueSpans<T extends { signal: number; start: number }>(ev: T[]): T[] {
+  const seen = new Set<string>();
+  return ev.filter((e) => {
+    const k = `${e.signal}:${e.start}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+export const SAP_MODEL_NOTE ="Model: Claude via SAP AI Core";
 
 /** The note shown when this case's model calls ran on SAP AI Core. Read from the case's
  *  own events. */

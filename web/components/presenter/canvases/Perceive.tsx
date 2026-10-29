@@ -4,7 +4,7 @@ import { FileText, MessageCircle } from "lucide-react";
 import { motion } from "motion/react";
 import { useReducedMotion } from "@/lib/motion";
 import { useRef } from "react";
-import { CAUSE, delay, FIELD, glossFor } from "@/lib/present";
+import { CAUSE, delay, FIELD, glossFor, uniqueSpans } from "@/lib/present";
 import { cn } from "@/lib/utils";
 import type { CaseRecord, Evidence } from "@/lib/types";
 import { EvidenceLinks } from "../EvidenceLinks";
@@ -52,7 +52,7 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
                   <FileText className="size-5" aria-hidden /> Forwarder notice · PDF
                 </div>
                 <div className={glossed ? "text-xl leading-[1.5]" : "flex flex-wrap gap-1.5"}>
-                  {[...spans].sort((x, y) => x.start - y.start).map((e, j) => (
+                  {uniqueSpans(spans).sort((x, y) => x.start - y.start).map((e, j) => (
                     <motion.mark
                       key={e.start}
                       initial={reduce ? false : { opacity: 0, y: 6 }}

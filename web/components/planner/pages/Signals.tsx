@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { caseTitle, shortId } from "@/lib/caseView";
 import { dayShort } from "@/lib/format";
 import { useWithExits } from "@/lib/motion";
-import { CAUSE, delay, delayChip, FIELD, glossFor } from "@/lib/present";
+import { CAUSE, delay, delayChip, FIELD, glossFor, uniqueSpans } from "@/lib/present";
 import type { CaseRecord, Evidence } from "@/lib/types";
 import type { InboxCase } from "@/lib/useInbox";
 import { cn } from "@/lib/utils";
@@ -116,7 +116,7 @@ function CaseList({ cases, loaded, openId, onOpen }: { cases: InboxCase[]; loade
 // ------------------------------------------------------------------ messages
 
 function numbered(ev: Evidence[]): Map<string, number> {
-  const sorted = [...ev].sort((a, b) => a.signal - b.signal || a.start - b.start);
+  const sorted = uniqueSpans(ev).sort((a, b) => a.signal - b.signal || a.start - b.start);
   return new Map(sorted.map((e, i) => [`${e.signal}:${e.start}`, i + 1]));
 }
 
@@ -141,7 +141,7 @@ function Marked({ text, spans, nums }: { text: string; spans: Evidence[]; nums: 
 
 function Messages({ record }: { record: CaseRecord }) {
   const d = record.disruption;
-  const ev = d?.evidence ?? [];
+  const ev = uniqueSpans(d?.evidence ?? []);
   const nums = numbered(ev);
   const glosses = ev.filter((e) => glossFor(e));
   return (
@@ -218,6 +218,7 @@ function Extracted({ record }: { record: CaseRecord }) {
     ev
       .filter((e) => fields.includes(e.field))
       .map((e) => nums.get(`${e.signal}:${e.start}`))
+      .filter((n, i, all) => all.indexOf(n) === i)
       .sort((a, b) => a! - b!);
   const from = (fields: string[]) => [...new Set(ev.filter((e) => fields.includes(e.field)).map((e) => e.source))];
   const rows: [string, string, string[]][] = [
