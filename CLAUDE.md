@@ -35,6 +35,7 @@ and the decisions made. **Update it every phase.**
 | Bedrock removed (owner, 28 Oct) | no Amazon Bedrock anywhere: Claude runs on SAP AI Core only (`LLM_PROVIDER=sap_genai`, the default); `LLM_FALLBACK`, `BEDROCK_MODEL_ID`, `make aws-check` / `aws-probe` / `agentcore-check` gone; `make install` works outside a git checkout |
 | "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters and the Plan stage restyle (added 28 Oct) |
 | Polish pass (`docs/polish-prompt.md`, 29 Oct) | phases 0–5 done (`docs/polish-plan.md`): spacing scale, one heavy sign per screen, hairline cards, copy budget, motion system, lane map that draws and morphs, Presenter story timing |
+| UI v3 (owner's mockup `ui.pdf`, 29 Oct) | Planner is now the mockup's sidebar app on real data (`docs/ui-v3-plan.md`): Overview, Signals, Impact, Response options, Approvals, Verification, Audit trail, Architecture, Evaluation ("Coming later"); Presenter kept, teal header |
 
 ## How to run
 
@@ -827,6 +828,42 @@ moments, drawer, error states and the washout check stay).
 - Results: pytest 305 passed (2 skipped); web smoke 9/9 (+4 skipped), replay 8/8 (+4),
   multi 10/10 (+3), WhatsApp in + reply 11/11 (+2), AWS stand-in 10/10 (+3); rehearse 3/3,
   rehearse-fault 1/1; replay with the network cut 1/1 and its smoke 8/8.
+
+### UI v3: the owner's mockup (`ui.pdf`, 29 Oct)
+
+Plan, page map and the left-out list: `docs/ui-v3-plan.md`. Front end only.
+
+- **Owner's decisions:** English; the sidebar app **replaces Planner mode**, **Presenter
+  stays** (story, pacing, keys unchanged); **only real data** (items with no source in SIAGA
+  are left out or shown as "Coming later"); the mockup's calm look, keeping the lane map and
+  every honesty label.
+- **Pages** (`components/planner/pages/`, page in `?page=` via `lib/page.ts`): Overview,
+  Signals (case list, messages with located quotes, extracted fields, confidence, demo
+  inputs), Impact (KPIs, four-step cascade, map, orders, delay prediction), Response options
+  (saving banner, option cards with cost lines, plan rounds, precedents, solver setup,
+  Critic checks), Approvals (approval sign, the real Tier 0–3 policy, why this plan,
+  evidence), Verification (outcome, routes, coverage, one card per SAP document), Audit trail
+  (`AuditView checkpoints`: one card per stage run above the filtered entries),
+  Architecture, Evaluation ("Coming later": needs a read-only endpoint for the rehearse
+  reports and the PERCEIVE eval).
+- **Shell** (`components/planner/Shell.tsx`): sidebar (counts: open cases, decisions
+  waiting; engine card with the model, REPLAY, multi-agent, solver and policy), white top bar
+  (case, status chip `case-status` with `data-status`, audit chain, mode switch) and the
+  stage stepper (`Journey.tsx`, test ids `stage-X`, `agent-X`). Default page: Approvals when
+  a decision waits, else Overview; Signals with no case.
+- **Palette:** `--sign-green` is now dark teal #1F4E46 (primary, done, routes), page
+  #F2F4F3, soft chips `--chip-{risk,needs,ok,info,muted}-{bg,fg}` (`Chip` in
+  `planner/ui.tsx`). The Planner approval sign uses soft fills (needs / ok / white) with
+  2px rings; the Presenter one keeps yellow. Presenter header and footer are teal.
+- **Removed:** `planner/CaseFile.tsx`, `sheets.tsx`, `Inbox.tsx`, `PlannerHeader.tsx`
+  (`modelNote` moved to `Shell.tsx`).
+- **Tests:** Planner tests go through the sidebar (`nav-<page>`); new
+  `e2e/pages.spec.ts` opens every page at 1280×720 and 1600×1000 with no sideways scroll,
+  checks two backend figures and that `?page=` survives a reload (also in the replay smoke).
+- The teal Presenter header failed the washout check on two small labels ("Signal to
+  verified", "Next: after your approval"); both are white now.
+- Results: pytest 292 passed (2 skipped); web smoke 12/12 (+4 skipped), replay 11/11 (+4),
+  multi + fake delay + PII 13/13 (+3); rehearse 3/3, rehearse-fault 1/1; washout passes.
 
 ### Polish pass (owner's brief `docs/polish-prompt.md`, 29 Oct)
 

@@ -19,7 +19,7 @@ export function PresenterClock({ events }: { events: CaseEvent[] }) {
     <div data-testid="demo-clock" className="flex items-center gap-2 text-signal-yellow">
       <Timer className="size-6" aria-hidden />
       <div className="text-right">
-        <div className="sign-label text-xs leading-none">{label}</div>
+        <div className="sign-label text-xs leading-none text-white">{label}</div>
         <motion.div
           key={stoppedBy ?? "running"}
           data-stopped={stoppedBy ?? undefined}

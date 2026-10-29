@@ -85,7 +85,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
       data-steps={pacing.steps.length}
       data-held={pacing.held ? "1" : undefined}
     >
-      <header className="flex h-14 shrink-0 items-center gap-6 bg-asphalt px-8 whitespace-nowrap text-white">
+      <header className="flex h-14 shrink-0 items-center gap-6 bg-sign-green px-8 whitespace-nowrap text-white">
         <Logo height={26} />
         {record && (
           <span className="min-w-0 truncate text-lg font-black" data-testid="presenter-case-title" title={caseTitle(record)}>
@@ -173,7 +173,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
         </section>
         <ImpactMeter record={record} viewEvents={viewEvents} isLatest={pacing.isLatest} />
       </main>
-      <footer className="flex h-9 shrink-0 items-center gap-4 bg-asphalt px-8 text-sm whitespace-nowrap text-white">
+      <footer className="flex h-9 shrink-0 items-center gap-4 bg-sign-green px-8 text-sm whitespace-nowrap text-white">
         {record && (
           <span className="font-mono text-xs" data-testid="case-line">
             Case {shortId(record.case_id)}
@@ -195,7 +195,7 @@ export function PresenterView({ state, modeSwitch }: { state: CaseState; modeSwi
           </button>
         )}
         {record && awaiting ? (
-          <span className="inline-flex items-center gap-1 font-bold text-white/70" data-testid="next-step" aria-disabled="true">
+          <span className="inline-flex items-center gap-1 font-bold text-white" data-testid="next-step" aria-disabled="true">
             Next: after your approval
           </span>
         ) : (

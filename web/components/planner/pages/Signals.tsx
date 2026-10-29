@@ -37,18 +37,19 @@ export function Signals({ inbox, caseProps, openId }: { inbox: InboxProps; caseP
           )
         }
       />
-      <div className="grid gap-8 xl:grid-cols-[288px_minmax(0,1fr)_minmax(0,22rem)]">
+      {/* three columns on a wide screen; at 1280 px the extracted fields sit under the messages */}
+      <div className="grid gap-8 lg:grid-cols-[288px_minmax(0,1fr)] 2xl:grid-cols-[288px_minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-8">
           <CaseList cases={inbox.cases} loaded={inbox.loaded} openId={openId} onOpen={inbox.onOpen} />
           <DemoInputs onStarted={inbox.onStarted} disabled={inbox.busy} onReset={inbox.onReset} />
         </div>
         {record ? (
-          <>
+          <div className="grid min-w-0 gap-8 2xl:contents">
             <Messages record={record} />
             <Extracted record={record} />
-          </>
+          </div>
         ) : (
-          <div className={cn(CARD, "p-6 text-base text-ink-2 xl:col-span-2")} data-testid="no-case">
+          <div className={cn(CARD, "p-6 text-base text-ink-2 2xl:col-span-2")} data-testid="no-case">
             No case open. Load the demo inputs and start a case, or pick one from the list.
           </div>
         )}

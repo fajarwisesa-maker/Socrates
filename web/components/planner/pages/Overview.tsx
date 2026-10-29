@@ -70,8 +70,8 @@ export function Overview({ record, events, approvals, onPage }: CasePageProps) {
           <Kpi
             label="Inbound PO stuck"
             icon={<PackageX aria-hidden />}
-            value={po ? `PO ${po.PurchaseOrder}` : "Not yet"}
-            note={po ? `${thousands(po.items[0]?.OrderQuantity)} ctn on the blocked lane` : "Assess reads SAP"}
+            value={a ? `${a.purchase_orders.length} PO` : "Not yet"}
+            note={po ? `PO ${po.PurchaseOrder} · ${thousands(po.items[0]?.OrderQuantity)} ctn on the blocked lane` : "Assess reads SAP"}
             testId="kpi-po"
           />
         </Reveal>
