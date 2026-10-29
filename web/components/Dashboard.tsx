@@ -29,7 +29,8 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, [mode]);
 
-  const toggle = <ModeSwitch mode={mode} onChange={setMode} />;
+  // the Planner's top bar is white (UI v3), the Presenter's header asphalt
+  const toggle = <ModeSwitch mode={mode} onChange={setMode} tone={mode === "planner" ? "light" : "dark"} />;
   // With reduced motion (the OS setting, or ?motion=off) motion skips transforms, the CSS
   // ends every transition at once and components show their end state (lib/motion.ts).
   return (

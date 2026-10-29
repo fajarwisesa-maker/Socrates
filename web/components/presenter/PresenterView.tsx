@@ -18,7 +18,7 @@ import { caseTitle, shortId } from "@/lib/caseView";
 import { cn } from "@/lib/utils";
 import { CARD, Logo } from "../signs";
 import { AgentContext } from "./canvases/Frame";
-import { modelNote } from "../planner/PlannerHeader";
+import { modelNote } from "../planner/Shell";
 
 const KEYS: [string, string][] = [
   ["Space", "next"],

@@ -44,6 +44,7 @@ test("motion on: Approve is clickable as soon as it is visible (Planner)", async
   await page.getByRole("button", { name: "Load demo WhatsApp" }).click();
   await page.getByRole("button", { name: "Load forwarder PDF" }).click();
   await page.getByTestId("start-case").click();
+  await page.getByTestId("nav-approvals").click();
   const approve = page.getByTestId("approve");
   await approve.waitFor({ state: "visible", timeout: 90_000 });
   await approve.evaluate((el) => el.scrollIntoView({ block: "center" })); // no actionability wait

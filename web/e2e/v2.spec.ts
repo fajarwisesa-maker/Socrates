@@ -22,7 +22,7 @@ test("v2: delay chip on Assess, PII chip and the Architecture tab in Planner mod
     await expect(chip).toHaveCount(0);
   }
 
-  await page.goto("/?mode=planner");
+  await page.goto("/?mode=planner&page=signals");
   await expect(page.getByTestId("planner")).toBeVisible();
   if (config.pii_masking === "local") {
     await expect(page.getByTestId("pii-chip")).toContainText("PII check · nothing to mask");
@@ -33,7 +33,7 @@ test("v2: delay chip on Assess, PII chip and the Architecture tab in Planner mod
     await page.getByTestId("stage-ASSESS").getByRole("button").click();
     await expect(page.getByTestId("delay-details")).toContainText("risk uses");
   }
-  await page.getByTestId("planner-tab-architecture").click();
+  await page.getByTestId("nav-architecture").click();
   const arch = page.getByTestId("architecture");
   await expect(arch).toBeVisible();
   await expect(page.getByTestId("arch-orchestrator")).toHaveAttribute("data-live", "1");

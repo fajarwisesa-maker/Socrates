@@ -12,21 +12,21 @@
  * >= 4.5:1 washed out), and teal text uses brand-teal-ink #0A4F4A.
  */
 :root {
-  --concrete: #edede8; /* page background */
+  --concrete: #f2f4f3; /* page background (UI v3: the mockup's cool grey) */
   --road-white: #ffffff; /* plates, tables, cards */
   --asphalt: #1e2124; /* header, text, sign borders */
   --asphalt-muted: #36393e; /* secondary text */
   --curb: #c9cac4; /* dividers, table rules */
-  --sign-green: #005a33; /* route, done, verified, primary action */
-  --sign-green-tint: #cfe6d9; /* tint and rules on green signs (text on green is white) */
+  --sign-green: #1f4e46; /* UI v3: dark teal = primary, route, done, verified */
+  --sign-green-tint: #d4e6e0; /* tint and rules on teal (text on teal is white) */
   --signal-yellow: #ffc20e; /* needs you, approval, deadline: asphalt text + border */
   --stop-red: #b00d28; /* blocked, rejected, reopened, at risk */
   --brand-teal: #0f766e; /* logo, focus ring */
   --brand-teal-ink: #0a4f4a; /* "Written by the agent" labels */
   --sea: #cfdde2; /* lane map only */
   --land: #e4e4dc; /* lane map only */
-  --hairline: #d8d9d3; /* the one 1px card line, drawn as an inset shadow */
-  --divider: #e4e4dc; /* table row dividers */
+  --hairline: #dde2e0; /* the one 1px card line, drawn as an inset shadow */
+  --divider: #e7ebe9; /* table row dividers */
 
   /* Spacing scale (docs/polish-prompt.md 3.1). Tailwind steps 1 / 2 / 4 / 6 / 8 / 12 / 16
      are the same values at 1rem = 16px, so components use those steps only. */
@@ -48,6 +48,18 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --rise: 8px;
 
+  /* UI v3 soft chips (the mockup's status pills): tinted fill, dark text >= 4.5:1 */
+  --chip-risk-bg: #fbe5e5;
+  --chip-risk-fg: #8a1a1a;
+  --chip-needs-bg: #fcefd2;
+  --chip-needs-fg: #6e4500;
+  --chip-ok-bg: #dff0e6;
+  --chip-ok-fg: #1b5536;
+  --chip-info-bg: #e3ecf7;
+  --chip-info-fg: #1d426c;
+  --chip-muted-bg: #eceeed;
+  --chip-muted-fg: #3c4240;
+
   /* Older token names, mapped onto the palette so every component follows it. */
   --canvas: var(--concrete);
   --surface: var(--road-white);
@@ -56,8 +68,8 @@
   --ink: var(--asphalt);
   --ink-2: var(--asphalt-muted);
   --brand: var(--sign-green);
-  --brand-ink: #004a2a;
-  --brand-soft: #dcede3;
+  --brand-ink: #173d37;
+  --brand-soft: #e1efe9;
   --risk: var(--stop-red);
   --risk-ink: #8e0a20;
   --risk-soft: #f8e1e4;
@@ -65,8 +77,8 @@
   --human-ink: var(--asphalt);
   --human-soft: #fff0c2;
   --ok: var(--sign-green);
-  --ok-ink: #004a2a;
-  --ok-soft: #dcede3;
+  --ok-ink: #173d37;
+  --ok-soft: #e1efe9;
 }
 
 /* Overpass draws its middle dot off-centre, so "Banjir · Brebes" read as "Banjir ·Brebes".
@@ -94,6 +106,16 @@
   --color-land: var(--land);
   --color-hairline: var(--hairline);
   --color-divider: var(--divider);
+  --color-chip-risk-bg: var(--chip-risk-bg);
+  --color-chip-risk-fg: var(--chip-risk-fg);
+  --color-chip-needs-bg: var(--chip-needs-bg);
+  --color-chip-needs-fg: var(--chip-needs-fg);
+  --color-chip-ok-bg: var(--chip-ok-bg);
+  --color-chip-ok-fg: var(--chip-ok-fg);
+  --color-chip-info-bg: var(--chip-info-bg);
+  --color-chip-info-fg: var(--chip-info-fg);
+  --color-chip-muted-bg: var(--chip-muted-bg);
+  --color-chip-muted-fg: var(--chip-muted-fg);
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);

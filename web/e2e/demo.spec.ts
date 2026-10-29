@@ -17,14 +17,18 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await page.screenshot(shots("1-inbox"));
 
   await page.getByTestId("start-case").click();
+  // UI v3: the sidebar pages; Approvals holds the decision
+  await expect(page.getByTestId("page-overview")).toBeVisible();
+  await page.getByTestId("nav-approvals").click();
   const card = page.getByTestId("approval-card").first();
   await expect(card).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId("exposure")).toHaveText("Rp 340.000.000");
   await expect(card).toContainText("Rp 7.500.000");
   await expect(card).toContainText("Day 1 18:00");
   await expect(page.getByTestId("stage-ACT")).toHaveAttribute("data-state", "waiting");
   await page.screenshot(shots("2-awaiting-approval"));
-  // The options table is on the Reflect sheet of the case file.
+  await page.getByTestId("nav-impact").click();
+  await expect(page.getByTestId("exposure")).toHaveText("Rp 340.000.000");
+  // The stepper's Reflect step opens Response options.
   await page.getByTestId("stage-REFLECT").getByRole("button").click();
   await expect(page.getByTestId("option-B1")).toContainText("Rp 8.100.000");
   await expect(page.getByTestId("option-B1")).toContainText("rejected: safety stock");
@@ -37,12 +41,12 @@ test("demo case: signal -> approval -> verified", async ({ page, request }) => {
   await expect(page.getByTestId("po-number")).toContainText(/45000182\d\d/, { timeout: 30_000 });
   await expect(page.getByTestId("case-status")).toHaveAttribute("data-status", "RESOLVED", { timeout: 90_000 });
   await expect(page.getByTestId("stage-VERIFY")).toHaveAttribute("data-state", "done");
-  await expect(page.getByTestId("audit-status")).toContainText("hash chain verified", {
-    timeout: 10_000,
-  });
-  await page.getByTestId("stage-VERIFY").getByRole("button").click();
-  await page.getByRole("button", { name: /Show \d+ entries/ }).click();
+  await page.getByTestId("go-verify").click();
+  await expect(page.getByTestId("outcome-line")).toHaveText("Rp 340 jt protected for Rp 11,4 jt");
   await page.screenshot(shots(process.env.SIAGA_EXPECT_REPLAY ? "5-replay-verified" : "3-verified"));
+  await page.getByTestId("nav-audit").click();
+  await expect(page.getByTestId("audit-status")).toContainText("hash chain verified", { timeout: 10_000 });
+  await expect(page.getByTestId("audit-checkpoints").locator("li").first()).toContainText("Case");
 
   // Audit filters: by stage (derived from the chain order), then by event type.
   const rows = page.getByTestId("audit-table").locator("tbody tr");
@@ -66,6 +70,7 @@ test("rejecting the bridge PO replans the remaining shortfall to air", async ({ 
   await page.getByRole("button", { name: "Load forwarder PDF" }).click();
   await expect(page.getByTestId("pdf-name")).toHaveText("forwarder_notice.pdf");
   await page.getByTestId("start-case").click();
+  await page.getByTestId("nav-approvals").click();
 
   const bridge = page.getByTestId("approval-card").filter({ has: page.getByText(/^Bridge PO:/) });
   await expect(bridge).toBeVisible({ timeout: 90_000 });

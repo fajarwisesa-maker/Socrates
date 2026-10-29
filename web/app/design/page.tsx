@@ -22,7 +22,7 @@ const TOKENS: [string, string, string][] = [
   ["asphalt", "#1e2124", "header, text, sign borders"],
   ["asphalt-muted", "#36393e", "secondary text (brief #50545A, darkened for the washout check)"],
   ["curb", "#c9cac4", "dividers, table rules"],
-  ["sign-green", "#005a33", "route, done, verified, primary action (brief #00653A, darkened)"],
+  ["sign-green", "#1f4e46", "UI v3 dark teal: primary, route, done, verified"],
   ["sign-green-tint", "#cfe6d9", "tints and rules on green signs"],
   ["signal-yellow", "#ffc20e", "needs you, approval, deadline (asphalt text and border)"],
   ["stop-red", "#b00d28", "blocked, rejected, reopened, at risk (brief #C8102E, darkened)"],

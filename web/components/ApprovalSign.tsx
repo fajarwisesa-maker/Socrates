@@ -47,6 +47,13 @@ function shortTitle(a: CaseAction | undefined): string | null {
   return null;
 }
 
+/** Planner (UI v3): the mockup's calm cards; the colours still change in place. */
+const PLANNER_TONE: Record<Tone, string> = {
+  pending: "bg-chip-needs-bg text-asphalt inset-ring-2 inset-ring-[#a86a00]",
+  approved: "bg-chip-ok-bg text-asphalt inset-ring-2 inset-ring-sign-green",
+  rejected: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
+};
+
 const TONE: Record<Tone, string> = {
   pending: "bg-signal-yellow text-asphalt inset-ring-2 inset-ring-asphalt",
   approved: "bg-sign-green text-white inset-ring-2 inset-ring-transparent",
@@ -286,7 +293,7 @@ export function ApprovalSign({
       {...common}
       className={cn(
         "flex flex-col gap-4 rounded-[12px] px-8 py-6 transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]",
-        TONE[tone],
+        PLANNER_TONE[tone],
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -354,7 +361,7 @@ export function ApprovalSign({
         <div id={detailsId} hidden={!open} className={cn("mt-4 flex flex-col gap-4", open && "rise")} style={{ animationDuration: "240ms" }}>
           {c.summary ? (
             <div>
-              <AgentWritten by={c.summary_by} className={tone === "approved" ? "text-white" : undefined} />
+              <AgentWritten by={c.summary_by} />
               <p className="text-base" data-testid="approval-summary">
                 {c.summary}
               </p>

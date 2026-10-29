@@ -81,10 +81,13 @@ export default function AuditView({
   caseId,
   version,
   defaultOpen = false,
+  checkpoints = false,
 }: {
   caseId: string | null;
   version: number;
   defaultOpen?: boolean;
+  /** UI v3 audit page: the chain as checkpoints (one per stage run) above the entries */
+  checkpoints?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.audit>> | null>(null);
@@ -188,6 +191,16 @@ export default function AuditView({
               )}
               {remoteError && <span className="text-risk-ink">S3 check failed: {remoteError}</span>}
             </div>
+          )}
+          {checkpoints && (
+            <Checkpoints
+              rows={rows}
+              onPick={(stage) => {
+                setStageFilter(stage);
+                setTypeFilter("all");
+                setOpen(true);
+              }}
+            />
           )}
           <button onClick={() => setOpen(!open)} className="text-xs font-medium text-brand-ink hover:underline">
             {open ? "Hide entries" : `Show ${data.entries.length} entries`}
@@ -307,5 +320,56 @@ function FilterRow({
         </button>
       ))}
     </div>
+  );
+}
+
+/** The chain as checkpoints: one card per run of a stage, in chain order (audit page). */
+function Checkpoints({ rows, onPick }: { rows: { entry: AuditEntry; stage: string }[]; onPick: (stage: string) => void }) {
+  const runs: { stage: string; rows: { entry: AuditEntry; stage: string }[] }[] = [];
+  for (const r of rows) {
+    const last = runs.at(-1);
+    if (last && last.stage === r.stage) last.rows.push(r);
+    else runs.push({ stage: r.stage, rows: [r] });
+  }
+  const count = (rs: { entry: AuditEntry }[], t: TypeId) => rs.filter((r) => typeOf(r.entry.kind) === t).length;
+  return (
+    <ol className="mb-4 flex flex-col gap-2" data-testid="audit-checkpoints">
+      {runs.map((run, i) => {
+        const first = run.rows[0].entry;
+        const last = run.rows.at(-1)!.entry;
+        const facts = [
+          [count(run.rows, "tool"), "tool call"],
+          [count(run.rows, "policy"), "policy decision"],
+          [count(run.rows, "model"), "model call"],
+          [count(run.rows, "approval"), "approval"],
+        ].filter(([n]) => (n as number) > 0);
+        const denied = run.rows.some((r) => r.entry.kind === "policy_decision" && !(r.entry.payload as { allowed?: boolean }).allowed);
+        return (
+          <li key={i} className="flex items-start gap-4 rounded-[12px] bg-surface p-4 inset-ring inset-ring-hairline">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sign-green text-xs font-black text-white">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-base font-black">{STAGE_NAME[run.stage] ?? run.stage}</span>
+                <span className="font-mono text-xs text-ink-2">
+                  {first.ts.slice(11, 19)} · #{first.seq}–{last.seq}
+                </span>
+                {denied && <span className="rounded-full bg-chip-risk-bg px-2 text-xs font-bold text-chip-risk-fg">policy denied</span>}
+              </div>
+              <span className="text-sm text-ink-2">
+                {facts.length ? facts.map(([n, w]) => `${n} ${w}${(n as number) > 1 ? "s" : ""}`).join(" · ") : "stage change"}
+              </span>
+              <span className="font-mono text-xs text-ink-2" title={last.hash}>
+                last hash {last.hash.slice(0, 16)}…
+              </span>
+            </div>
+            <button onClick={() => onPick(run.stage)} className="min-h-11 shrink-0 text-sm font-bold text-asphalt underline decoration-2 underline-offset-4">
+              Show {run.rows.length} entries
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
