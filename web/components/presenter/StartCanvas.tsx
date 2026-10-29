@@ -4,6 +4,7 @@ import { Check, FileText, MessageCircle, Play } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { plainError } from "@/lib/caseView";
 
 /** Before a case: load the two demo signals and start. Replaces the signal inbox. */
 export function StartCanvas({ onStarted }: { onStarted: (caseId: string) => void }) {
@@ -22,7 +23,7 @@ export function StartCanvas({ onStarted }: { onStarted: (caseId: string) => void
       const { case_id } = await api.startCase(form);
       onStarted(case_id);
     } catch (e) {
-      setError((e as Error).message);
+      setError(plainError(e, "starting the case"));
     } finally {
       setBusy(false);
     }

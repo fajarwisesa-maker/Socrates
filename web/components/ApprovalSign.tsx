@@ -10,7 +10,7 @@
 import { ArrowRight, Check, ChevronDown, Loader2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { actionFor, approvalTitle, countdown, DECISION_OBJECT } from "@/lib/caseView";
+import { actionFor, approvalState, approvalTitle, countdown, DECISION_OBJECT, plainError, planTotal, type ApprovalState } from "@/lib/caseView";
 import { dayShort, juta, thousands } from "@/lib/format";
 import type { Approval, CaseAction, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
@@ -20,7 +20,7 @@ import { AgentWritten, SolverLabel } from "./signs";
 import { Button } from "./ui/button";
 
 type Variant = "planner" | "presenter";
-type Tone = "pending" | "approved" | "rejected";
+type Tone = ApprovalState;
 
 /** Test ids differ per mode (the Planner and Presenter e2e tests predate the redesign). */
 const IDS = {
@@ -49,15 +49,31 @@ function shortTitle(a: CaseAction | undefined): string | null {
 
 /** Planner (UI v3): the mockup's calm cards; the colours still change in place. */
 const PLANNER_TONE: Record<Tone, string> = {
-  pending: "bg-chip-needs-bg text-asphalt inset-ring-2 inset-ring-[#a86a00]",
-  approved: "bg-chip-ok-bg text-asphalt inset-ring-2 inset-ring-sign-green",
+  pending: "bg-tint-needs-bg text-asphalt inset-ring-2 inset-ring-signal-yellow",
+  busy: "bg-tint-needs-bg text-asphalt inset-ring-2 inset-ring-tint-needs-line",
+  approved: "bg-tint-ok-bg text-asphalt inset-ring-2 inset-ring-sign-green",
   rejected: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
+  expired: "bg-tint-risk-bg text-asphalt inset-ring-2 inset-ring-stop-red",
+  escalated: "bg-tint-risk-bg text-asphalt inset-ring-2 inset-ring-stop-red",
+};
+
+/** The label plate in the sign's top line. */
+const LABEL_PLATE: Record<Tone, string> = {
+  pending: "bg-signal-yellow text-asphalt",
+  busy: "bg-chip-needs-bg text-chip-needs-fg",
+  approved: "bg-chip-ok-bg text-chip-ok-fg",
+  rejected: "bg-chip-risk-bg text-chip-risk-fg",
+  expired: "bg-chip-risk-bg text-chip-risk-fg",
+  escalated: "bg-chip-risk-bg text-chip-risk-fg",
 };
 
 const TONE: Record<Tone, string> = {
   pending: "bg-signal-yellow text-asphalt inset-ring-2 inset-ring-asphalt",
+  busy: "bg-signal-yellow text-asphalt inset-ring-2 inset-ring-asphalt",
   approved: "bg-sign-green text-white inset-ring-2 inset-ring-transparent",
   rejected: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
+  expired: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
+  escalated: "bg-road-white text-asphalt inset-ring-2 inset-ring-stop-red",
 };
 
 export function ApprovalSign({
@@ -66,6 +82,7 @@ export function ApprovalSign({
   variant = "planner",
   onDecided,
   onNext,
+  onSeeWhy,
 }: {
   approval: Approval;
   record: CaseRecord;
@@ -73,6 +90,8 @@ export function ApprovalSign({
   onDecided?: () => void;
   /** Planner: the next step after an approval ("Go to Verify"); focus moves to it */
   onNext?: () => void;
+  /** escalated: "See what happened" (Planner opens the audit trail) */
+  onSeeWhy?: () => void;
 }) {
   const now = useNow(1000);
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
@@ -90,20 +109,8 @@ export function ApprovalSign({
   const presenter = variant === "presenter";
   const object = DECISION_OBJECT[action?.kind ?? ""] ?? "action";
   const title = approvalTitle(action, record, c.what);
-  const pendingNow = approval.status === "PENDING" && action?.status === "PENDING_APPROVAL";
-  const expired = approval.status === "EXPIRED" || action?.status === "EXPIRED";
-  // withdrawn: the case was escalated before anyone decided (older cases kept it PENDING)
-  const withdrawn =
-    approval.status === "WITHDRAWN" ||
-    action?.status === "WITHDRAWN" ||
-    (approval.status === "PENDING" && ["ESCALATED", "RESOLVED", "REOPENED", "FAILED"].includes(record.status));
-  const tone: Tone = withdrawn
-    ? "rejected"
-    : approval.status === "APPROVED" && !expired
-      ? "approved"
-      : !pendingNow && approval.status !== "PENDING"
-        ? "rejected"
-        : "pending";
+  // one source for the state: lib/caseView.ts approvalState (the case status decides)
+  const tone: Tone = approvalState(approval, record);
   const left = countdown(c.approve_by, now);
   const approveBy = c.approve_by ? dayShort(record.day0, c.approve_by) : null;
   const rejectedOptions = record.critic_findings.filter((f) => !f.clean);
@@ -122,46 +129,40 @@ export function ApprovalSign({
       setDecidedHere(true);
       onDecided?.();
     } catch (e) {
-      setError((e as Error).message);
+      setError(plainError(e, decision === "approve" ? "approving" : "rejecting"));
       setBusy(null);
+      onDecided?.(); // reload: the case may have moved on
     }
   }
 
-  const announcement =
-    tone === "approved"
-      ? sapRef
-        ? `Approved. ${title}: SAP document ${sapRef}.`
-        : `Approved. Creating the ${object} in SAP.`
-      : tone === "rejected"
-        ? withdrawn
-          ? "Withdrawn. The case was handed to a human planner."
-          : expired
-          ? "Approved too late. SIAGA replans."
-          : "Rejected. SIAGA keeps what was done and replans."
-        : "";
+  const announcement: Record<Tone, string> = {
+    approved: sapRef ? `Approved. ${title}: SAP document ${sapRef}.` : `Approved. Creating the ${object} in SAP.`,
+    rejected: "Rejected. SIAGA keeps what was done and replans.",
+    expired: "Approved too late. SIAGA replans.",
+    escalated: "Escalated. The case was handed to a human planner; this can no longer be decided here.",
+    busy: "",
+    pending: "",
+  };
 
-  const label =
-    tone === "approved"
-      ? `Approved · Tier ${action?.tier ?? 3}`
-      : tone === "rejected"
-        ? withdrawn
-          ? "Withdrawn · not decided"
-          : expired
-          ? "Approved too late"
-          : "Rejected"
-        : presenter
-          ? `Tier ${action?.tier ?? 3} · needs you`
-          : `Your approval needed · Tier ${action?.tier ?? 3}`;
+  const tier = `Tier ${action?.tier ?? 3}`;
+  const label: Record<Tone, string> = {
+    approved: `Approved · ${tier}`,
+    rejected: "Rejected",
+    expired: "Approved too late",
+    escalated: "Escalated · not actionable",
+    busy: `${tier} · waiting for SIAGA`,
+    pending: presenter ? `${tier} · needs you` : `Your approval needed · ${tier}`,
+  };
 
   const deadline = tone === "pending" && approveBy && (
     <span
       data-testid="approve-by"
       className={cn(
-        "rounded-[6px] px-2 py-1 font-mono text-sm font-bold whitespace-nowrap",
-        left?.expired ? "bg-stop-red text-white" : "bg-asphalt text-signal-yellow",
+        "rounded-[6px] px-2 py-1 font-mono text-sm font-bold whitespace-nowrap transition-colors duration-[var(--dur-base)]",
+        left?.expired ? "bg-chip-risk-bg text-chip-risk-fg" : "bg-asphalt text-signal-yellow",
       )}
     >
-      {left ? `${left.text} · ` : ""}Approve by {approveBy}
+      {left ? `${left.expired ? "Approve-by passed" : left.text} · ` : ""}Approve by {approveBy}
     </span>
   );
 
@@ -182,17 +183,33 @@ export function ApprovalSign({
     </Reveal>
   );
 
-  const rejectedLine = tone === "rejected" && (
-    <Reveal delay={120} as="p" className="text-base">
-      {withdrawn
-        ? `SIAGA handed the case to a human planner before this was decided, so it can no longer be approved here.${record.escalation_reason ? ` Reason: ${record.escalation_reason}` : ""}`
-        : expired
-        ? "The approve-by time had passed, so SIAGA replanned."
-        : `${approval.decided_by === "planner" || !approval.decided_by ? "You" : approval.decided_by} rejected this. SIAGA keeps what was done and replans.`}
-      {approval.reason && !withdrawn && (
-        <>
-          {" "}Reason: <span lang="id">“{approval.reason}”</span>
-        </>
+  const closedLine = (tone === "rejected" || tone === "expired" || tone === "escalated" || tone === "busy") && (
+    <Reveal delay={120} as="div" className="flex flex-col gap-2 text-base" testId="approval-closed">
+      <p>
+        {tone === "escalated"
+          ? "SIAGA handed the case to a human planner before this was decided, so it cannot be approved or rejected here. Everything done so far is kept in SAP and in the audit trail."
+          : tone === "expired"
+            ? record.status === "RUNNING"
+              ? "The approve-by time had passed, so SIAGA is replanning."
+              : "The approve-by time had passed, so SIAGA replanned."
+            : tone === "busy"
+              ? "SIAGA is still working on the case. You can decide as soon as it waits for you."
+              : `${approval.decided_by === "planner" || !approval.decided_by ? "You" : approval.decided_by} rejected this. SIAGA keeps what was done and replans.`}
+        {tone === "rejected" && approval.reason && (
+          <>
+            {" "}Reason: <span lang="id">“{approval.reason}”</span>
+          </>
+        )}
+      </p>
+      {tone === "escalated" && record.escalation_reason && (
+        <p className="text-sm" data-testid="escalation-reason">
+          <b>Why:</b> {record.escalation_reason}
+        </p>
+      )}
+      {tone === "escalated" && onSeeWhy && (
+        <Button variant="link" className="self-start text-sm text-current" onClick={onSeeWhy} data-testid="see-what-happened">
+          See what happened <ArrowRight aria-hidden />
+        </Button>
       )}
     </Reveal>
   );
@@ -244,7 +261,7 @@ export function ApprovalSign({
   };
   const live = (
     <p className="sr-only" aria-live="polite">
-      {announcement}
+      {announcement[tone]}
     </p>
   );
 
@@ -256,7 +273,7 @@ export function ApprovalSign({
         className={cn("rounded-[12px] px-6 py-4 transition-[background-color,color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]", TONE[tone])}
       >
         <div className="flex items-center gap-4">
-          <span className="sign-label shrink-0 text-sm">{label}</span>
+          <span className="sign-label shrink-0 text-sm">{label[tone]}</span>
           <h3 id={titleId} className="min-w-0 flex-1 truncate text-xl leading-tight font-black" title={title}>
             {shortTitle(action) ?? title}
           </h3>
@@ -280,7 +297,7 @@ export function ApprovalSign({
             </span>
           )}
           {sapLine}
-          {rejectedLine}
+          {closedLine}
           {tone === "pending" && !rejecting && (
             <Button
               size="lg"
@@ -313,9 +330,15 @@ export function ApprovalSign({
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="sign-label flex items-center gap-2 text-sm">
-          {tone === "approved" && <Check className="size-5" strokeWidth={3} aria-hidden />}
-          {label}
+        <span
+          className={cn(
+            "sign-label flex items-center gap-2 rounded-[6px] px-2 py-1 text-sm transition-colors duration-[var(--dur-base)]",
+            LABEL_PLATE[tone],
+          )}
+          data-testid="approval-label"
+        >
+          {tone === "approved" && <Check className="size-4" strokeWidth={3} aria-hidden />}
+          {label[tone]}
         </span>
         {deadline}
         {tone === "approved" && approval.decided_by && (
@@ -323,14 +346,15 @@ export function ApprovalSign({
         )}
       </div>
       <div className="flex flex-col gap-1">
-        <h3 id={titleId} className="truncate text-xl leading-tight font-black" title={title}>
+        <h3 id={titleId} className="text-xl leading-tight font-black">
           {title}
         </h3>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <span className="text-4xl leading-none font-black">{juta(c.cost)}</span>
-          <span className="text-sm">
-            {c.cost_display} · part of a plan totalling {c.plan_total_display}
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+          <span className="flex flex-col">
+            <span className="text-4xl leading-none font-black">{juta(c.cost)}</span>
+            <span className="mt-1 font-mono text-xs text-ink-2">{c.cost_display}</span>
           </span>
+          {planTotal(action, record) && <span className="pb-5 text-sm">part of the {planTotal(action, record)} plan</span>}
         </div>
       </div>
       {tone === "pending" && (
@@ -339,7 +363,7 @@ export function ApprovalSign({
         </p>
       )}
       {sapLine}
-      {rejectedLine}
+      {closedLine}
 
       {tone === "pending" && !rejecting && (
         <div className="flex flex-wrap items-center gap-4">
@@ -400,7 +424,7 @@ export function ApprovalSign({
                     <b>
                       {x.option_id}, {x.label.toLowerCase()}:
                     </b>{" "}
-                    {x.total_cost_display}, clean.
+                    {juta(record.solver_results.find((s) => s.option_id === x.option_id)?.result.total_cost) ?? x.total_cost_display}, clean.
                   </li>
                 ))}
                 {rejectedOptions.map((f) => {
@@ -411,7 +435,7 @@ export function ApprovalSign({
                       <b>
                         {f.option_id}, {o?.label.toLowerCase() ?? "option"}:
                       </b>{" "}
-                      {o?.total_cost_display}, rejected by the Critic. {why}
+                      {o ? juta(o.result.total_cost) : ""}, rejected by the Critic. {why}
                     </li>
                   );
                 })}

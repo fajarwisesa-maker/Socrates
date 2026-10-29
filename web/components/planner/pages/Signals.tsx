@@ -9,7 +9,7 @@ import { Reveal } from "@/components/Reveal";
 import { AgentWritten } from "@/components/signs";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { caseTitle, shortId } from "@/lib/caseView";
+import { caseStatusView, caseTitle, plainError, shortId } from "@/lib/caseView";
 import { dayShort } from "@/lib/format";
 import { useWithExits } from "@/lib/motion";
 import { CAUSE, delay, delayChip, FIELD, glossFor, uniqueSpans } from "@/lib/present";
@@ -17,7 +17,6 @@ import type { CaseRecord, Evidence } from "@/lib/types";
 import type { InboxCase } from "@/lib/useInbox";
 import { cn } from "@/lib/utils";
 import { CARD } from "../../signs";
-import { STATUS_CHIP } from "../Shell";
 import { Chip, PageHeader, Panel } from "../ui";
 import type { CasePageProps, InboxProps } from "./types";
 
@@ -80,7 +79,7 @@ function CaseList({ cases, loaded, openId, onOpen }: { cases: InboxCase[]; loade
       <ul className="flex flex-col gap-2">
         {listed.map(({ item: c, exiting }, i) => {
           const r = c.record;
-          const s = STATUS_CHIP[r.status] ?? { tone: "info" as const, text: "Running" };
+          const s = caseStatusView(r, c.approvals).header;
           const active = r.case_id === openId;
           return (
             <Reveal as="li" key={r.case_id} delay={Math.min(i, 4) * 70} className={exiting ? "fade-out" : undefined}>
@@ -299,7 +298,7 @@ function DemoInputs({ onStarted, disabled, onReset }: { onStarted: (id: string) 
       const { case_id } = await api.startCase(form);
       onStarted(case_id);
     } catch (e) {
-      setError((e as Error).message);
+      setError(plainError(e, "starting the case"));
     } finally {
       setBusy(false);
     }

@@ -9,6 +9,7 @@ import { stageInfo, STAGE_LABEL, STAGES } from "@/lib/stages";
 import type { CaseEvent, CaseRecord, Stage } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
+import { Chip } from "./ui";
 
 /** Which page shows a stage. */
 export const STAGE_PAGE: Record<Stage, Page> = {
@@ -50,48 +51,55 @@ export function Journey({
           const info = stageInfo(stage, events, record, now);
           const post = postState(stage, info.state, events, record);
           const note = stageNote(stage, record, events, now);
-          const current = info.state === "running" || info.state === "waiting";
+          const current = post === "current";
           const showNote = note && (current || note.tone === "risk");
           const here = STAGE_PAGE[stage] === page;
+          // tinted pill on the current stage: needs while waiting for a person, info while working
+          const pill = current
+            ? info.state === "waiting"
+              ? "bg-tint-needs-bg inset-ring inset-ring-tint-needs-line"
+              : "bg-tint-info-bg inset-ring inset-ring-tint-info-line"
+            : post === "verified"
+              ? "bg-tint-ok-bg inset-ring inset-ring-tint-ok-line"
+              : post === "flagged" && info.state === "escalated"
+                ? "bg-tint-risk-bg inset-ring inset-ring-tint-risk-line"
+                : null;
           return (
             <li key={stage} data-testid={`stage-${stage}`} data-state={info.state} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden className={cn("h-0.5 w-4", info.state === "pending" ? "bg-hairline" : "bg-sign-green")} />}
+              {i > 0 && <span aria-hidden className={cn("h-0.5 w-4 transition-colors duration-[var(--dur-base)]", post === "pending" ? "bg-hairline" : "bg-sign-green")} />}
               <button
                 type="button"
                 onClick={() => onPage(STAGE_PAGE[stage])}
-                disabled={info.state === "pending"}
+                disabled={post === "pending"}
                 aria-current={here && current ? "step" : undefined}
                 className={cn(
                   "flex min-h-9 items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm disabled:cursor-default",
-                  "transition-[background-color] duration-[var(--dur-fast)]",
-                  here ? "bg-surface-2" : "hover:bg-surface-2",
+                  "transition-[background-color,box-shadow] duration-[var(--dur-base)]",
+                  pill ?? (here ? "bg-row-hover inset-ring inset-ring-hairline" : "hover:bg-row-hover"),
                 )}
               >
                 <span
                   aria-hidden
+                  key={current ? "current" : post}
                   data-post={post}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full text-xs font-black transition-colors duration-[var(--dur-base)]",
                     DOT[post],
+                    current && info.state === "running" && "pulse-once",
                   )}
                 >
                   {i + 1}
                 </span>
-                <span className={cn("font-bold", info.state === "pending" ? "text-ink-2" : "text-asphalt")}>{STAGE_LABEL[stage]}</span>
+                <span className={cn("font-bold", post === "pending" ? "text-ink-2" : "text-asphalt")}>{STAGE_LABEL[stage]}</span>
                 {agents[stage] && (
                   <span className="sr-only" data-testid={`agent-${stage}`}>
                     {agents[stage]}
                   </span>
                 )}
                 {showNote && (
-                  <span
-                    className={cn(
-                      "text-xs font-bold",
-                      note.tone === "risk" ? "text-chip-risk-fg" : note.tone === "needs" ? "text-chip-needs-fg" : "text-ink-2",
-                    )}
-                  >
+                  <Chip tone={note.tone} testId={`stage-note-${stage}`}>
                     {note.text}
-                  </span>
+                  </Chip>
                 )}
               </button>
             </li>

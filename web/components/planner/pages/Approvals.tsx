@@ -7,6 +7,7 @@ import { Check, FileText, MessageCircle, Scale, ShieldCheck, X } from "lucide-re
 import { ApprovalSign } from "@/components/ApprovalSign";
 import { LaneDivider, TierPlate, TIER_MEANING, AgentWritten } from "@/components/signs";
 import { Button } from "@/components/ui/button";
+import { caseStatusView } from "@/lib/caseView";
 import { actionTitle } from "@/lib/present";
 import { juta } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -19,14 +20,15 @@ export function Approvals({ record, approvals, onDecided, onPage }: CasePageProp
   const pendingFirst = [...approvals].sort(
     (a, b) => Number(b.status === "PENDING") - Number(a.status === "PENDING") || b.approval_id.localeCompare(a.approval_id),
   );
-  const pending = approvals.filter((a) => a.status === "PENDING").length;
+  const view = caseStatusView(record, approvals);
+  const pending = view.decidable.length;
   const auto = record.actions.filter((a) => a.status === "EXECUTED" && a.tier <= 2);
   const chosen = record.critic_findings.find((f) => f.option_id === record.chosen_option);
 
   return (
     <div className="flex flex-col gap-8" data-testid="page-approvals">
       <PageHeader
-        chips={pending ? <Chip tone="needs">{pending} waiting for you</Chip> : <Chip tone="ok">Nothing waits for you</Chip>}
+        chips={<Chip tone={view.pageChip.tone} testId="approvals-chip">{view.pageChip.text}</Chip>}
         title="Approvals"
         description="SIAGA does internal, reversible actions under Rp 50 jt itself. Supplier orders, spot air, customer date changes and anything from Rp 50 jt wait here for you."
       />
@@ -54,7 +56,7 @@ export function Approvals({ record, approvals, onDecided, onPage }: CasePageProp
             </p>
           )}
           {pendingFirst.map((a) => (
-            <ApprovalSign key={a.approval_id} approval={a} record={record} onDecided={onDecided} onNext={() => onPage("verification")} />
+            <ApprovalSign key={a.approval_id} approval={a} record={record} onDecided={onDecided} onNext={() => onPage("verification")} onSeeWhy={() => onPage("audit")} />
           ))}
           {record.notes.map((n) => (
             <p key={n.ref} className="flex items-start gap-4 text-sm" data-testid="tier0-note">

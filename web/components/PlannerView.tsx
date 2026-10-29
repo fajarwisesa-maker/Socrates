@@ -5,6 +5,8 @@
 // stages as a stepper, and one page at a time. The page is kept in ?page=.
 import { useDelayed } from "@/lib/motion";
 import { setPage, usePickedPage, type Page } from "@/lib/page";
+import { caseStatusView } from "@/lib/caseView";
+import { juta } from "@/lib/format";
 import { agentsByStage } from "@/lib/present";
 import type { CaseState } from "@/lib/useCase";
 import { useAudit, useInbox } from "@/lib/useInbox";
@@ -29,7 +31,8 @@ export default function PlannerView({ state, modeSwitch }: { state: CaseState; m
   const picked = usePickedPage();
   const audit = useAudit(caseId, events.length);
   const inbox = useInbox(events.length);
-  const pending = approvals.filter((a) => a.status === "PENDING").length;
+  const status = record ? caseStatusView(record, approvals) : null;
+  const pending = status?.decidable.length ?? 0;
   // no page picked yet: the decision when one waits, the overview of a case, else the signals
   const page: Page = picked ?? (!caseId ? "signals" : pending ? "approvals" : "overview");
 
@@ -105,8 +108,9 @@ export default function PlannerView({ state, modeSwitch }: { state: CaseState; m
         config={config}
         events={events}
         counts={{
-          signals: open_ ? { n: open_, tone: "info", label: "open" } : undefined,
-          approvals: pending ? { n: pending, tone: "needs", label: "waiting" } : undefined,
+          signals: open_ ? { tone: "info", text: `${open_} open` } : undefined,
+          impact: record?.risk ? { tone: "risk", text: juta(record.risk.max_exposure) } : undefined,
+          approvals: status?.badge ?? undefined,
         }}
       />
       <div className="flex min-w-0 flex-1 flex-col">

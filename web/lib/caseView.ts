@@ -1,10 +1,10 @@
 // Words and states for the case file (Planner) and the Presenter canvases. Names come from
 // SAP labels, numbers from the backend; this file chooses words, formats and picks states.
 // Times: the approval countdown compares a backend timestamp with the browser clock.
-import { thousands } from "./format";
+import { dayShort, juta, thousands } from "./format";
 import { placeInText } from "./laneLayout";
 import { CAUSE, plantName, supplierName } from "./present";
-import { stageInfo, STAGE_LABEL, type StageState } from "./stages";
+import { stageInfo, STAGE_LABEL, STAGES, type StageState } from "./stages";
 import type { Approval, CaseAction, CaseEvent, CaseRecord, Stage } from "./types";
 import type { PostState } from "@/components/signs";
 
@@ -81,6 +81,7 @@ export function liveStage(record: CaseRecord, events: CaseEvent[]): Stage {
 
 /** Colour of a KM post: green done, yellow current or needs you, red flagged, white not reached. */
 export function postState(stage: Stage, state: StageState, events: CaseEvent[], record: CaseRecord): PostState {
+  if (afterEscalation(stage, events, record)) return "pending";
   if (state === "escalated" || state === "failed") return "flagged";
   if (stage === "REFLECT" && events.some((e) => e.stage === "REFLECT" && e.status === "completed" && e.data.rejected))
     return "flagged";
@@ -92,7 +93,7 @@ export function postState(stage: Stage, state: StageState, events: CaseEvent[], 
 /** One line under each KM post. */
 export function stageNote(stage: Stage, record: CaseRecord, events: CaseEvent[], now: number | null): { text: string; tone: "muted" | "risk" | "needs" | "ok" } | null {
   const info = stageInfo(stage, events, record, now);
-  if (info.state === "pending") return null;
+  if (info.state === "pending" || afterEscalation(stage, events, record)) return null;
   if (info.state === "running") return { text: "Working", tone: "muted" };
   if (info.state === "escalated") return { text: "Handed to a planner", tone: "risk" };
   switch (stage) {
@@ -170,4 +171,184 @@ export function approvalTitle(a: CaseAction | undefined, record: CaseRecord, fal
 /** The approval for an action, and the action for an approval. */
 export function actionFor(approval: Approval, record: CaseRecord): CaseAction | undefined {
   return record.actions.find((x) => x.approval_id === approval.approval_id);
+}
+
+// ------------------------------------------------------------------ one status for every screen
+
+/** The stage where the case was handed to a planner, or null. */
+export function escalatedStage(events: CaseEvent[], record: CaseRecord): Stage | null {
+  if (record.status !== "ESCALATED") return null;
+  const e = events.find((x) => x.status === "escalated" && x.stage !== "CASE");
+  return (e?.stage as Stage | undefined) ?? null;
+}
+
+/** Stages after the one where the case escalated were never reached: grey, never green. */
+export function afterEscalation(stage: Stage, events: CaseEvent[], record: CaseRecord): boolean {
+  const at = escalatedStage(events, record);
+  return at !== null && STAGES.indexOf(stage) > STAGES.indexOf(at);
+}
+
+export type StatusTone = "risk" | "needs" | "ok" | "info" | "muted";
+
+export interface CaseStatusView {
+  kind: "awaiting" | "expired" | "escalated" | "running" | "replanning" | "verifying" | "resolved" | "reopened" | "failed" | "open";
+  /** the header chip */
+  header: { tone: StatusTone; text: string };
+  /** the Approvals badge in the sidebar (null = none) */
+  badge: { tone: StatusTone; text: string } | null;
+  /** the chip on the Approvals page */
+  pageChip: { tone: StatusTone; text: string };
+  /** approvals a person can decide now (empty unless the case awaits approval) */
+  decidable: Approval[];
+}
+
+/**
+ * Every status word, badge and chip comes from here (docs/ui-v3-polish-plan.md, 4b), from
+ * the case status and its approvals, so the screens never disagree. An approval is only
+ * decidable while the case is AWAITING_APPROVAL: anything else the API refuses.
+ */
+export function caseStatusView(record: CaseRecord, approvals: Approval[]): CaseStatusView {
+  const pending = approvals.filter((a) => a.status === "PENDING");
+  const decidable = record.status === "AWAITING_APPROVAL" ? pending : [];
+  const any = approvals.length > 0;
+  const lastExpired = approvals.some((a) => a.status === "EXPIRED") && pending.length === 0;
+  const done = { tone: "ok" as const, text: "done" };
+  switch (record.status) {
+    case "AWAITING_APPROVAL": {
+      const by = decidable.map((a) => a.card.approve_by).filter((d): d is string => !!d).sort()[0];
+      const n = decidable.length;
+      return {
+        kind: "awaiting",
+        header: { tone: "needs", text: by ? `Needs you · by ${dayShort(record.day0, by)}` : "Needs you" },
+        badge: { tone: "needs", text: `${n} waiting` },
+        pageChip: { tone: "needs", text: `${n} waiting for you` },
+        decidable,
+      };
+    }
+    case "ESCALATED":
+      return {
+        kind: "escalated",
+        header: { tone: "risk", text: "Escalated" },
+        badge: { tone: "risk", text: "escalated" },
+        pageChip: { tone: "risk", text: "Escalated: a planner takes over" },
+        decidable,
+      };
+    case "RESOLVED":
+      return {
+        kind: "resolved",
+        header: { tone: "ok", text: "Resolved" },
+        badge: any ? done : null,
+        pageChip: { tone: "ok", text: "Nothing waits for you" },
+        decidable,
+      };
+    case "REOPENED":
+      return {
+        kind: "reopened",
+        header: { tone: "risk", text: "Reopened" },
+        badge: { tone: "risk", text: "reopened" },
+        pageChip: { tone: "risk", text: "Reopened after the SAP check" },
+        decidable,
+      };
+    case "VERIFYING":
+      return {
+        kind: "verifying",
+        header: { tone: "info", text: "Verifying" },
+        badge: any ? done : null,
+        pageChip: { tone: "ok", text: "Nothing waits for you" },
+        decidable,
+      };
+    case "FAILED":
+      return {
+        kind: "failed",
+        header: { tone: "risk", text: "Failed" },
+        badge: { tone: "risk", text: "failed" },
+        pageChip: { tone: "risk", text: "The case failed" },
+        decidable,
+      };
+    case "RUNNING":
+      if (lastExpired)
+        return {
+          kind: "expired",
+          header: { tone: "risk", text: "Approval expired" },
+          badge: { tone: "risk", text: "expired" },
+          pageChip: { tone: "risk", text: "Approved too late: SIAGA is replanning" },
+          decidable,
+        };
+      if (approvals.some((a) => a.status === "REJECTED") && pending.length === 0)
+        return {
+          kind: "replanning",
+          header: { tone: "info", text: "Replanning" },
+          badge: null,
+          pageChip: { tone: "info", text: "SIAGA is replanning" },
+          decidable,
+        };
+      return {
+        kind: "running",
+        header: { tone: "muted", text: "Running" },
+        badge: null,
+        pageChip: { tone: "muted", text: "SIAGA is working" },
+        decidable,
+      };
+    default:
+      return {
+        kind: "open",
+        header: { tone: "muted", text: "Open" },
+        badge: null,
+        pageChip: { tone: "muted", text: "No decision yet" },
+        decidable,
+      };
+  }
+}
+
+export type ApprovalState = "pending" | "busy" | "approved" | "rejected" | "expired" | "escalated";
+
+/** What one approval sign shows, from the approval and the case status (4b). */
+export function approvalState(approval: Approval, record: CaseRecord): ApprovalState {
+  const action = actionFor(approval, record);
+  if (approval.status === "EXPIRED" || action?.status === "EXPIRED") return "expired";
+  if (approval.status === "APPROVED") return "approved";
+  if (approval.status === "REJECTED") return "rejected";
+  if (approval.status === "WITHDRAWN" || action?.status === "WITHDRAWN") return "escalated";
+  // PENDING: decidable only while the case waits for it
+  if (record.status === "AWAITING_APPROVAL") return "pending";
+  if (record.status === "RUNNING" || record.status === "OPEN") return "busy";
+  return "escalated";
+}
+
+/** An API error as one plain sentence; the raw text goes to the console only. */
+export function plainError(e: unknown, doing: string): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  console.error(`SIAGA: ${doing} failed:`, raw);
+  const code = Number(raw.split(" ")[0]);
+  if (code === 409)
+    return `This can no longer be done: the case has moved on since this page loaded. The page now shows its current state.`;
+  if (code === 401 || code === 403) return `The Case API refused the request. Check the API key on the dashboard server, then try again.`;
+  if (code === 404) return `SIAGA no longer knows this case. It may have been reset; pick a case from Signals.`;
+  if (code >= 500) return `SIAGA hit an error while ${doing}. Try again; if it repeats, check the Case API log.`;
+  return `Could not reach the Case API while ${doing}. Check that make dev is running, then try again.`;
+}
+
+/** The total of the option an action belongs to, in the short form ("Rp 99 jt"). */
+export function planTotal(action: CaseAction | undefined, record: CaseRecord): string | null {
+  const o = action && record.solver_results.find((x) => x.option_id === action.option_id);
+  return o ? juta(o.result.total_cost) : null;
+}
+
+/** One action's status chip (Overview decisions, Act lists), consistent with its approval. */
+export function actionChip(action: CaseAction, record: CaseRecord, approvals: Approval[]): { tone: StatusTone; text: string } {
+  const ap = approvals.find((p) => p.approval_id === action.approval_id);
+  if (action.status === "EXECUTED") return { tone: "ok", text: action.tier >= 3 ? "Approved · done" : "Done by SIAGA" };
+  if (ap) {
+    const s = approvalState(ap, record);
+    if (s === "pending") return { tone: "needs", text: "Needs you" };
+    if (s === "busy") return { tone: "muted", text: "Waiting for SIAGA" };
+    if (s === "escalated") return { tone: "risk", text: "Escalated" };
+    if (s === "expired") return { tone: "risk", text: "Too late" };
+    if (s === "rejected") return { tone: "risk", text: "Rejected" };
+    if (s === "approved") return { tone: "info", text: "Approved · creating" };
+  }
+  if (action.status === "REJECTED") return { tone: "risk", text: "Rejected" };
+  if (action.status === "EXPIRED") return { tone: "risk", text: "Too late" };
+  if (action.status === "WITHDRAWN") return { tone: "risk", text: "Escalated" };
+  return { tone: "muted", text: action.status.replace("_", " ").toLowerCase() };
 }

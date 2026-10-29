@@ -17,12 +17,11 @@ import {
   Check,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { caseTitle, countdown, laneCode, shortId } from "@/lib/caseView";
+import { caseStatusView, caseTitle, laneCode, shortId } from "@/lib/caseView";
 import type { Page } from "@/lib/page";
 import { sapModelNote } from "@/lib/present";
 import type { Approval, CaseEvent, CaseRecord, Config } from "@/lib/types";
 import type { AuditData } from "@/lib/useInbox";
-import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { CARD, Logo, RouteShield } from "../signs";
 import { Chip, type ChipTone } from "./ui";
@@ -59,7 +58,7 @@ export function Sidebar({
 }: {
   page: Page;
   onPage: (p: Page) => void;
-  counts: Partial<Record<Page, { n: number; tone: ChipTone; label: string }>>;
+  counts: Partial<Record<Page, { tone: ChipTone; text: string }>>;
   config: Config | null;
   events: CaseEvent[];
 }) {
@@ -100,9 +99,9 @@ export function Sidebar({
             >
               <Icon className="size-4 shrink-0" aria-hidden />
               <span className="flex-1">{label}</span>
-              {c && c.n > 0 && (
-                <Chip tone={active ? "muted" : c.tone} testId={`nav-count-${id}`}>
-                  {c.n} {c.label}
+              {c && (
+                <Chip tone={c.tone} testId={`nav-count-${id}`} className={cn(active && "inset-ring inset-ring-white/60")}>
+                  {c.text}
                 </Chip>
               )}
             </button>,
@@ -136,24 +135,9 @@ export function Sidebar({
   );
 }
 
-export const STATUS_CHIP: Record<string, { tone: ChipTone; text: string }> = {
-  AWAITING_APPROVAL: { tone: "needs", text: "Needs you" },
-  RESOLVED: { tone: "ok", text: "Resolved" },
-  REOPENED: { tone: "risk", text: "Reopened" },
-  ESCALATED: { tone: "risk", text: "Escalated" },
-  VERIFYING: { tone: "info", text: "Verifying" },
-};
-
-/** The case status as one chip whose colour changes in place. */
+/** The case status as one chip whose colour changes in place (from caseStatusView). */
 export function CaseStatus({ record, approvals }: { record: CaseRecord; approvals: Approval[] }) {
-  const now = useNow(1000);
-  const next = approvals
-    .filter((a) => a.status === "PENDING" && a.card.approve_by)
-    .map((a) => a.card.approve_by!)
-    .sort()[0];
-  const left = countdown(next, now);
-  const replanning = record.status === "RUNNING" && approvals.some((a) => a.status === "REJECTED");
-  const s = STATUS_CHIP[record.status] ?? { tone: "info" as const, text: replanning ? "Replanning" : "Running" };
+  const s = caseStatusView(record, approvals).header;
   return (
     <span data-testid="case-status" data-status={record.status}>
       <Chip
@@ -162,7 +146,6 @@ export function CaseStatus({ record, approvals }: { record: CaseRecord; approval
         icon={record.status === "RESOLVED" ? <Check aria-hidden strokeWidth={3} /> : undefined}
       >
         {s.text}
-        {record.status === "AWAITING_APPROVAL" && left ? ` · ${left.expired ? "expired" : `${left.text} left`}` : ""}
       </Chip>
     </span>
   );
