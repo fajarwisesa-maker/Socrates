@@ -16,14 +16,13 @@ import { CAUSE, delay, delayChip, FIELD, glossFor, uniqueSpans } from "@/lib/pre
 import type { CaseRecord, Evidence } from "@/lib/types";
 import type { InboxCase } from "@/lib/useInbox";
 import { cn } from "@/lib/utils";
-import { CARD } from "../../signs";
 import { Chip, PageHeader, Panel } from "../ui";
 import type { CasePageProps, InboxProps } from "./types";
 
 export function Signals({ inbox, caseProps, openId }: { inbox: InboxProps; caseProps: CasePageProps | null; openId: string | null }) {
   const record = caseProps?.record ?? null;
   return (
-    <div className="flex flex-col gap-8" data-testid="page-signals">
+    <div className="flex flex-col gap-6" data-testid="page-signals">
       <PageHeader
         chips={record?.signals.some((s) => s.via === "whatsapp_api") ? <Chip tone="ok">Received live on WhatsApp</Chip> : undefined}
         title="Signals"
@@ -37,22 +36,28 @@ export function Signals({ inbox, caseProps, openId }: { inbox: InboxProps; caseP
         }
       />
       {/* three columns on a wide screen; at 1280 px the extracted fields sit under the messages */}
-      <div className="grid gap-8 lg:grid-cols-[288px_minmax(0,1fr)] 2xl:grid-cols-[288px_minmax(0,1fr)_minmax(0,22rem)]">
-        <div className="flex flex-col gap-8">
+      <Reveal delay={50} className="grid gap-6 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-4 2xl:col-span-3">
           <CaseList cases={inbox.cases} loaded={inbox.loaded} openId={openId} onOpen={inbox.onOpen} />
           <DemoInputs onStarted={inbox.onStarted} disabled={inbox.busy} onReset={inbox.onReset} />
         </div>
         {record ? (
-          <div className="grid min-w-0 gap-8 2xl:contents">
-            <Messages record={record} />
-            <Extracted record={record} />
-          </div>
+          <>
+            <div className="min-w-0 lg:col-span-8 2xl:col-span-5">
+              <Messages record={record} />
+            </div>
+            <div className="min-w-0 lg:col-span-12 2xl:col-span-4">
+              <Extracted record={record} />
+            </div>
+          </>
         ) : (
-          <div className={cn(CARD, "p-6 text-base text-ink-2 2xl:col-span-2")} data-testid="no-case">
-            No case open. Load the demo inputs and start a case, or pick one from the list.
+          <div className="min-w-0 lg:col-span-8 2xl:col-span-9">
+            <Panel title="No case open" icon={<MessageCircle aria-hidden />} testId="no-case">
+              <p className="text-base text-ink-2">Load the demo inputs and start a case, or pick one from the list.</p>
+            </Panel>
           </div>
         )}
-      </div>
+      </Reveal>
     </div>
   );
 }
@@ -89,11 +94,11 @@ function CaseList({ cases, loaded, openId, onOpen }: { cases: InboxCase[]; loade
                 aria-current={active ? "true" : undefined}
                 className={cn(
                   "flex w-full flex-col gap-1 rounded-[8px] p-2 text-left transition-[background-color,box-shadow] duration-[var(--dur-fast)]",
-                  active ? "bg-brand-soft inset-ring inset-ring-sign-green" : "hover:bg-surface-2",
+                  active ? "bg-tint-ok-bg inset-ring inset-ring-tint-ok-line" : "hover:bg-row-hover",
                 )}
               >
                 <span className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-black">{caseTitle(r)}</span>
+                  <span className="truncate text-sm font-black" title={caseTitle(r)}>{caseTitle(r)}</span>
                   <span className="shrink-0 font-mono text-xs text-ink-2">{r.created_at.slice(11, 16)}</span>
                 </span>
                 <span lang="id" className="text-xs text-ink-2 italic">
@@ -145,11 +150,11 @@ function Messages({ record }: { record: CaseRecord }) {
   const glosses = ev.filter((e) => glossFor(e));
   return (
     <Panel title="Messages" icon={<MessageCircle aria-hidden />} description={`Case ${shortId(record.case_id)} · opened ${dayShort(record.day0, record.created_at)}`}>
-      <div className="flex flex-col gap-4 rounded-[12px] bg-surface-2 p-4">
+      <div className="flex flex-col divide-y divide-divider">
         {record.signals.map((s, i) => {
           const spans = ev.filter((e) => e.signal === i + 1);
           return s.type === "pdf" ? (
-            <article key={i} className={cn(CARD, "flex flex-col gap-2 p-4")} data-testid="sheet-pdf">
+            <article key={i} className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0" data-testid="sheet-pdf">
               <header className="flex items-center gap-2 text-sm font-bold text-ink-2">
                 <FileText className="size-4" aria-hidden /> Forwarder notice · {s.filename ?? "PDF"}
               </header>
@@ -168,7 +173,7 @@ function Messages({ record }: { record: CaseRecord }) {
               </ul>
             </article>
           ) : (
-            <article key={i} className="flex max-w-[92%] flex-col gap-1 self-start rounded-[12px] rounded-tl-[4px] bg-road-white p-4 inset-ring inset-ring-hairline" data-testid="sheet-whatsapp">
+            <article key={i} className="flex flex-col gap-1 py-4 first:pt-0 last:pb-0" data-testid="sheet-whatsapp">
               <header className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink-2">
                 <MessageCircle className="size-4" aria-hidden /> Driver · WhatsApp
                 {s.via === "whatsapp_api" && (
@@ -184,7 +189,7 @@ function Messages({ record }: { record: CaseRecord }) {
         })}
       </div>
       {glosses.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 border-t border-divider pt-4">
           <AgentWritten />
           <ul className="flex flex-col gap-1 text-sm">
             {glosses.map((e) => (
@@ -231,7 +236,7 @@ function Extracted({ record }: { record: CaseRecord }) {
   const agreeing = d.confidence_basis?.corroborated_fields ?? [];
   const chip = delayChip(record.delay_prediction);
   return (
-    <div className="flex flex-col gap-8">
+    <div className="grid h-full gap-6 lg:grid-cols-2 2xl:grid-cols-1">
       <Panel title="Extracted and checked" icon={<ShieldCheck aria-hidden />} description="Fields from the model, each tied to quotes code found">
         <table className="w-full text-sm" data-testid="disruption-fields">
           <tbody>
@@ -263,7 +268,7 @@ function Extracted({ record }: { record: CaseRecord }) {
           </Chip>
         )}
       </Panel>
-      <Panel title="Confidence" icon={<ShieldCheck aria-hidden />} testId="sheet-confidence">
+      <Panel title="Confidence" icon={<ShieldCheck aria-hidden />} tone={d.confidence === "High" ? "ok" : "needs"} testId="sheet-confidence">
         <p className="text-2xl font-black" data-testid="margin-confidence">
           {progression.length > 1 ? progression.map((x) => x.label).join(" → ") : d.confidence}
         </p>

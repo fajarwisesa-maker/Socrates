@@ -16,7 +16,7 @@ import type { Approval, CaseAction, CaseRecord } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { Reveal } from "./Reveal";
-import { AgentWritten, SolverLabel } from "./signs";
+import { AgentWritten, NoBreakCodes, SolverLabel } from "./signs";
 import { Button } from "./ui/button";
 
 type Variant = "planner" | "presenter";
@@ -347,7 +347,7 @@ export function ApprovalSign({
       </div>
       <div className="flex flex-col gap-1">
         <h3 id={titleId} className="text-xl leading-tight font-black">
-          {title}
+          <NoBreakCodes text={title} />
         </h3>
         <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
           <span className="flex flex-col">

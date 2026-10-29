@@ -280,3 +280,21 @@ export function SolverLabel({ children = "Calculated by the solver, not AI", cla
 export function SignHeading({ children, className }: { children: ReactNode; className?: string }) {
   return <h2 className={cn("sign-label text-sm text-asphalt", className)}>{children}</h2>;
 }
+
+/** Text whose SAP codes ("(V-2002)", "DC-CKR", "STO-000001") never break at their hyphen. */
+export function NoBreakCodes({ text }: { text: string }) {
+  const parts = text.split(/(\(?[A-Z]{1,4}-[A-Z0-9]+\)?)/);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 ? (
+          <span key={i} className="whitespace-nowrap">
+            {p}
+          </span>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
+}

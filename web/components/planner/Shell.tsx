@@ -173,7 +173,7 @@ export function TopBar({
         <div className="flex min-w-0 flex-1 items-center gap-4">
           {lane && <RouteShield code={lane} />}
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-base font-black" data-testid="case-title" title={caseTitle(record)}>
+            <span className="text-base leading-tight font-black" data-testid="case-title">
               {caseTitle(record)}
             </span>
             <span className="font-mono text-xs text-ink-2">

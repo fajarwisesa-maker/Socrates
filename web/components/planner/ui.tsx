@@ -179,6 +179,7 @@ export function Kpi({
   note,
   icon,
   tone = "neutral",
+  compact = false,
   className,
   testId,
 }: {
@@ -187,6 +188,8 @@ export function Kpi({
   note?: ReactNode;
   icon?: ReactNode;
   tone?: Tone;
+  /** five in a row (Impact): smaller value and padding so 1280 px still fits */
+  compact?: boolean;
   className?: string;
   testId?: string;
 }) {
@@ -194,7 +197,8 @@ export function Kpi({
   return (
     <div
       className={cn(
-        "flex h-full min-w-0 flex-col gap-1 rounded-[12px] p-5",
+        "flex h-full min-w-0 flex-col gap-1 rounded-[12px]",
+        compact ? "p-4" : "p-5",
         "transition-[background-color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-standard)]",
         t.surface,
         className,
@@ -206,7 +210,7 @@ export function Kpi({
         <span className={cn("text-xs font-bold tracking-[0.06em] uppercase", t.label)}>{label}</span>
         {icon && <IconTile tone={tone}>{icon}</IconTile>}
       </div>
-      <div className={cn("text-3xl leading-tight font-black whitespace-nowrap", t.strong)}>{value}</div>
+      <div className={cn("leading-tight font-black whitespace-nowrap", compact ? "text-[1.5rem]" : "text-3xl", t.strong)}>{value}</div>
       {note && <p className="text-sm text-ink-2">{note}</p>}
     </div>
   );

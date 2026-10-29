@@ -46,7 +46,7 @@ export function Journey({
   const now = useNow(1000);
   return (
     <nav aria-label="Agent stages" data-testid="timeline" className="bg-road-white px-8 py-2 shadow-[inset_0_-1px_0_var(--hairline)]">
-      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <ol className="flex flex-wrap items-center gap-x-1 gap-y-1">
         {STAGES.map((stage, i) => {
           const info = stageInfo(stage, events, record, now);
           const post = postState(stage, info.state, events, record);
@@ -66,7 +66,7 @@ export function Journey({
                 : null;
           return (
             <li key={stage} data-testid={`stage-${stage}`} data-state={info.state} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden className={cn("h-0.5 w-4 transition-colors duration-[var(--dur-base)]", post === "pending" ? "bg-hairline" : "bg-sign-green")} />}
+              {i > 0 && <span aria-hidden className={cn("h-0.5 w-3 transition-colors duration-[var(--dur-base)]", post === "pending" ? "bg-hairline" : "bg-sign-green")} />}
               <button
                 type="button"
                 onClick={() => onPage(STAGE_PAGE[stage])}

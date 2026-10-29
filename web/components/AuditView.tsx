@@ -333,7 +333,7 @@ function Checkpoints({ rows, onPick }: { rows: { entry: AuditEntry; stage: strin
   }
   const count = (rs: { entry: AuditEntry }[], t: TypeId) => rs.filter((r) => typeOf(r.entry.kind) === t).length;
   return (
-    <ol className="mb-4 flex flex-col gap-2" data-testid="audit-checkpoints">
+    <ol className="mb-4 flex flex-col divide-y divide-divider" data-testid="audit-checkpoints">
       {runs.map((run, i) => {
         const first = run.rows[0].entry;
         const last = run.rows.at(-1)!.entry;
@@ -345,7 +345,7 @@ function Checkpoints({ rows, onPick }: { rows: { entry: AuditEntry; stage: strin
         ].filter(([n]) => (n as number) > 0);
         const denied = run.rows.some((r) => r.entry.kind === "policy_decision" && !(r.entry.payload as { allowed?: boolean }).allowed);
         return (
-          <li key={i} className="flex items-start gap-4 rounded-[12px] bg-surface p-4 inset-ring inset-ring-hairline">
+          <li key={i} className="flex items-start gap-4 rounded-[8px] px-2 py-3 transition-colors duration-[var(--dur-fast)] hover:bg-row-hover">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sign-green text-xs font-black text-white">
               {String(i + 1).padStart(2, "0")}
             </span>

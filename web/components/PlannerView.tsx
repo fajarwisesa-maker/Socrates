@@ -11,6 +11,7 @@ import { agentsByStage } from "@/lib/present";
 import type { CaseState } from "@/lib/useCase";
 import { useAudit, useInbox } from "@/lib/useInbox";
 import ArchitectureView from "./ArchitectureView";
+import { Reveal } from "./Reveal";
 import AuditView from "./AuditView";
 import { CARD } from "./signs";
 import { cn } from "@/lib/utils";
@@ -73,11 +74,13 @@ export default function PlannerView({ state, modeSwitch }: { state: CaseState; m
     body = <Evaluation />;
   } else if (page === "architecture") {
     body = (
-      <div className="flex flex-col gap-8" data-testid="architecture-page">
-        <PageHeader title="Architecture" description="What runs where in this session: the agent, the model, the solver, the policy engine and SAP." />
-        <section className={cn(CARD, "p-6")} data-testid="architecture-panel">
+      <div className="flex flex-col gap-6" data-testid="architecture-page">
+        <Reveal>
+          <PageHeader title="Architecture" description="What runs where in this session: the agent, the model, the solver, the policy engine and SAP." />
+        </Reveal>
+        <Reveal delay={50} as="section" className={cn(CARD, "p-6")} testId="architecture-panel">
           <ArchitectureView config={config} record={record} />
-        </section>
+        </Reveal>
       </div>
     );
   } else if (!caseId) {
@@ -86,13 +89,17 @@ export default function PlannerView({ state, modeSwitch }: { state: CaseState; m
     body = <LoadingCase />;
   } else if (page === "audit") {
     body = (
-      <div className="flex flex-col gap-8" data-testid="audit-page">
+      <div className="flex flex-col gap-6" data-testid="audit-page">
+        <Reveal>
         <PageHeader
           chips={audit?.verification ? <Chip tone={audit.verification.ok ? "ok" : "risk"}>{audit.verification.ok ? "Chain intact" : "Chain broken"}</Chip> : undefined}
           title="Audit trail"
           description="Every stage change, tool call, policy decision, model call and approval, hash-chained so an edit shows."
         />
-        <AuditView caseId={caseId} version={events.length} defaultOpen checkpoints />
+        </Reveal>
+        <Reveal delay={50}>
+          <AuditView caseId={caseId} version={events.length} defaultOpen checkpoints />
+        </Reveal>
       </div>
     );
   } else {
@@ -144,12 +151,28 @@ function NoCase({ onSignals }: { onSignals: () => void }) {
   );
 }
 
-/** Shown only when loading a case takes longer than 300 ms, so a quick switch never flashes. */
+/** First load of a case: a skeleton shaped like the Overview grid, shown only after 300 ms so a
+ *  quick switch never flashes; nothing jumps when the data arrives. */
 function LoadingCase() {
   const slow = useDelayed(300);
+  if (!slow) return null;
   return (
-    <p className="text-lg font-bold" role="status">
-      {slow ? "Loading case…" : ""}
-    </p>
+    <div className="fade-in flex flex-col gap-6" role="status" data-testid="loading-case">
+      <span className="sr-only">Loading case…</span>
+      <div className="flex flex-col gap-2" aria-hidden>
+        <div className="h-5 w-40 rounded-full bg-chip-muted-bg" />
+        <div className="h-9 w-64 rounded-[8px] bg-chip-muted-bg" />
+        <div className="h-5 w-full max-w-2xl rounded-full bg-chip-muted-bg" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-hidden>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={cn(CARD, "h-32")} />
+        ))}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-12" aria-hidden>
+        <div className={cn(CARD, "h-80 xl:col-span-8")} />
+        <div className={cn(CARD, "h-80 xl:col-span-4")} />
+      </div>
+    </div>
   );
 }

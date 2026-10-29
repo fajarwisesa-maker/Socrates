@@ -110,7 +110,7 @@ export function stageNote(stage: Stage, record: CaseRecord, events: CaseEvent[],
       return rejected.length ? { text: `${rejected.join(", ")} rejected`, tone: "risk" } : { text: "All rules pass", tone: "muted" };
     }
     case "ACT":
-      return info.state === "waiting" ? { text: "Waiting for you", tone: "needs" } : { text: "Done", tone: "muted" };
+      return info.state === "waiting" ? { text: "Needs you", tone: "needs" } : { text: "Done", tone: "muted" };
     case "VERIFY": {
       if (record.status === "REOPENED") return { text: "Re-opened", tone: "risk" };
       if (record.status === "RESOLVED") return { text: "Verified in SAP", tone: "ok" };

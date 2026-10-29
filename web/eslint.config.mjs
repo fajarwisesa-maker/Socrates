@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".next-smoke/**",
+    ".next-*/**", // other distDirs (SIAGA_DIST_DIR), e.g. a second dev server
     "test-results/**",
     "playwright-report/**",
     "out/**",
