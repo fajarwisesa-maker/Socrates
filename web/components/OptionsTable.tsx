@@ -111,7 +111,7 @@ export default function OptionsTable({ record }: { record: CaseRecord | null }) 
                   className="whitespace-nowrap pr-3 text-right font-semibold tabular-nums"
                   title={o.result.infeasible_reason ?? undefined}
                 >
-                  {o.result.status === "optimal" ? o.total_cost_display : "—"}
+                  {o.result.status === "optimal" ? o.total_cost_display : "infeasible"}
                 </td>
                 <td className="pr-3 text-xs text-ink-2">{dayLabel(record.day0, latest)}</td>
                 <td className="pr-3">{maxTier !== null && <TierBadge tier={maxTier} />}</td>

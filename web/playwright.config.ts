@@ -11,6 +11,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.SIAGA_WEB_URL ?? "http://127.0.0.1:3000",
     viewport: { width: 1600, height: 1000 },
+    // tests never wait on animations (lib/motion.ts and globals.css end them at once);
+    // e2e/motion.spec.ts turns motion back on to check nothing waits for it
+    contextOptions: { reducedMotion: "reduce" },
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
   reporter: [["list"]],

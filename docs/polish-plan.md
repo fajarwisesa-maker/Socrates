@@ -42,3 +42,21 @@ use stay (moved text stays in the DOM where a test reads it).
 - Every Presenter step must still fit 1280×720, Act with the map most of all.
 - Lighter hairlines must keep 3:1 for UI boundaries where they carry meaning (approval sign,
   rejected sign); the 2 px asphalt and red hairlines do.
+
+## Outcome (Phase 5)
+
+Done as planned, with these choices:
+
+- The KM post, StatusPlate and map plates keep their small internal paddings (2 to 4 px):
+  they set the plate height for the type, so the spacing scale applies to layout only.
+- The Presenter approval sign is two rows, not one: title and Reject on the first, cost,
+  approve-by and Approve on the second. One row did not fit the 1280 px canvas.
+- The Presenter rail is 13rem (208 px), not 184 px: the notes ("Check in 30 s") are
+  `text-xl` there.
+- Executed actions in Presenter Act are one line under the map; the map shows the route.
+- Removed inbox cases fade out at their old place; a case moving between groups rises in
+  its new group (it is new there).
+- Mid-transition colours of the approval sign (yellow to green over 320 ms) have low
+  contrast for those frames; the end states pass the washout check.
+
+Checks: see CLAUDE.md, "Polish pass".

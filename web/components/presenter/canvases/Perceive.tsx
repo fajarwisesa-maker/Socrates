@@ -29,9 +29,9 @@ export function PerceiveCanvas({ record, round }: { record: CaseRecord; round: n
 
   const value: Record<(typeof SHOWN_FIELDS)[number], string> = {
     cause: CAUSE[d.cause] ?? d.cause,
-    location: d.location ?? "—",
+    location: d.location ?? "unknown",
     delay: delay(d.delay_hours_min, d.delay_hours_max),
-    references: d.references.length ? d.references.map((r) => `PO ${r}`).join(", ") : "—",
+    references: d.references.length ? d.references.map((r) => `PO ${r}`).join(", ") : "none",
   };
   const progression = d.confidence_basis?.progression ?? [];
   // v2 glosses make the WhatsApp bubble taller; the PDF phrases then flow on shared lines

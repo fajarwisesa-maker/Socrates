@@ -58,7 +58,7 @@ export function pct(p: number): string {
 
 /** Presenter short form in juta (millions): 340000000 -> "Rp 340 jt", 11400000 -> "Rp 11,4 jt". */
 export function juta(amount: number | null | undefined): string {
-  if (amount === null || amount === undefined) return "—";
+  if (amount === null || amount === undefined) return "none";
   const sign = amount < 0 ? "−" : "";
   const abs = Math.abs(amount);
   if (abs >= 1e9) return `${sign}Rp ${trim1(abs / 1e9)} M`;

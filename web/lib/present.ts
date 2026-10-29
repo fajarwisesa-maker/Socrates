@@ -100,7 +100,7 @@ export function actionTitle(a: CaseAction, labels: Labels | undefined, dest: str
 }
 
 export function eta(record: CaseRecord, iso: string | null | undefined): string {
-  return iso ? dayShort(record.day0, iso) : "—";
+  return iso ? dayShort(record.day0, iso) : "unknown";
 }
 
 /** Events of one stage, split into rounds (one list per "started" event). */

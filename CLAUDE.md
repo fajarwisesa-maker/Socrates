@@ -34,6 +34,7 @@ and the decisions made. **Update it every phase.**
 | UI redesign (`SIAGA_ui_redesign_prompt.md`) | step 1 audit (`docs/ui-redesign-audit.md`), backend additions A–G, step 2 visual system + Presenter shell, step 3 stage canvases, step 4 wow moments + pacing, steps 1–6 done (projector check passes; `make rehearse N=10` 10/10 on fake and replay) |
 | Bedrock removed (owner, 28 Oct) | no Amazon Bedrock anywhere: Claude runs on SAP AI Core only (`LLM_PROVIDER=sap_genai`, the default); `LLM_FALLBACK`, `BEDROCK_MODEL_ID`, `make aws-check` / `aws-probe` / `agentcore-check` gone; `make install` works outside a git checkout |
 | "Jalan Tol" redesign (`docs/redesign-prompt.md`, 28 Oct) | phases 0–5 done (`docs/redesign-plan.md`): toll-road sign system, lane map, Planner inbox + case file, Presenter on the same components, audit filters and the Plan stage restyle (added 28 Oct) |
+| Polish pass (`docs/polish-prompt.md`, 29 Oct) | phases 0–5 done (`docs/polish-plan.md`): spacing scale, one heavy sign per screen, hairline cards, copy budget, motion system, lane map that draws and morphs, Presenter story timing |
 
 ## How to run
 
@@ -826,6 +827,76 @@ moments, drawer, error states and the washout check stay).
 - Results: pytest 305 passed (2 skipped); web smoke 9/9 (+4 skipped), replay 8/8 (+4),
   multi 10/10 (+3), WhatsApp in + reply 11/11 (+2), AWS stand-in 10/10 (+3); rehearse 3/3,
   rehearse-fault 1/1; replay with the network cut 1/1 and its smoke 8/8.
+
+### Polish pass (owner's brief `docs/polish-prompt.md`, 29 Oct)
+
+Plan and audit: `docs/polish-plan.md`. Front end only; no backend change. Same colours,
+Overpass, sign components and lane map as the Jalan Tol redesign.
+
+- **Spacing:** `--space-1..7` (4 to 64 px) in `globals.css`; components use the Tailwind
+  steps 1 / 2 / 4 / 6 / 8 / 12 / 16, which are the same values. Page padding 32, section gap
+  32, card padding 24 (approval sign 24 × 32), rail 184, margin 264. Sub-4px paddings inside
+  plates and chips are the only exception.
+- **Borders:** one heavy sign per screen (the case header's gantry; on the inbox the Needs
+  you sign). Impact panel, outcome and candidates are flat green (`GantrySign flat`). Cards
+  are `CARD` / `<Card>`: white, 12 px radius, a 1 px `#D8D9D3` inset ring (`inset-ring`), no
+  drop shadow (`--shadow-card` / `--shadow-sign` are now empty). Plates and chips are filled;
+  white ones carry the hairline. Tables have `#E4E4DC` row dividers only. Buttons: primary
+  filled, secondary (`outline`) a 2 px asphalt inset ring, tertiary `link`. Borders are inset
+  shadows or outlines, so a state change never changes a size.
+- **Copy:** the KM rail shows names only, plus a note on the current stage ("Waiting for
+  you") or a flagged one ("B1 rejected"); the agent is named in the stage heading
+  ("KM 2 · Impact Agent"; v1: "KM 2 of 7") and stays on the rail for screen readers
+  (`agent-X`, `rail-agent-X` are `sr-only`). The impact panel is three numbers and the solver
+  label ("Not yet" before a value; exact rupiah in the tooltip and for screen readers, testid
+  `exposure`). The tool-call budget line moved to the margin. Inbox: Needs you as full signs,
+  the other groups as one row of count tiles, then their cases. Tier legend: plate + two to
+  four words (`TIER_MEANING.short`).
+- **Approval sign** (`ApprovalSign.tsx`): one `<section>` whose background, text colour and
+  inset ring transition over 320 ms (yellow + asphalt ring, green, white + red ring).
+  Up front: what, cost and deadline, if you reject, buttons. Why / agent summary, other
+  options and the binding note are under "Show details" (`aria-expanded`, `hidden`, still in
+  the DOM). The SAP document rises in after 120 ms; `aria-live` announces the result; in
+  Planner focus moves to "Go to Verify" (`go-verify`). Presenter: a two-row sign under the
+  map with a short title ("Bridge PO · 500 ctn") and "Approve PO".
+- **Motion** (`lib/motion.ts`, `components/Reveal.tsx`, `components/Figure.tsx`, tokens and
+  keyframes `rise`, `fade-in`, `fade-out`, `highlight`, `stamp` in `globals.css`):
+  - `usePrefersReducedMotion()` (alias `useReducedMotion`) honours the OS setting and
+    `?motion=off` (`html[data-motion="off"]`); a CSS rule ends every animation and
+    transition at once in both cases, and `MotionConfig` follows it.
+  - `useCountUp(target, format, {delay, enabled, id})`: requestAnimationFrame, ease-out
+    900 ms, once per page load per `id`, last frame exactly `format(target)`. `Figure`
+    reserves the final string's width so a counting number never moves the layout.
+  - `useWithExits` keeps a removed list item for 200 ms to fade it out; `useDelayed(300)`
+    keeps quick loads from flashing "Loading…".
+  - Planner: heading and content keyed by stage (rise 8 px, 60 ms stagger); case status is
+    one plate that changes colour; Verify shows "Checking both documents in SAP…" then the
+    outcome rises in. Inbox cards and tiles rise once; polling re-renders nothing visible
+    (a pixel diff of the same view 2.5 s apart is identical).
+- **Lane map:** road ids are per source, so a road changes state in place. Each road draws
+  from its source to the DC (`pathLength=1`, `stroke-dashoffset` over 800 ms, two frames
+  after it mounts; dash 1 / gap 1.1 / start 1.05 so no round cap shows before the draw) and
+  draws again when its action is executed; overlays fade in after. Plates and markers change
+  colour over 400 ms; the DC's coverage plate ("1.000 ctn covered") turns 400 ms after the
+  routes. The map is outside the keyed stage content: Planner `StageSheet` (top on Assess /
+  Verify, bottom on Act via CSS order) and Presenter `StageCanvas`, which is now mounted once
+  per case and renders one `Frame` for Assess, Act and Verify (`assessHead` / `AssessBody`,
+  `actHead` / `ActBody`, `verifyHead` / `VerifyBody`), so Act to Verify morphs.
+- **Presenter story** (4.3): Perceive phrases between 0.7 and 1.5 s, fields 1.9 s, links,
+  PDF phrases 2.5 s, confidence 2.9 s (Perceive dwell min 3.8 s). Assess: map fades in and
+  draws, orders at 0.5 s, shortfall at 1.6 s. Simulate: cards 140 ms apart. Reflect: REJECTED
+  pops 280 ms (1.3 to 1), B2 rises with CHOSEN. Act: routes draw, the sign at 0.6 s; Next reads
+  "after your approval" and Space / → wait while the latest step has a pending decision.
+  Verify: "Re-reading … in SAP", routes and plate turn, outcome at 1.0 s, time at 1.6 s.
+- **Tests:** Playwright runs with `contextOptions.reducedMotion: "reduce"`;
+  `e2e/motion.spec.ts` turns motion on and clicks Approve at its centre on the first frame
+  it is visible (Presenter and Planner; Planner also checks focus and the announcement). It
+  runs in the replay smoke too. The pacing test reads "Not yet" instead of "—".
+- **Dev note:** after token or class changes, a stale Turbopack cache served the old CSS
+  (dark hairlines); stop `next dev` by PID, `rm -rf web/.next/dev`, start again.
+- Results: pytest 292 passed (2 skipped); web smoke 11/11 (+4 skipped), replay 10/10 (+4),
+  multi + fake delay + PII 12/12 (+3), replay with the network cut 10/10 (+4); rehearse 3/3,
+  rehearse-fault 1/1, replay rehearse with the network cut 1/1; washout check passes.
 
 ### Bedrock removed (owner's decision, 28 Oct)
 
