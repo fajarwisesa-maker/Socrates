@@ -151,8 +151,8 @@ export function Overview({ record, events, approvals, onPage }: CasePageProps) {
             {record.actions.length === 0 && <li className="text-sm text-ink-2">No action yet.</li>}
             {record.actions.map((x) => {
               const ap = approvals.find((p) => p.approval_id === x.approval_id);
-              const tone = x.status === "EXECUTED" ? "ok" : x.status === "PENDING_APPROVAL" ? "needs" : x.status === "REJECTED" || x.status === "EXPIRED" ? "risk" : "muted";
-              const text = x.status === "EXECUTED" ? (x.tier >= 3 ? "Approved · done" : "Done by SIAGA") : x.status === "PENDING_APPROVAL" ? "Needs you" : x.status === "REJECTED" ? "Rejected" : x.status === "EXPIRED" ? "Too late" : x.status.toLowerCase();
+              const tone = x.status === "EXECUTED" ? "ok" : x.status === "PENDING_APPROVAL" ? "needs" : x.status === "REJECTED" || x.status === "EXPIRED" || x.status === "WITHDRAWN" ? "risk" : "muted";
+              const text = x.status === "EXECUTED" ? (x.tier >= 3 ? "Approved · done" : "Done by SIAGA") : x.status === "PENDING_APPROVAL" ? "Needs you" : x.status === "REJECTED" ? "Rejected" : x.status === "EXPIRED" ? "Too late" : x.status === "WITHDRAWN" ? "Withdrawn" : x.status.toLowerCase();
               return (
                 <li key={x.action_id} className="flex items-center gap-4 border-b border-divider py-2 last:border-0">
                   <Chip tone="muted">Tier {x.tier}</Chip>

@@ -7,6 +7,9 @@ import { juta, thousands } from "@/lib/format";
 import { actionTitle } from "@/lib/present";
 import type { Approval, CaseAction, CaseRecord } from "@/lib/types";
 
+/** Actions that will not run: rejected, approved too late, or withdrawn on escalation. */
+const CLOSED: CaseAction["status"][] = ["REJECTED", "EXPIRED", "WITHDRAWN"];
+
 const VERB: Record<string, string> = {
   stock_transfer: "Transfer",
   alternate_supplier: "Bridge PO",
@@ -16,7 +19,7 @@ const VERB: Record<string, string> = {
 
 /** Act's headline: what SIAGA did, and what waits for a person. */
 export function actHead(record: CaseRecord): { headline: string; tone: "ink" | "risk" } {
-  const shown = record.actions.filter((a) => a.status !== "REJECTED" && a.status !== "EXPIRED");
+  const shown = record.actions.filter((a) => !CLOSED.includes(a.status));
   const executed = shown.filter((a) => a.status === "EXECUTED");
   const pending = shown.filter((a) => a.status === "PENDING_APPROVAL");
   const autoDone = executed.filter((a) => a.tier <= 2);
@@ -43,8 +46,8 @@ export function actHead(record: CaseRecord): { headline: string; tone: "ink" | "
  * per action SIAGA did alone, then the approval sign, which turns green in place.
  */
 export function ActBody({ record, approvals, onDecided }: { record: CaseRecord; approvals: Approval[]; onDecided: () => void }) {
-  const shown = record.actions.filter((a) => a.status !== "REJECTED" && a.status !== "EXPIRED");
-  const dropped = record.actions.filter((a) => a.status === "REJECTED" || a.status === "EXPIRED");
+  const shown = record.actions.filter((a) => !CLOSED.includes(a.status));
+  const dropped = record.actions.filter((a) => CLOSED.includes(a.status));
   return (
     <div className="flex h-full flex-col gap-4">
       {shown.slice(0, 3).map((a) => {
@@ -63,7 +66,7 @@ export function ActBody({ record, approvals, onDecided }: { record: CaseRecord; 
             {dropped.map((a, i) => (
               <span key={a.action_id}>
                 {i > 0 && ", "}
-                {VERB[a.kind] ?? a.kind} · {juta(a.cost)} ({a.status === "EXPIRED" ? "approved too late" : "rejected"}
+                {VERB[a.kind] ?? a.kind} · {juta(a.cost)} ({a.status === "EXPIRED" ? "approved too late" : a.status === "WITHDRAWN" ? "withdrawn" : "rejected"}
                 {a.rejection_reason ? <span lang="id">: “{a.rejection_reason}”</span> : null})
               </span>
             ))}

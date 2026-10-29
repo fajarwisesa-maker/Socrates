@@ -32,7 +32,7 @@ CaseStatus = Literal[
     "FAILED",
 ]
 Stage = Literal["PERCEIVE", "ASSESS", "PLAN", "SIMULATE", "REFLECT", "ACT", "VERIFY", "CASE"]
-ApprovalStatus = Literal["PENDING", "APPROVED", "REJECTED", "EXPIRED"]
+ApprovalStatus = Literal["PENDING", "APPROVED", "REJECTED", "EXPIRED", "WITHDRAWN"]
 
 
 class CaseRecord(BaseModel):
@@ -134,6 +134,7 @@ class CaseStore(Protocol):
     def decide_approval(
         self, approval_id: str, approve: bool, by: str, reason: str | None = None
     ) -> ApprovalRequest: ...
+    def withdraw_pending(self, case_id: str, reason: str) -> list[ApprovalRequest]: ...
     def find_valid_approval(
         self, case_id: str, tool: str, args: dict[str, Any]
     ) -> ApprovalRequest | None: ...
@@ -317,6 +318,25 @@ class SqliteCaseStore:
             )
             self._put_approval(a)
             return a
+
+    def withdraw_pending(self, case_id: str, reason: str) -> list[ApprovalRequest]:
+        """Close every pending approval of a case that left AWAITING_APPROVAL (escalated),
+        so no one can approve an action the agent no longer runs."""
+        out = []
+        with self._lock:
+            for a in self.list_approvals(case_id):
+                if a.status == "PENDING":
+                    a = a.model_copy(
+                        update={
+                            "status": "WITHDRAWN",
+                            "decided_at": self._now(),
+                            "decided_by": "siaga",
+                            "reason": reason,
+                        }
+                    )
+                    self._put_approval(a)
+                    out.append(a)
+        return out
 
     def find_valid_approval(
         self, case_id: str, tool: str, args: dict[str, Any]

@@ -107,6 +107,7 @@ class MultiAgentOrchestrator(Agent):
 
     def _escalate(self, case_id: str, reason: str) -> None:
         case = self.store.get_case(case_id)
+        self._withdraw_pending(case_id)
         self.store.update_case(case_id, status="ESCALATED", escalation_reason=reason)
         self.rt.audit.append(case_id, "case", {"event": "escalated", "reason": reason})
         self._event(

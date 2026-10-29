@@ -308,3 +308,24 @@ def test_throttle_exhausted_escalates_as_model_unavailable(runtime, signals):
     assert c.escalation_reason.startswith("LLM unavailable: SAP AI Core HTTP 429 (throttled)")
     retries = [e for e in runtime.store.list_events(c.case_id) if e.status == "retry"]
     assert [e.data["attempt"] for e in retries] == [2, 3, 4, 5, 6]
+
+
+def test_escalation_withdraws_pending_approvals(agent, runtime, signals):
+    # a live run raised a Tier 3 card, then escalated before the next one: the card stayed
+    # PENDING and Approve answered 409. An escalated case runs nothing, so it is withdrawn.
+    c = run_golden(agent, signals)
+    approval_id = pending(c)["approval_id"]
+    agent._escalate(c.case_id, "tool-call budget of 20 used up")
+    c = runtime.store.get_case(c.case_id)
+    assert c.status == "ESCALATED"
+    a = runtime.store.get_approval(approval_id)
+    assert a.status == "WITHDRAWN" and a.decided_by == "siaga"
+    assert (
+        next(x for x in c.actions if x.get("approval_id") == approval_id)["status"] == "WITHDRAWN"
+    )
+    assert runtime.store.find_valid_approval(c.case_id, a.tool, a.args) is None
+    with pytest.raises(ValueError):
+        runtime.store.decide_approval(approval_id, True, by="planner")
+    withdrawn = [e.payload for e in runtime.audit.read(c.case_id) if e.kind == "approval"]
+    assert withdrawn[-1]["event"] == "withdrawn"
+    assert runtime.audit.verify(c.case_id).ok

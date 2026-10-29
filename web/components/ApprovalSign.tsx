@@ -92,8 +92,18 @@ export function ApprovalSign({
   const title = approvalTitle(action, record, c.what);
   const pendingNow = approval.status === "PENDING" && action?.status === "PENDING_APPROVAL";
   const expired = approval.status === "EXPIRED" || action?.status === "EXPIRED";
-  const tone: Tone =
-    approval.status === "APPROVED" && !expired ? "approved" : !pendingNow && approval.status !== "PENDING" ? "rejected" : "pending";
+  // withdrawn: the case was escalated before anyone decided (older cases kept it PENDING)
+  const withdrawn =
+    approval.status === "WITHDRAWN" ||
+    action?.status === "WITHDRAWN" ||
+    (approval.status === "PENDING" && ["ESCALATED", "RESOLVED", "REOPENED", "FAILED"].includes(record.status));
+  const tone: Tone = withdrawn
+    ? "rejected"
+    : approval.status === "APPROVED" && !expired
+      ? "approved"
+      : !pendingNow && approval.status !== "PENDING"
+        ? "rejected"
+        : "pending";
   const left = countdown(c.approve_by, now);
   const approveBy = c.approve_by ? dayShort(record.day0, c.approve_by) : null;
   const rejectedOptions = record.critic_findings.filter((f) => !f.clean);
@@ -123,7 +133,9 @@ export function ApprovalSign({
         ? `Approved. ${title}: SAP document ${sapRef}.`
         : `Approved. Creating the ${object} in SAP.`
       : tone === "rejected"
-        ? expired
+        ? withdrawn
+          ? "Withdrawn. The case was handed to a human planner."
+          : expired
           ? "Approved too late. SIAGA replans."
           : "Rejected. SIAGA keeps what was done and replans."
         : "";
@@ -132,7 +144,9 @@ export function ApprovalSign({
     tone === "approved"
       ? `Approved · Tier ${action?.tier ?? 3}`
       : tone === "rejected"
-        ? expired
+        ? withdrawn
+          ? "Withdrawn · not decided"
+          : expired
           ? "Approved too late"
           : "Rejected"
         : presenter
@@ -170,10 +184,12 @@ export function ApprovalSign({
 
   const rejectedLine = tone === "rejected" && (
     <Reveal delay={120} as="p" className="text-base">
-      {expired
+      {withdrawn
+        ? `SIAGA handed the case to a human planner before this was decided, so it can no longer be approved here.${record.escalation_reason ? ` Reason: ${record.escalation_reason}` : ""}`
+        : expired
         ? "The approve-by time had passed, so SIAGA replanned."
         : `${approval.decided_by === "planner" || !approval.decided_by ? "You" : approval.decided_by} rejected this. SIAGA keeps what was done and replans.`}
-      {approval.reason && (
+      {approval.reason && !withdrawn && (
         <>
           {" "}Reason: <span lang="id">“{approval.reason}”</span>
         </>

@@ -189,11 +189,37 @@ class Agent:
 
     def _escalate(self, case_id: str, reason: str) -> None:
         case = self.store.get_case(case_id)
+        self._withdraw_pending(case_id)
         self.store.update_case(case_id, status="ESCALATED", escalation_reason=reason)
         self.rt.audit.append(case_id, "case", {"event": "escalated", "reason": reason})
         self._event(
             case_id, case.stage or "CASE", "escalated", "Escalated to a human planner", reason
         )
+
+    def _withdraw_pending(self, case_id: str) -> None:
+        """An escalated case runs no more actions: approvals raised before the escalation
+        (e.g. the first of two Tier 3 cards) are withdrawn, so none can be approved."""
+        withdrawn = self.store.withdraw_pending(case_id, "case escalated to a human planner")
+        if not withdrawn:
+            return
+        ids = {a.approval_id for a in withdrawn}
+        case = self.store.get_case(case_id)
+        actions = [
+            {**a, "status": "WITHDRAWN"} if a.get("approval_id") in ids else a for a in case.actions
+        ]
+        self.store.update_case(case_id, actions=actions)
+        for a in withdrawn:
+            self.rt.audit.append(
+                case_id,
+                "approval",
+                {
+                    "event": "withdrawn",
+                    "approval_id": a.approval_id,
+                    "status": a.status,
+                    "by": "siaga",
+                    "reason": a.reason,
+                },
+            )
 
     def _sap_day0(self) -> str | None:
         day0 = getattr(self.rt.sap, "day0", None)  # mock SAP only; display anchor

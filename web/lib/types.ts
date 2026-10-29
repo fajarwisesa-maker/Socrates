@@ -83,7 +83,7 @@ export interface CaseAction {
   cost: number;
   cost_display: string;
   eta: string | null;
-  status: "PLANNED" | "EXECUTED" | "PENDING_APPROVAL" | "REJECTED" | "EXPIRED" | "FAILED";
+  status: "PLANNED" | "EXECUTED" | "PENDING_APPROVAL" | "REJECTED" | "EXPIRED" | "WITHDRAWN" | "FAILED";
   sap_ref?: string | null;
   approval_id?: string;
   rejection_reason?: string | null;
@@ -112,7 +112,7 @@ export interface ApprovalCard {
 export interface Approval {
   approval_id: string;
   tool: string;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "WITHDRAWN";
   card: ApprovalCard;
   decided_by: string | null;
   decided_at: string | null;
